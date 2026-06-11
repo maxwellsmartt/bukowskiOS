@@ -4340,6 +4340,31 @@
         "pendingSync": "A budget change is waiting to sync. We'll retry automatically when the connection is back.",
         "localOnly": "Showing a target saved on this device. The cloud has not confirmed a newer version."
       },
+      "command": {
+        "aria": "Project financial control",
+        "eyebrow": "Financial control",
+        "body": "Review spend, target, pending crew fees and cost-bearing incidents from one place.",
+        "emptyValue": "No target",
+        "targetHint": "Set a target to see progress, remaining budget and over-budget alerts.",
+        "remainingHint": "{{amount}} remains against the defined target.",
+        "overHint": "This project is over target by {{amount}}.",
+        "syncCloud": "Target syncs to the cloud when connected.",
+        "syncLocal": "Target is kept locally until cloud sync returns.",
+        "status": {
+          "noTarget": "No target",
+          "paused": "Comparison paused",
+          "over": "Over target",
+          "onTrack": "On budget"
+        },
+        "metrics": {
+          "status": "Status",
+          "target": "Target",
+          "spent": "Spent",
+          "pendingCrew": "Pending crew",
+          "incidents": "Incidents",
+          "incidentsValue": "{{open}} open · {{high}} high"
+        }
+      },
       "currency": {
         "mixedWarning": "This project has entries in multiple currencies ({{currencies}}). We do not combine currencies without a confirmed conversion, so the progress bar is paused.",
         "targetMismatch": "The target is in {{targetCurrency}}, but entries are in {{entryCurrency}}. Update the target or convert the entries before comparing."

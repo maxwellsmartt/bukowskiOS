@@ -4344,6 +4344,31 @@
         "pendingSync": "Hay un cambio de presupuesto pendiente de sincronizar. Se reintentará automáticamente cuando vuelva la conexión.",
         "localOnly": "Mostrando una meta guardada en este dispositivo. La nube no confirmó una versión más reciente."
       },
+      "command": {
+        "aria": "Control financiero del proyecto",
+        "eyebrow": "Control financiero",
+        "body": "Revisa gasto, meta, honorarios pendientes e incidentes con impacto económico desde un solo lugar.",
+        "emptyValue": "Sin meta",
+        "targetHint": "Define una meta para ver avance, restante y alertas de sobrepresupuesto.",
+        "remainingHint": "Quedan {{amount}} disponibles frente a la meta definida.",
+        "overHint": "El proyecto excede la meta por {{amount}}.",
+        "syncCloud": "Meta sincronizada con la nube cuando hay conexión.",
+        "syncLocal": "Meta guardada localmente hasta que vuelva la nube.",
+        "status": {
+          "noTarget": "Sin meta",
+          "paused": "Comparación pausada",
+          "over": "Excedido",
+          "onTrack": "En presupuesto"
+        },
+        "metrics": {
+          "status": "Estado",
+          "target": "Meta",
+          "spent": "Gastado",
+          "pendingCrew": "Crew pendiente",
+          "incidents": "Incidentes",
+          "incidentsValue": "{{open}} abiertos · {{high}} alta"
+        }
+      },
       "currency": {
         "mixedWarning": "Hay entradas en varias monedas ({{currencies}}). No combinamos monedas sin una conversión confirmada, por eso la barra de progreso queda pausada.",
         "targetMismatch": "La meta está en {{targetCurrency}}, pero las entradas están en {{entryCurrency}}. Actualiza la meta o convierte las entradas antes de comparar."

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, Pencil, Plus, Save, X } from "lucide-react";
+import { ArrowUpRight, Pencil, Plus, Save, Users, X } from "lucide-react";
 
 import { useSession } from "@app/providers/SessionProvider";
 import { useToast } from "@app/providers/ToastProvider";
@@ -9,7 +9,6 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useCollaboratorFeeSummary, useFinanceEntries } from "@features/finance/useFinanceData";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
-import { HelpHint } from "@shared/components/HelpHint";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
@@ -143,6 +142,9 @@ const buildCurrencyBreakdown = (rows: FinanceEntryLike[]) => {
   });
   return totals;
 };
+
+const projectBudgetFinanceColumnKeys = ["date", "type", "category", "amount", "status"];
+const projectBudgetIncidentColumnKeys = ["incident", "responsible", "severity", "costEstimate", "status"];
 
 export const ProjectBudgetPage = () => {
   const { t } = useTranslation();
@@ -398,6 +400,22 @@ export const ProjectBudgetPage = () => {
   const targetUsage = canCompareBudgetTarget && budgetTarget > 0 ? Math.min(1, totals.expense / budgetTarget) : 0;
   const remainingTarget = canCompareBudgetTarget && budgetTarget ? budgetTarget - totals.expense : 0;
   const overTarget = canCompareBudgetTarget && budgetTarget != null && totals.expense > budgetTarget;
+  const openIncidentCount = data.incidents.filter((incident) => incident.status !== "Resolved").length;
+  const highSeverityIncidentCount = data.incidents.filter((incident) => incident.status !== "Resolved" && incident.severity === "High").length;
+  const targetStatusLabel =
+    budgetTarget == null
+      ? t("projects.budget.command.status.noTarget")
+      : !canCompareBudgetTarget
+        ? t("projects.budget.command.status.paused")
+        : overTarget
+          ? t("projects.budget.command.status.over")
+          : t("projects.budget.command.status.onTrack");
+  const targetStatusTone =
+    budgetTarget == null || !canCompareBudgetTarget
+      ? "is-warning"
+      : overTarget
+        ? "is-critical"
+        : "is-success";
   const currencyWarning = hasMixedCurrencies
     ? t("projects.budget.currency.mixedWarning", { currencies: entryCurrencies.join(", ") })
     : targetCurrencyMismatch
@@ -409,29 +427,71 @@ export const ProjectBudgetPage = () => {
       <SectionHeader title={t("projects.budget.title")} />
 
       <div className="project-workspace-scroll">
-        <SurfaceCard
-          className="project-scroll-card"
-          title={t("projects.budget.target.title")}
-          aside={
-            !isEditingTarget ? (
-              <div className="surface-card-actions">
-                <HelpHint
-                  body={
-                    cloudEnabled
-                      ? t("projects.budget.target.cloudHelp")
-                      : t("projects.budget.target.localHelp")
-                  }
-                />
-                <button className="ghost-control" onClick={() => setIsEditingTarget(true)} type="button">
-                  <Pencil size={13} />
-                  <span>{budgetTarget != null ? t("projects.budget.target.update") : t("projects.budget.target.set")}</span>
-                </button>
-              </div>
-            ) : null
-          }
-        >
+        <section className="project-budget-command-card" aria-label={t("projects.budget.command.aria")}>
+          <div className="project-budget-command-copy">
+            <span>{t("projects.budget.command.eyebrow")}</span>
+            <strong>{data.project.name}</strong>
+            <p>{t("projects.budget.command.body")}</p>
+          </div>
+
+          <div className="project-budget-command-metrics">
+            <div className={`project-budget-command-metric ${targetStatusTone}`}>
+              <span>{t("projects.budget.command.metrics.status")}</span>
+              <strong>{targetStatusLabel}</strong>
+            </div>
+            <div className="project-budget-command-metric">
+              <span>{t("projects.budget.command.metrics.target")}</span>
+              <strong>{budgetTarget != null ? formatCurrency(budgetTarget, displayCurrency) : t("projects.budget.command.emptyValue")}</strong>
+            </div>
+            <div className={`project-budget-command-metric${overTarget ? " is-critical" : ""}`}>
+              <span>{t("projects.budget.command.metrics.spent")}</span>
+              <strong>
+                {canCompareBudgetTarget
+                  ? formatCurrency(totals.expense, displayCurrency)
+                  : formatCurrencyBreakdown(totalsByCurrency, "expense")}
+              </strong>
+            </div>
+            <div className={`project-budget-command-metric${collaboratorSummary.pendingAmount ? " is-warning" : ""}`}>
+              <span>{t("projects.budget.command.metrics.pendingCrew")}</span>
+              <strong>{formatCurrency(collaboratorSummary.pendingAmount, displayCurrency)}</strong>
+            </div>
+            <button
+              className={`project-budget-command-metric${highSeverityIncidentCount ? " is-critical" : openIncidentCount ? " is-warning" : " is-success"}`}
+              onClick={() => {
+                if (projectId) {
+                  navigate(`/projects/${projectId}/incidents`);
+                }
+              }}
+              type="button"
+            >
+              <span>{t("projects.budget.command.metrics.incidents")}</span>
+              <strong>{t("projects.budget.command.metrics.incidentsValue", { open: openIncidentCount, high: highSeverityIncidentCount })}</strong>
+            </button>
+          </div>
+
+          <div className="project-budget-command-actions">
+            <button
+              className="action-primary-button action-row-button"
+              onClick={() =>
+                navigate(projectId ? `/finance/entries?new=1&projectId=${encodeURIComponent(projectId)}` : "/finance/entries")
+              }
+              type="button"
+            >
+              <Plus size={14} />
+              <span>{t("projects.budget.finance.addEntry")}</span>
+            </button>
+            <button className="ghost-control action-row-button" onClick={() => setIsEditingTarget(true)} type="button">
+              <Pencil size={13} />
+              <span>{budgetTarget != null ? t("projects.budget.target.update") : t("projects.budget.target.set")}</span>
+            </button>
+            <button className="ghost-control action-row-button" onClick={() => navigate("/finance/collaborators")} type="button">
+              <Users size={14} />
+              <span>{t("projects.budget.collaborators.open")}</span>
+            </button>
+          </div>
+
           {isEditingTarget ? (
-            <div className="agent-form-grid">
+            <div className="project-budget-target-editor">
               <label className="field-block">
                 <span className="field-label">{t("projects.budget.target.amount", { currency: displayCurrency })}</span>
                 <input
@@ -442,7 +502,7 @@ export const ProjectBudgetPage = () => {
                   value={targetDraft}
                 />
               </label>
-              <div className="surface-card-actions" style={{ gridColumn: "1 / -1", justifyContent: "flex-end" }}>
+              <div className="surface-card-actions">
                 <button
                   className="ghost-control"
                   disabled={isSavingTarget}
@@ -466,7 +526,7 @@ export const ProjectBudgetPage = () => {
                 </button>
               </div>
             </div>
-          ) : budgetTarget != null ? (
+          ) : (
             <>
               {targetSyncState !== "synced" ? (
                 <div className={`action-feedback ${targetSyncState === "pending" ? "action-feedback-warning" : "action-feedback-info"}`}>
@@ -476,26 +536,6 @@ export const ProjectBudgetPage = () => {
                 </div>
               ) : null}
               {currencyWarning ? <div className="action-feedback action-feedback-warning">{currencyWarning}</div> : null}
-              <div className="project-budget-grid">
-                <div className="summary-row">
-                  <span className="summary-label">{t("projects.budget.target.target")}</span>
-                  <span className="summary-value">{formatCurrency(budgetTarget, displayCurrency)}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">{t("projects.budget.target.spent")}</span>
-                  <span className="summary-value">
-                    {canCompareBudgetTarget
-                      ? formatCurrency(totals.expense, displayCurrency)
-                      : formatCurrencyBreakdown(totalsByCurrency, "expense")}
-                  </span>
-                </div>
-                {canCompareBudgetTarget ? (
-                  <div className="summary-row">
-                    <span className="summary-label">{overTarget ? t("projects.budget.target.overBy") : t("projects.budget.target.remaining")}</span>
-                    <span className="summary-value">{formatCurrency(Math.abs(remainingTarget), displayCurrency)}</span>
-                  </div>
-                ) : null}
-              </div>
               {canCompareBudgetTarget ? (
                 <div
                   aria-label={t("projects.budget.target.usageAria", { percent: (targetUsage * 100).toFixed(0) })}
@@ -509,19 +549,20 @@ export const ProjectBudgetPage = () => {
                 </div>
               ) : null}
             </>
-          ) : (
-            <>
-              {targetSyncState === "pending" ? (
-                <div className="action-feedback action-feedback-warning">{t("projects.budget.target.pendingSync")}</div>
-              ) : null}
-              <p className="surface-card-subtitle">
-                {t("projects.budget.target.noTargetPrefix")} <strong>{t("projects.budget.target.set")}</strong> {t("projects.budget.target.noTargetSuffix")}
-              </p>
-            </>
           )}
-        </SurfaceCard>
+          <div className="project-budget-command-footnote">
+            <span>
+              {budgetTarget != null && canCompareBudgetTarget
+                ? t(overTarget ? "projects.budget.command.overHint" : "projects.budget.command.remainingHint", {
+                    amount: formatCurrency(Math.abs(remainingTarget), displayCurrency),
+                  })
+                : t("projects.budget.command.targetHint")}
+            </span>
+            <span>{cloudEnabled ? t("projects.budget.command.syncCloud") : t("projects.budget.command.syncLocal")}</span>
+          </div>
+        </section>
 
-        <div className="project-detail-support-grid">
+        <div className="project-budget-overview-grid">
           <SurfaceCard className="project-scroll-card" title={t("projects.budget.summary.title")}>
             <div className="project-budget-grid">
               <div className="summary-row">
@@ -595,100 +636,104 @@ export const ProjectBudgetPage = () => {
           </SurfaceCard>
         </div>
 
-        <SurfaceCard
-          className="project-scroll-card"
-          aside={
-            <div className="surface-card-actions">
-              <button className="ghost-control" onClick={() => navigate("/finance/entries")} type="button">
-                <ArrowUpRight size={14} />
-                <span>{t("projects.budget.finance.open")}</span>
-              </button>
-              <button
-                className="action-primary-button"
-                onClick={() =>
-                  navigate(projectId ? `/finance/entries?new=1&projectId=${encodeURIComponent(projectId)}` : "/finance/entries")
-                }
-                type="button"
-              >
-                <Plus size={14} />
-                <span>{t("projects.budget.finance.addEntry")}</span>
-              </button>
-            </div>
-          }
-          title={t("projects.budget.finance.title")}
-        >
-          {financeError ? <div className="action-feedback action-feedback-error">{financeError}</div> : null}
-          {showEntriesEmpty ? (
-            <GuidedEmptyState
-              title={t("projects.budget.finance.emptyTitle")}
-              body={t("projects.budget.finance.emptyBody")}
-              actionLabel={t("projects.budget.finance.addFinanceEntry")}
-              onAction={() => navigate("/finance/entries")}
-              tone="subtle"
-            />
-          ) : (
+        <div className="project-budget-table-grid">
+          <SurfaceCard
+            className="project-scroll-card project-budget-table-card"
+            aside={
+              <div className="surface-card-actions">
+                <button className="ghost-control" onClick={() => navigate("/finance/entries")} type="button">
+                  <ArrowUpRight size={14} />
+                  <span>{t("projects.budget.finance.open")}</span>
+                </button>
+                <button
+                  className="action-primary-button"
+                  onClick={() =>
+                    navigate(projectId ? `/finance/entries?new=1&projectId=${encodeURIComponent(projectId)}` : "/finance/entries")
+                  }
+                  type="button"
+                >
+                  <Plus size={14} />
+                  <span>{t("projects.budget.finance.addEntry")}</span>
+                </button>
+              </div>
+            }
+            title={t("projects.budget.finance.title")}
+          >
+            {financeError ? <div className="action-feedback action-feedback-error">{financeError}</div> : null}
+            {showEntriesEmpty ? (
+              <GuidedEmptyState
+                title={t("projects.budget.finance.emptyTitle")}
+                body={t("projects.budget.finance.emptyBody")}
+                actionLabel={t("projects.budget.finance.addFinanceEntry")}
+                onAction={() => navigate(projectId ? `/finance/entries?new=1&projectId=${encodeURIComponent(projectId)}` : "/finance/entries")}
+                tone="subtle"
+              />
+            ) : (
+              <DataTable
+                columns={[
+                  { key: "date", label: t("projects.budget.finance.columns.date"), render: (row) => row.date },
+                  { key: "type", label: t("projects.budget.finance.columns.type"), render: (row) => row.type },
+                  { key: "category", label: t("projects.budget.finance.columns.category"), render: (row) => row.category },
+                  { key: "reference", label: t("projects.budget.finance.columns.reference"), render: (row) => row.reference },
+                  { key: "amount", label: t("projects.budget.finance.columns.amount"), align: "right", render: (row) => row.amount },
+                  { key: "status", label: t("projects.budget.finance.columns.status"), render: (row) => row.status },
+                ]}
+                defaultVisibleColumnKeys={projectBudgetFinanceColumnKeys}
+                getRowId={(row) => row.id}
+                maxHeight="min(46vh, 440px)"
+                persistKey="project-budget-finance-entries-v2"
+                rows={projectEntries}
+                onRowClick={(row) => navigate(`/finance/entries?focus=${encodeURIComponent(row.id)}`)}
+              />
+            )}
+          </SurfaceCard>
+
+          <SurfaceCard className="project-scroll-card project-budget-table-card" title={t("projects.budget.incidents.title")}>
             <DataTable
               columns={[
-                { key: "date", label: t("projects.budget.finance.columns.date"), render: (row) => row.date },
-                { key: "type", label: t("projects.budget.finance.columns.type"), render: (row) => row.type },
-                { key: "category", label: t("projects.budget.finance.columns.category"), render: (row) => row.category },
-                { key: "reference", label: t("projects.budget.finance.columns.reference"), render: (row) => row.reference },
-                { key: "amount", label: t("projects.budget.finance.columns.amount"), align: "right", render: (row) => row.amount },
-                { key: "status", label: t("projects.budget.finance.columns.status"), render: (row) => row.status },
+                {
+                  key: "incident",
+                  label: t("projects.budget.incidents.columns.incident"),
+                  width: 260,
+                  minWidth: 190,
+                  render: (row) => (
+                    <div className="identity-cell">
+                      <span className="identity-title">{row.title}</span>
+                      <span className="identity-meta">{row.asset}</span>
+                    </div>
+                  ),
+                },
+                { key: "responsible", label: t("projects.budget.incidents.columns.responsible"), width: 160, minWidth: 128, render: (row) => row.responsible },
+                {
+                  key: "severity",
+                  label: t("projects.budget.incidents.columns.severity"),
+                  width: 100,
+                  minWidth: 88,
+                  render: (row) => t(`incidents.severity.${row.severity}`, { defaultValue: row.severity }),
+                },
+                { key: "costEstimate", label: t("projects.budget.incidents.columns.estimate"), align: "right", width: 120, minWidth: 100, render: (row) => row.costEstimate },
+                {
+                  key: "status",
+                  label: t("projects.budget.incidents.columns.status"),
+                  width: 110,
+                  minWidth: 92,
+                  render: (row) => t(`incidents.statuses.${row.status}`, { defaultValue: row.status }),
+                },
               ]}
+              defaultVisibleColumnKeys={projectBudgetIncidentColumnKeys}
               getRowId={(row) => row.id}
-              maxHeight="min(40vh, 360px)"
-              persistKey="project-budget-finance-entries"
-              rows={projectEntries}
-              onRowClick={(row) => navigate(`/finance/entries?focus=${encodeURIComponent(row.id)}`)}
+              maxHeight="min(46vh, 440px)"
+              persistKey="project-budget-incidents-v2"
+              rows={data.incidents}
+              emptyMessage={t("projects.budget.incidents.empty")}
+              onRowClick={(row) => {
+                if (projectId) {
+                  navigate(`/projects/${projectId}/incidents?focus=${encodeURIComponent(row.id)}`);
+                }
+              }}
             />
-          )}
-        </SurfaceCard>
-
-        <SurfaceCard className="project-scroll-card" title={t("projects.budget.incidents.title")}>
-          <DataTable
-            columns={[
-              {
-                key: "incident",
-                label: t("projects.budget.incidents.columns.incident"),
-                width: 260,
-                minWidth: 190,
-                render: (row) => (
-                  <div className="identity-cell">
-                    <span className="identity-title">{row.title}</span>
-                    <span className="identity-meta">{row.asset}</span>
-                  </div>
-                ),
-              },
-              { key: "responsible", label: t("projects.budget.incidents.columns.responsible"), width: 160, minWidth: 128, render: (row) => row.responsible },
-              {
-                key: "severity",
-                label: t("projects.budget.incidents.columns.severity"),
-                width: 100,
-                minWidth: 88,
-                render: (row) => t(`incidents.severity.${row.severity}`, { defaultValue: row.severity }),
-              },
-              { key: "costEstimate", label: t("projects.budget.incidents.columns.estimate"), align: "right", width: 120, minWidth: 100, render: (row) => row.costEstimate },
-              {
-                key: "status",
-                label: t("projects.budget.incidents.columns.status"),
-                width: 110,
-                minWidth: 92,
-                render: (row) => t(`incidents.statuses.${row.status}`, { defaultValue: row.status }),
-              },
-            ]}
-            getRowId={(row) => row.id}
-            maxHeight="min(40vh, 360px)"
-            persistKey="project-budget-incidents"
-            rows={data.incidents}
-            emptyMessage={t("projects.budget.incidents.empty")}
-            onRowClick={(row) => {
-              if (projectId) {
-                navigate(`/projects/${projectId}/incidents?focus=${encodeURIComponent(row.id)}`);
-              }
-            }}
-          />
-        </SurfaceCard>
+          </SurfaceCard>
+        </div>
       </div>
     </div>
   );
