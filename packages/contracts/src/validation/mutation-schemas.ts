@@ -797,15 +797,20 @@ const createCatalogCrewSchema = z
       .array(
         z
           .object({
+            id: optionalTrimmedString,
             bankName: optionalTrimmedString,
             accountHolder: optionalTrimmedString,
-            accountNumber: nonEmptyString,
+            accountNumber: optionalTrimmedString,
             accountType: optionalTrimmedString,
             routingNumber: optionalTrimmedString,
             notes: optionalTrimmedString,
             maskInPreview: z.boolean().optional(),
           })
-          .strict(),
+          .strict()
+          .refine((entry) => Boolean(entry.id || entry.accountNumber), {
+            message: "Bank account number is required for new bank accounts.",
+            path: ["accountNumber"],
+          }),
       )
       .optional(),
   })

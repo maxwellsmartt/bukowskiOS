@@ -3156,7 +3156,7 @@
   "catalog": {
     "title": "Catálogo",
     "unavailable": "Catálogo no disponible: {{message}}",
-    "loading": "Cargando ubicaciones, crew, clientes y categorías.",
+    "loading": "Cargando ubicaciones, personal, clientes y categorías.",
     "searchPlaceholder": "Buscar {{entity}}",
     "fallbacks": {
       "record": "Registro de catálogo",
@@ -3172,8 +3172,8 @@
         "plural": "Departamentos"
       },
       "crew": {
-        "singular": "miembro de crew",
-        "plural": "Crew"
+        "singular": "persona",
+        "plural": "Personal"
       },
       "client": {
         "singular": "cliente",
@@ -3204,7 +3204,7 @@
       "code": "Código",
       "company": "Empresa",
       "contact": "Contacto",
-      "crewName": "Nombre de crew",
+      "crewName": "Nombre de persona",
       "department": "Departamento",
       "description": "Descripción",
       "documentId": "Documento",
@@ -3220,12 +3220,14 @@
       "package": "Paquete",
       "phone": "Teléfono",
       "primaryQr": "QR principal",
+      "pur": "PUR",
       "qrReady": "QR listo",
       "qty": "Cant.",
       "ready": "Listo",
+      "rnc": "RNC",
       "role": "Rol",
       "roleLabel": "Etiqueta de rol",
-      "routing": "Routing / ABA",
+      "routing": "Ruta bancaria / ABA",
       "status": "Estado",
       "supportEmail": "Correo de soporte",
       "telegram": "Telegram",
@@ -3243,7 +3245,7 @@
       "blankTemplate": "Plantilla vacía",
       "clearMessage": "Limpiar mensaje",
       "clearSelection": "Limpiar selección",
-      "closePreview": "Cerrar preview de catálogo",
+      "closePreview": "Cerrar vista previa de catálogo",
       "export": "Exportar",
       "exportCsv": "Exportar CSV",
       "exportSelected": "Exportar selección ({{count}})",
@@ -3253,12 +3255,13 @@
     },
     "empty": {
       "title": "Empieza con tus registros compartidos",
-      "body": "Agrega ubicaciones, departamentos, crew, clientes y categorías para que el resto de la app se mantenga consistente.",
+      "body": "Agrega ubicaciones, departamentos, personal, clientes y categorías para que el resto de la app se mantenga consistente.",
       "tipLocations": "Crea ubicaciones antes de mover inventario",
-      "tipCrew": "Agrega departamentos y crew antes de asignar trabajo",
+      "tipCrew": "Agrega departamentos y personal antes de asignar trabajo",
       "tipCategories": "Define categorías antes de crear equipos",
       "action": "Crear primera ubicación",
-      "table": "Aún no hay {{entity}}. Crea el primer registro aquí."
+      "table": "Aún no hay {{entity}}. Crea el primer registro aquí.",
+      "search": "No hay {{entity}} que coincidan con esta búsqueda."
     },
     "messages": {
       "update": "Actualización de catálogo"
@@ -3308,7 +3311,7 @@
       "packageContents": "Contenido del paquete",
       "pickRoleFirst": "Elige un rol primero. Puedes refinar permisos luego en Usuarios y acceso.",
       "reused": "Qué se reutilizará",
-      "rolePreview": "Preview del rol",
+      "rolePreview": "Vista previa del rol",
       "selectRole": "Elige un rol"
     },
     "telegram": {
@@ -3333,14 +3336,16 @@
       "addAccount": "Agregar cuenta",
       "appAccess": "Acceso a la app",
       "attachFiles": "Adjuntar archivos",
-      "attachmentsAfterCreate": "Los adjuntos aparecerán aquí después de crear el perfil de crew.",
+      "attachmentsAfterCreate": "Los adjuntos aparecerán aquí después de crear el perfil.",
       "bankAccounts": "Cuentas bancarias",
       "close": "Cerrar editor de catálogo",
       "create": "Crear",
       "documents": "Documentos",
       "editTitle": "Editar {{entity}}",
+      "enterAccountNumber": "Escribe un número nuevo para reemplazar el guardado",
       "freeInStock": "Libre en stock",
       "kitMembers": "Miembros del kit",
+      "kitStockHelp": "Crear un kit no reserva stock; la disponibilidad se valida al asignarlo.",
       "linkedTo": "Vinculado a {{user}}.",
       "liveOn": "Activo en {{project}}{{unit}}",
       "moreDetails": "Más detalles",
@@ -3354,19 +3359,20 @@
       "removeBankAccountNumber": "Quitar cuenta bancaria {{number}}",
       "removeDocumentNamed": "Quitar {{name}}",
       "removeFile": "Quitar archivo",
-      "saveFirstForFiles": "Guarda este perfil de crew primero para adjuntar archivos.",
+      "saveFirstForFiles": "Guarda este perfil primero para adjuntar archivos.",
       "uploading": "Subiendo…"
     },
     "errors": {
       "assignKit": "La asignación del kit falló.",
-      "createUser": "No se pudo crear el usuario desde este registro de crew.",
+      "createUser": "No se pudo crear el usuario desde este registro de personal.",
       "exportCsv": "No se pudo exportar este CSV.",
       "importCsv": "No se pudo importar este CSV.",
+      "loadUsers": "No tienes permiso para gestionar usuarios desde este catálogo.",
       "pickRole": "Elige un rol antes de crear el usuario.",
       "previewCsv": "No se pudo previsualizar este CSV.",
-      "removeDocument": "No se pudo quitar el documento de crew.",
+      "removeDocument": "No se pudo quitar el documento de personal.",
       "save": "No se pudo guardar este registro de catálogo.",
-      "uploadDocument": "No se pudo subir el documento de crew."
+      "uploadDocument": "No se pudo subir el documento de personal."
     }
   },
   "projectSetup": {

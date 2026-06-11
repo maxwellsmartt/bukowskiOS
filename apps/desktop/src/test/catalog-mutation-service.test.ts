@@ -115,6 +115,22 @@ describe("catalog mutation service", () => {
 
     expect(kitTemplate.csvText.trim()).toBe("code,name,description,notes,assetQuantities,isActive");
 
+    const clientTemplate = mutations.buildCsvExport({
+      workspaceId: "workspace-metadata",
+      entityType: "client",
+      mode: "template",
+    });
+
+    expect(clientTemplate.csvText.trim()).toBe("name,contactName,email,phone,rnc,notes,isActive");
+
+    const productionCompanyTemplate = mutations.buildCsvExport({
+      workspaceId: "workspace-metadata",
+      entityType: "production_company",
+      mode: "template",
+    });
+
+    expect(productionCompanyTemplate.csvText.trim()).toBe("name,contactName,email,phone,pur,notes,isActive");
+
     mutations.createEntity({
       workspaceId: "workspace-metadata",
       entityType: "department",
@@ -172,6 +188,59 @@ describe("catalog mutation service", () => {
     snapshot = reads.getCatalogSnapshot();
     expect(snapshot.departments.find((row) => row.code === "ZZCSV2")?.isActive).toBe(true);
     expect(snapshot.departments.find((row) => row.code === "ZZCSV1")?.isActive).toBe(false);
+
+    const clientCsv = [
+      "name,contactName,email,phone,rnc,notes,isActive",
+      "CSV Client,Ops,client@test.dev,+1 809 555 0101,1-30-99999-1,Client import,true",
+    ].join("\n");
+
+    const clientImportResult = mutations.importCsv({
+      workspaceId: "workspace-metadata",
+      entityType: "client",
+      csvText: clientCsv,
+      strategy: "merge",
+    });
+
+    expect(clientImportResult.created).toBe(1);
+
+    const productionCompanyCsv = [
+      "name,contactName,email,phone,pur,notes,isActive",
+      "CSV Production,Prod Desk,prod@test.dev,+1 809 555 0202,PUR-2026-001,Production import,true",
+    ].join("\n");
+
+    const productionCompanyImportResult = mutations.importCsv({
+      workspaceId: "workspace-metadata",
+      entityType: "production_company",
+      csvText: productionCompanyCsv,
+      strategy: "merge",
+    });
+
+    expect(productionCompanyImportResult.created).toBe(1);
+
+    snapshot = reads.getCatalogSnapshot();
+    const importedClient = snapshot.clients.find((row) => row.name === "CSV Client");
+    const importedProductionCompany = snapshot.productionCompanies.find((row) => row.name === "CSV Production");
+
+    expect(importedClient?.rnc).toBe("1-30-99999-1");
+    expect(importedProductionCompany?.pur).toBe("PUR-2026-001");
+
+    const clientExport = mutations.buildCsvExport({
+      workspaceId: "workspace-metadata",
+      entityType: "client",
+      mode: "data",
+      ids: [importedClient!.id],
+    });
+    const productionCompanyExport = mutations.buildCsvExport({
+      workspaceId: "workspace-metadata",
+      entityType: "production_company",
+      mode: "data",
+      ids: [importedProductionCompany!.id],
+    });
+
+    expect(clientExport.csvText).toContain("rnc");
+    expect(clientExport.csvText).toContain("1-30-99999-1");
+    expect(productionCompanyExport.csvText).toContain("pur");
+    expect(productionCompanyExport.csvText).toContain("PUR-2026-001");
 
     cleanup();
   });

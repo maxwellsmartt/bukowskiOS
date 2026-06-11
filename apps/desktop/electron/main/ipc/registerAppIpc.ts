@@ -8,6 +8,7 @@ import {
   appUsersSnapshotReadArgsSchema,
   createAppUserSchema,
   deleteAppUserSchema,
+  DEFAULT_WORKSPACE_ID,
   emptyReadArgsSchema,
   revokeTelegramLinkSchema,
   setAppUserActiveSchema,
@@ -15,6 +16,7 @@ import {
 } from "@contracts";
 import { ipcChannels } from "@contracts/ipc/channels";
 import { assertAllowedExternalUrl } from "../security/securityConfig";
+import type { WorkspaceAccessGuard } from "../services/auth/workspaceAccessGuard";
 import {
   getFreshStoredUserClaims,
   getFreshStoredUserId,
@@ -28,6 +30,7 @@ import { safeHandle, safeHandleRead, safeHandleReadWithSchema } from "./ipcSafeH
 
 type RegisterAppIpcOptions = {
   database: DatabaseSync;
+  workspaceAccess: WorkspaceAccessGuard;
   appSettings: {
     getDocumentsRoot: () => string;
     getDocumentsRootSetting: () => string | null;
@@ -423,6 +426,7 @@ const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) =
 
 export const registerAppIpc = ({
   database,
+  workspaceAccess,
   appSettings,
   getDiagnosticsSnapshot,
   getSupportSnapshot,
@@ -462,8 +466,16 @@ export const registerAppIpc = ({
   }));
   safeHandleReadWithSchema(ipcChannels.app.getDiagnostics, emptyReadArgsSchema, () => getDiagnosticsSnapshot());
   safeHandleReadWithSchema(ipcChannels.app.getSupportSnapshot, emptyReadArgsSchema, () => getSupportSnapshot());
-  safeHandleReadWithSchema(ipcChannels.app.getUsersSnapshot, appUsersSnapshotReadArgsSchema, (_event, query) =>
-    getUsersSnapshot(query as import("@contracts").AppUsersSnapshotQuery | undefined),
+  safeHandleReadWithSchema(ipcChannels.app.getUsersSnapshot, appUsersSnapshotReadArgsSchema, async (_event, query) => {
+    const workspaceId = (query as import("@contracts").AppUsersSnapshotQuery | undefined)?.workspaceId ?? DEFAULT_WORKSPACE_ID;
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId,
+      action: "view workspace users",
+      accessLevel: "read",
+      requiredPermission: "users.manage",
+    });
+    return getUsersSnapshot(query as import("@contracts").AppUsersSnapshotQuery | undefined);
+  },
   );
   safeHandleReadWithSchema(
     ipcChannels.app.getLocalWorkspaces,
@@ -474,31 +486,71 @@ export const registerAppIpc = ({
   safeHandle(
     ipcChannels.app.createUser,
     createAppUserSchema,
-    (_event, input) => createUser(input),
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "create workspace users",
+        accessLevel: "write",
+        requiredPermission: "users.manage",
+      });
+      return createUser(input);
+    },
     "The app could not create that user.",
   );
   safeHandle(
     ipcChannels.app.updateUser,
     updateAppUserSchema,
-    (_event, input) => updateUser(input),
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "update workspace users",
+        accessLevel: "write",
+        requiredPermission: "users.manage",
+      });
+      return updateUser(input);
+    },
     "The app could not update that user.",
   );
   safeHandle(
     ipcChannels.app.setUserActive,
     setAppUserActiveSchema,
-    (_event, input) => setUserActive(input),
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "update workspace users",
+        accessLevel: "write",
+        requiredPermission: "users.manage",
+      });
+      return setUserActive(input);
+    },
     "The app could not change that user state.",
   );
   safeHandle(
     ipcChannels.app.revokeTelegramLink,
     revokeTelegramLinkSchema,
-    (_event, input) => revokeTelegramLink(input),
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "update workspace users",
+        accessLevel: "write",
+        requiredPermission: "users.manage",
+      });
+      return revokeTelegramLink(input);
+    },
     "The app could not revoke Telegram access for that user.",
   );
   safeHandle(
     ipcChannels.app.deleteUser,
     deleteAppUserSchema,
-    (_event, input) => deleteUser(input),
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "delete workspace users",
+        accessLevel: "write",
+        requiredPermission: "users.manage",
+      });
+      return deleteUser(input);
+    },
     "The app could not remove that user.",
   );
   safeHandle(

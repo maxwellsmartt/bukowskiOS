@@ -23,6 +23,7 @@ import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListToolbar } from "@shared/components/ListToolbar";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
+import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
@@ -168,12 +169,14 @@ const buildCatalogPreviewRows = (entityType: CatalogEntityType, row: Record<stri
         { label: t("catalog.fields.contact"), value: String(row.contactName ?? "—") },
         { label: t("catalog.fields.email"), value: String(row.email ?? "—") },
         { label: t("catalog.fields.phone"), value: String(row.phone ?? "—") },
+        { label: t("catalog.fields.rnc"), value: String(row.rnc ?? "—") },
       ];
     case "production_company":
       return [
         { label: t("catalog.fields.contact"), value: String(row.contactName ?? "—") },
         { label: t("catalog.fields.email"), value: String(row.email ?? "—") },
         { label: t("catalog.fields.phone"), value: String(row.phone ?? "—") },
+        { label: t("catalog.fields.pur"), value: String(row.pur ?? "—") },
       ];
     case "manufacturer":
       return [
@@ -225,6 +228,7 @@ const catalogSortOptionsByEntityType: Record<CatalogEntityType, Array<ListSortOp
     { value: "contactName", label: "Contact", labelKey: "catalog.fields.contact", columnKey: "contactName" },
     { value: "email", label: "Email", labelKey: "catalog.fields.email", columnKey: "email" },
     { value: "phone", label: "Phone", labelKey: "catalog.fields.phone", columnKey: "phone" },
+    { value: "rnc", label: "RNC", labelKey: "catalog.fields.rnc", columnKey: "rnc" },
     { value: "status", label: "Status", labelKey: "catalog.fields.status" },
   ],
   production_company: [
@@ -232,6 +236,7 @@ const catalogSortOptionsByEntityType: Record<CatalogEntityType, Array<ListSortOp
     { value: "contactName", label: "Contact", labelKey: "catalog.fields.contact", columnKey: "contactName" },
     { value: "email", label: "Email", labelKey: "catalog.fields.email", columnKey: "email" },
     { value: "phone", label: "Phone", labelKey: "catalog.fields.phone", columnKey: "phone" },
+    { value: "pur", label: "PUR", labelKey: "catalog.fields.pur", columnKey: "pur" },
     { value: "status", label: "Status", labelKey: "catalog.fields.status" },
   ],
   manufacturer: [
@@ -257,6 +262,7 @@ const catalogSortOptionsByEntityType: Record<CatalogEntityType, Array<ListSortOp
 };
 
 type ImportDialogState = {
+  entityType: CatalogEntityType;
   fileName: string;
   csvText: string;
   strategy: CatalogCsvImportStrategy;
@@ -394,6 +400,7 @@ export const CatalogPage = () => {
   const { data: projects } = useProjectsData();
   const [activeTab, setActiveTab] = useState<CatalogEntityType>("crew");
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const importPreviewRequestIdRef = useRef(0);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const exportTriggerRef = useRef<HTMLButtonElement | null>(null);
   const activeSortOptions = useMemo(
@@ -445,6 +452,7 @@ export const CatalogPage = () => {
   const [kitAssignError, setKitAssignError] = useState<string | null>(null);
   const [isSubmittingKitAssign, setIsSubmittingKitAssign] = useState(false);
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
+  const [usersSnapshotError, setUsersSnapshotError] = useState<string | null>(null);
   const [isCreatingCrewUser, setIsCreatingCrewUser] = useState(false);
   const [createCrewUserRoleId, setCreateCrewUserRoleId] = useState("");
 
@@ -453,9 +461,16 @@ export const CatalogPage = () => {
       return;
     }
 
-    const nextUsersSnapshot = await window.bukowskiApp.getUsersSnapshot({ workspaceId: activeWorkspaceId });
-    setUsersSnapshot(nextUsersSnapshot);
-    setCreateCrewUserRoleId((current) => current || nextUsersSnapshot.roles[0]?.id || "");
+    try {
+      const nextUsersSnapshot = await window.bukowskiApp.getUsersSnapshot({ workspaceId: activeWorkspaceId });
+      setUsersSnapshot(nextUsersSnapshot);
+      setUsersSnapshotError(null);
+      setCreateCrewUserRoleId((current) => current || nextUsersSnapshot.roles[0]?.id || "");
+    } catch (nextError) {
+      setUsersSnapshot(emptyUsersSnapshot);
+      setUsersSnapshotError(getUserFacingErrorMessage(nextError, t("catalog.errors.loadUsers")));
+      setCreateCrewUserRoleId("");
+    }
   };
 
   useEffect(() => {
@@ -530,6 +545,7 @@ export const CatalogPage = () => {
           { key: "contactName", label: t("catalog.fields.contact"), width: 150, minWidth: 120, render: (row) => (row.contactName as string) || "—" },
           { key: "email", label: t("catalog.fields.email"), width: 180, minWidth: 150, render: (row) => (row.email as string) || "—" },
           { key: "phone", label: t("catalog.fields.phone"), width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
+          { key: "rnc", label: t("catalog.fields.rnc"), width: 130, minWidth: 110, render: (row) => (row.rnc as string) || "—" },
         ],
       },
       {
@@ -542,6 +558,7 @@ export const CatalogPage = () => {
           { key: "contactName", label: t("catalog.fields.contact"), width: 160, minWidth: 130, render: (row) => (row.contactName as string) || "—" },
           { key: "email", label: t("catalog.fields.email"), width: 180, minWidth: 150, render: (row) => (row.email as string) || "—" },
           { key: "phone", label: t("catalog.fields.phone"), width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
+          { key: "pur", label: t("catalog.fields.pur"), width: 130, minWidth: 110, render: (row) => (row.pur as string) || "—" },
           {
             key: "status",
             label: t("catalog.fields.status"),
@@ -807,10 +824,21 @@ export const CatalogPage = () => {
     }
   };
 
-  const refreshImportPreview = async (strategy: CatalogCsvImportStrategy, csvText: string, fileName: string) => {
+  const refreshImportPreview = async (
+    strategy: CatalogCsvImportStrategy,
+    csvText: string,
+    fileName: string,
+    entityType: CatalogEntityType = activeTab,
+  ) => {
+    const requestId = importPreviewRequestIdRef.current + 1;
+    importPreviewRequestIdRef.current = requestId;
     try {
-      const preview = await previewCatalogCsvImport({ workspaceId: activeWorkspaceId, entityType: activeTab, csvText, strategy });
+      const preview = await previewCatalogCsvImport({ workspaceId: activeWorkspaceId, entityType, csvText, strategy });
+      if (requestId !== importPreviewRequestIdRef.current) {
+        return;
+      }
       setImportDialogState({
+        entityType,
         fileName,
         csvText,
         strategy,
@@ -818,7 +846,11 @@ export const CatalogPage = () => {
         error: null,
       });
     } catch (nextError) {
+      if (requestId !== importPreviewRequestIdRef.current) {
+        return;
+      }
       setImportDialogState({
+        entityType,
         fileName,
         csvText,
         strategy,
@@ -912,7 +944,7 @@ export const CatalogPage = () => {
       setIsSubmittingImport(true);
       const { result } = await importCatalogCsv({
         workspaceId: activeWorkspaceId,
-        entityType: activeTab,
+        entityType: importDialogState.entityType,
         csvText: importDialogState.csvText,
         strategy: importDialogState.strategy,
       });
@@ -1013,6 +1045,7 @@ export const CatalogPage = () => {
               key={tab.key}
               className={`action-mode-button${activeTab === tab.key ? " active" : ""}`}
                 onClick={() => {
+                  importPreviewRequestIdRef.current += 1;
                   setActiveTab(tab.key);
                   setEditorMode(null);
                   setEditorError(null);
@@ -1046,7 +1079,7 @@ export const CatalogPage = () => {
                 onClick={() => importInputRef.current?.click()}
                 type="button"
               >
-                <Download size={14} />
+                <Upload size={14} />
                 <span>{t("catalog.actions.importCsv")}</span>
               </button>
               <button
@@ -1057,7 +1090,7 @@ export const CatalogPage = () => {
                 ref={exportTriggerRef}
                 type="button"
               >
-                <Upload size={14} />
+                <Download size={14} />
                 <span>{selectedCount ? t("catalog.actions.exportSelected", { count: selectedCount }) : t("catalog.actions.exportCsv")}</span>
                 <ChevronDown size={14} />
               </button>
@@ -1152,7 +1185,11 @@ export const CatalogPage = () => {
           <DataTable
             activeRowId={activePreviewIds[activeTab]}
             columns={activeTabConfig.columns}
-            emptyMessage={t("catalog.empty.table", { entity: activeTabConfig.label.toLowerCase() })}
+            emptyMessage={
+              catalogControls.searchValue.trim()
+                ? t("catalog.empty.search", { entity: activeTabConfig.label.toLowerCase() })
+                : t("catalog.empty.table", { entity: activeTabConfig.label.toLowerCase() })
+            }
             getRowId={(row) => String(row.id)}
             onRowClick={(row) => setActivePreviewIds((current) => ({ ...current, [activeTab]: String(row.id) }))}
             onSelectedRowIdsChange={(rowIds) =>
@@ -1175,6 +1212,7 @@ export const CatalogPage = () => {
                   }
                 : null
             }
+            syncPreferences
           />
         </SurfaceCard>
 
@@ -1182,79 +1220,82 @@ export const CatalogPage = () => {
           <div className="catalog-side-rail">
             {editorMode ? (
               <CatalogEditorPanel
-            assetOptions={data.assetOptions}
-            crewDocuments={activeTab === "crew" && editTargetRow ? ((editTargetRow.documents as CatalogSnapshot["crewMembers"][number]["documents"]) ?? []) : []}
-            departmentOptions={data.departments}
-            userOptions={data.users}
-            entityType={activeTab}
-            error={editorError}
-            initialValue={editorMode === "edit" ? editTargetRow : null}
-            isSubmitting={isSubmittingEditor}
-            isUploadingCrewDocuments={isUploadingCrewDocuments}
-            mode={editorMode}
-            onClose={() => {
-              setEditorMode(null);
-              setEditorError(null);
-            }}
-            onDeleteCrewDocument={handleDeleteCrewDocument}
-            onOpenCrewDocument={openCrewCatalogDocument}
-            onSubmit={async (payload) =>
-              applyCatalogMutation(
-                () =>
-                  editorMode === "create"
-                    ? createCatalogEntity({ ...payload, workspaceId: activeWorkspaceId } as never)
-                    : updateCatalogEntity({ ...payload, workspaceId: activeWorkspaceId } as never),
-                editorMode === "edit" && selectedCount === 1 && typeof editTargetRow?.id === "string" ? [editTargetRow.id as string] : [],
-              )
-            }
-            onUploadCrewDocuments={
-              activeTab === "crew" && editorMode === "edit" && typeof editTargetRow?.id === "string"
-                ? async () => handleUploadCrewDocuments(editTargetRow.id as string)
-                : undefined
-            }
-            onUploadCrewDocumentsFromPaths={
-              activeTab === "crew" && editorMode === "edit" && typeof editTargetRow?.id === "string"
-                ? async (filePaths) => handleUploadCrewDocuments(editTargetRow.id as string, filePaths)
-                : undefined
-            }
+                assetOptions={data.assetOptions}
+                crewDocuments={activeTab === "crew" && editTargetRow ? ((editTargetRow.documents as CatalogSnapshot["crewMembers"][number]["documents"]) ?? []) : []}
+                departmentOptions={data.departments}
+                userOptions={data.users}
+                entityType={activeTab}
+                error={editorError}
+                initialValue={editorMode === "edit" ? editTargetRow : null}
+                isSubmitting={isSubmittingEditor}
+                isUploadingCrewDocuments={isUploadingCrewDocuments}
+                mode={editorMode}
+                onClose={() => {
+                  setEditorMode(null);
+                  setEditorError(null);
+                }}
+                onDeleteCrewDocument={handleDeleteCrewDocument}
+                onOpenCrewDocument={openCrewCatalogDocument}
+                onSubmit={async (payload) =>
+                  applyCatalogMutation(
+                    () =>
+                      editorMode === "create"
+                        ? createCatalogEntity({ ...payload, workspaceId: activeWorkspaceId } as never)
+                        : updateCatalogEntity({ ...payload, workspaceId: activeWorkspaceId } as never),
+                    editorMode === "edit" && selectedCount === 1 && typeof editTargetRow?.id === "string" ? [editTargetRow.id as string] : [],
+                  )
+                }
+                onUploadCrewDocuments={
+                  activeTab === "crew" && editorMode === "edit" && typeof editTargetRow?.id === "string"
+                    ? async () => handleUploadCrewDocuments(editTargetRow.id as string)
+                    : undefined
+                }
+                onUploadCrewDocumentsFromPaths={
+                  activeTab === "crew" && editorMode === "edit" && typeof editTargetRow?.id === "string"
+                    ? async (filePaths) => handleUploadCrewDocuments(editTargetRow.id as string, filePaths)
+                    : undefined
+                }
               />
             ) : showPreview && previewRow ? (
               <SurfaceCard
-            title={resolveCatalogPreviewTitle(activeTab, previewRow, t)}
-            aside={
-              <button
-                aria-label={t("catalog.actions.closePreview")}
-                className="icon-ghost-control"
-                onClick={() => setActivePreviewIds((current) => ({ ...current, [activeTab]: null }))}
-                type="button"
+                className="catalog-detail-card detail-rail-card"
+                title={resolveCatalogPreviewTitle(activeTab, previewRow, t)}
+                aside={
+                  <button
+                    aria-label={t("catalog.actions.closePreview")}
+                    className="icon-ghost-control"
+                    onClick={() => setActivePreviewIds((current) => ({ ...current, [activeTab]: null }))}
+                    type="button"
+                  >
+                    <X size={14} />
+                  </button>
+                }
               >
-                <X size={14} />
-              </button>
-            }
-          >
-            <div className="summary-grid">
-              <div className="summary-row">
-                <span className="summary-label">{t("catalog.fields.type")}</span>
-                <span className="summary-value">{activeTabConfig.label}</span>
-              </div>
-              {buildCatalogPreviewRows(activeTab, previewRow, t).map((row) => (
-                <div key={row.label} className="summary-row">
-                  <span className="summary-label">{row.label}</span>
-                  <span className="summary-value">{row.value}</span>
-                </div>
-              ))}
-            </div>
-
-            {activeTab === "crew" ? (
-              <>
-                <div className="catalog-preview-section">
-                  <div className="surface-card-header">
-                    <div>
-                  <h3 className="surface-card-title">{t("catalog.preview.appUser")}</h3>
-                    </div>
+                <div className="summary-grid detail-hero-grid">
+                  <div className="summary-row">
+                    <span className="summary-label">{t("catalog.fields.type")}</span>
+                    <span className="summary-value">{activeTabConfig.label}</span>
                   </div>
+                  {buildCatalogPreviewRows(activeTab, previewRow, t).map((row) => (
+                    <div key={row.label} className="summary-row">
+                      <span className="summary-label">{row.label}</span>
+                      <span className="summary-value">{row.value}</span>
+                    </div>
+                  ))}
+                </div>
 
-                  {previewLinkedUser ? (
+                {activeTab === "crew" ? (
+                  <>
+                    <div className="catalog-preview-section">
+                      <div className="surface-card-header">
+                        <div>
+                          <h3 className="surface-card-title">{t("catalog.preview.appUser")}</h3>
+                        </div>
+                      </div>
+
+                  {usersSnapshotError ? (
+                    <div className="catalog-crew-support-empty">{usersSnapshotError}</div>
+                  ) : previewLinkedUser ? (
                     <div className="summary-grid">
                       <div className="summary-row">
                         <span className="summary-label">{t("catalog.fields.linkedUser")}</span>
@@ -1286,18 +1327,14 @@ export const CatalogPage = () => {
                       <div className="agent-form-grid">
                         <label className="field-block">
                           <span className="field-label">{t("catalog.fields.role")}</span>
-                          <select
-                            className="field-input"
-                            onChange={(event) => setCreateCrewUserRoleId(event.target.value)}
-                            value={createCrewUserRoleId}
-                          >
+                          <SelectField onChange={(event) => setCreateCrewUserRoleId(event.target.value)} value={createCrewUserRoleId}>
                             <option value="">{t("catalog.preview.selectRole")}</option>
                             {usersSnapshot.roles.map((role) => (
                               <option key={role.id} value={role.id}>
                                 {role.name}
                               </option>
                             ))}
-                          </select>
+                          </SelectField>
                         </label>
                         <div className="field-block field-block-span-2">
                           <span className="field-label">{t("catalog.preview.reused")}</span>
@@ -1357,7 +1394,7 @@ export const CatalogPage = () => {
                         <div key={account.id} className="catalog-preview-bank-account">
                           <strong>{account.bankName || account.accountType || t("catalog.preview.bankAccount")}</strong>
                           <span>{account.accountHolder || t("catalog.preview.noAccountHolder")}</span>
-                          <span>{account.maskInPreview ? account.maskedAccountNumber : account.accountNumber}</span>
+                          <span>{account.maskedAccountNumber}</span>
                         </div>
                       ))}
                     </div>
@@ -1561,13 +1598,13 @@ export const CatalogPage = () => {
                 <span className="list-toolbar-menu-label">{t("catalog.actions.export")}</span>
                 <button className="list-toolbar-menu-item" onClick={() => void runExport("template")} role="menuitem" type="button">
                   <span className="list-toolbar-menu-item-copy">
-                    <Upload size={14} />
+                    <Download size={14} />
                     <span>{t("catalog.actions.blankTemplate")}</span>
                   </span>
                 </button>
                 <button className="list-toolbar-menu-item" onClick={() => void runExport("data")} role="menuitem" type="button">
                   <span className="list-toolbar-menu-item-copy">
-                    <Upload size={14} />
+                    <Download size={14} />
                     <span>{selectedCount ? t("catalog.actions.selectedRows", { count: selectedCount }) : t("catalog.actions.allRows")}</span>
                   </span>
                 </button>
@@ -1579,7 +1616,7 @@ export const CatalogPage = () => {
 
       {importDialogState ? (
         <CatalogCsvImportDialog
-          entityLabel={activeTabConfig.label}
+          entityLabel={tabs.find((tab) => tab.key === importDialogState.entityType)?.label ?? activeTabConfig.label}
           isSubmitting={isSubmittingImport}
           onClose={() => {
             if (!isSubmittingImport) {
@@ -1591,7 +1628,7 @@ export const CatalogPage = () => {
             if (!importDialogState) {
               return;
             }
-            void refreshImportPreview(strategy, importDialogState.csvText, importDialogState.fileName);
+            void refreshImportPreview(strategy, importDialogState.csvText, importDialogState.fileName, importDialogState.entityType);
           }}
           state={importDialogState}
         />

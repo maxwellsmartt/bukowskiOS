@@ -32,8 +32,8 @@ const expectedHeadersByEntity: Record<CatalogEntityType, string[]> = {
   location: ["code", "name", "locationType", "description", "isActive"],
   department: ["code", "name", "description", "isActive"],
   crew: ["fullName", "primaryDepartmentCode", "documentId", "roleLabel", "email", "phone", "notes", "bankAccounts", "isActive"],
-  client: ["name", "contactName", "email", "phone", "notes", "isActive"],
-  production_company: ["name", "contactName", "email", "phone", "notes", "isActive"],
+  client: ["name", "contactName", "email", "phone", "rnc", "notes", "isActive"],
+  production_company: ["name", "contactName", "email", "phone", "pur", "notes", "isActive"],
   manufacturer: ["name", "contactName", "supportEmail", "phone", "notes", "isActive"],
   category: ["code", "name", "description", "isActive"],
   kit: ["code", "name", "description", "notes", "assetQuantities", "isActive"],
@@ -90,7 +90,16 @@ type ImportAnalysisRow =
       key: string;
       existingId: string | null;
       entityType: "client" | "production_company";
-      payload: { name: string; contactName: string | null; email: string | null; phone: string | null; notes: string | null; isActive: boolean };
+      payload: {
+        name: string;
+        contactName: string | null;
+        email: string | null;
+        phone: string | null;
+        rnc?: string | null;
+        pur?: string | null;
+        notes: string | null;
+        isActive: boolean;
+      };
     }
   | {
       rowNumber: number;
@@ -573,6 +582,8 @@ const analyzeImport = (db: DatabaseSync, input: PreviewCatalogCsvImportInput): I
               contactName: normalizeOptional(record.contactName),
               email: normalizeOptional(record.email),
               phone: normalizeOptional(record.phone),
+              rnc: input.entityType === "client" ? normalizeOptional(record.rnc) : undefined,
+              pur: input.entityType === "production_company" ? normalizeOptional(record.pur) : undefined,
               notes: normalizeOptional(record.notes),
               isActive: parseBooleanValue(record.isActive),
             },
@@ -907,7 +918,7 @@ const runImportRow = (
         db.prepare(
           `
             UPDATE clients
-            SET name = ?, contact_name = ?, email = ?, phone = ?, notes = ?, is_active = ?, updated_at = ?
+            SET name = ?, contact_name = ?, email = ?, phone = ?, rnc = ?, notes = ?, is_active = ?, updated_at = ?
             WHERE id = ?
           `,
         ).run(
@@ -915,6 +926,7 @@ const runImportRow = (
           row.payload.contactName,
           row.payload.email,
           row.payload.phone,
+          row.payload.rnc ?? null,
           row.payload.notes,
           row.payload.isActive ? 1 : 0,
           now,
@@ -926,8 +938,8 @@ const runImportRow = (
 
       db.prepare(
         `
-          INSERT INTO clients (id, workspace_id, name, contact_name, email, phone, notes, is_active, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO clients (id, workspace_id, name, contact_name, email, phone, rnc, notes, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
       ).run(
         `client-${slugify(row.payload.name)}-${Date.now().toString(36)}-${row.rowNumber}`,
@@ -936,6 +948,7 @@ const runImportRow = (
         row.payload.contactName,
         row.payload.email,
         row.payload.phone,
+        row.payload.rnc ?? null,
         row.payload.notes,
         row.payload.isActive ? 1 : 0,
         now,
@@ -948,7 +961,7 @@ const runImportRow = (
         db.prepare(
           `
             UPDATE production_companies
-            SET name = ?, contact_name = ?, email = ?, phone = ?, notes = ?, is_active = ?, updated_at = ?
+            SET name = ?, contact_name = ?, email = ?, phone = ?, pur = ?, notes = ?, is_active = ?, updated_at = ?
             WHERE id = ?
           `,
         ).run(
@@ -956,6 +969,7 @@ const runImportRow = (
           row.payload.contactName,
           row.payload.email,
           row.payload.phone,
+          row.payload.pur ?? null,
           row.payload.notes,
           row.payload.isActive ? 1 : 0,
           now,
@@ -967,8 +981,8 @@ const runImportRow = (
 
       db.prepare(
         `
-          INSERT INTO production_companies (id, workspace_id, name, contact_name, email, phone, notes, is_active, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO production_companies (id, workspace_id, name, contact_name, email, phone, pur, notes, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
       ).run(
         `production-company-${slugify(row.payload.name)}-${Date.now().toString(36)}-${row.rowNumber}`,
@@ -977,6 +991,7 @@ const runImportRow = (
         row.payload.contactName,
         row.payload.email,
         row.payload.phone,
+        row.payload.pur ?? null,
         row.payload.notes,
         row.payload.isActive ? 1 : 0,
         now,
@@ -1221,19 +1236,21 @@ export const createCatalogCsvService = (db: DatabaseSync, codeService: CodeGener
             .prepare(
               `
                 SELECT
-                  crew_member_id,
-                  COALESCE(bank_name, '') AS bank_name,
-                  COALESCE(account_holder, '') AS account_holder,
-                  account_number,
-                  COALESCE(account_type, '') AS account_type,
-                  COALESCE(routing_number, '') AS routing_number,
-                  COALESCE(notes, '') AS notes,
-                  mask_in_preview
+                  crew_bank_accounts.crew_member_id,
+                  COALESCE(crew_bank_accounts.bank_name, '') AS bank_name,
+                  COALESCE(crew_bank_accounts.account_holder, '') AS account_holder,
+                  crew_bank_accounts.account_number,
+                  COALESCE(crew_bank_accounts.account_type, '') AS account_type,
+                  COALESCE(crew_bank_accounts.routing_number, '') AS routing_number,
+                  COALESCE(crew_bank_accounts.notes, '') AS notes,
+                  crew_bank_accounts.mask_in_preview
                 FROM crew_bank_accounts
-                ORDER BY crew_member_id, sort_order, created_at
+                JOIN crew_members ON crew_members.id = crew_bank_accounts.crew_member_id
+                WHERE crew_members.workspace_id = ?
+                ORDER BY crew_bank_accounts.crew_member_id, crew_bank_accounts.sort_order, crew_bank_accounts.created_at
               `,
             )
-            .all() as Array<{
+            .all(workspaceId) as Array<{
             crew_member_id: string;
             bank_name: string;
             account_holder: string;
@@ -1272,13 +1289,14 @@ export const createCatalogCsvService = (db: DatabaseSync, codeService: CodeGener
       case "client":
         rows = (db
           .prepare(
-            `SELECT name, COALESCE(contact_name, '') AS contact_name, COALESCE(email, '') AS email, COALESCE(phone, '') AS phone, COALESCE(notes, '') AS notes, is_active FROM clients WHERE workspace_id = ?${idFilter.sql} ORDER BY name`,
+            `SELECT name, COALESCE(contact_name, '') AS contact_name, COALESCE(email, '') AS email, COALESCE(phone, '') AS phone, COALESCE(rnc, '') AS rnc, COALESCE(notes, '') AS notes, is_active FROM clients WHERE workspace_id = ?${idFilter.sql} ORDER BY name`,
           )
-          .all(workspaceId, ...idFilter.params) as Array<{ name: string; contact_name: string; email: string; phone: string; notes: string; is_active: number }>).map((row) => ({
+          .all(workspaceId, ...idFilter.params) as Array<{ name: string; contact_name: string; email: string; phone: string; rnc: string; notes: string; is_active: number }>).map((row) => ({
           name: row.name,
           contactName: row.contact_name,
           email: row.email,
           phone: row.phone,
+          rnc: row.rnc,
           notes: row.notes,
           isActive: row.is_active ? "true" : "false",
         }));
@@ -1286,13 +1304,14 @@ export const createCatalogCsvService = (db: DatabaseSync, codeService: CodeGener
       case "production_company":
         rows = (db
           .prepare(
-            `SELECT name, COALESCE(contact_name, '') AS contact_name, COALESCE(email, '') AS email, COALESCE(phone, '') AS phone, COALESCE(notes, '') AS notes, is_active FROM production_companies WHERE workspace_id = ?${idFilter.sql} ORDER BY name`,
+            `SELECT name, COALESCE(contact_name, '') AS contact_name, COALESCE(email, '') AS email, COALESCE(phone, '') AS phone, COALESCE(pur, '') AS pur, COALESCE(notes, '') AS notes, is_active FROM production_companies WHERE workspace_id = ?${idFilter.sql} ORDER BY name`,
           )
-          .all(workspaceId, ...idFilter.params) as Array<{ name: string; contact_name: string; email: string; phone: string; notes: string; is_active: number }>).map((row) => ({
+          .all(workspaceId, ...idFilter.params) as Array<{ name: string; contact_name: string; email: string; phone: string; pur: string; notes: string; is_active: number }>).map((row) => ({
           name: row.name,
           contactName: row.contact_name,
           email: row.email,
           phone: row.phone,
+          pur: row.pur,
           notes: row.notes,
           isActive: row.is_active ? "true" : "false",
         }));

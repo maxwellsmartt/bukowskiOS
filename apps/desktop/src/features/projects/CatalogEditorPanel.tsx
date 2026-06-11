@@ -31,6 +31,7 @@ type CatalogEditorPanelProps = {
 };
 
 type CrewBankAccountDraft = {
+  id?: string;
   bankName: string;
   accountHolder: string;
   accountNumber: string;
@@ -38,6 +39,7 @@ type CrewBankAccountDraft = {
   routingNumber: string;
   notes: string;
   maskInPreview: boolean;
+  maskedAccountNumber?: string;
 };
 
 type KitAssetSelectionDraft = {
@@ -69,6 +71,7 @@ const readKitAssetSelections = (value: Record<string, unknown> | null | undefine
 const readBankAccounts = (value: Record<string, unknown> | null | undefined): CrewBankAccountDraft[] =>
   Array.isArray(value?.bankAccounts)
     ? (value.bankAccounts as Array<Record<string, unknown>>).map((entry) => ({
+        id: typeof entry.id === "string" ? entry.id : undefined,
         bankName: typeof entry.bankName === "string" ? entry.bankName : "",
         accountHolder: typeof entry.accountHolder === "string" ? entry.accountHolder : "",
         accountNumber: typeof entry.accountNumber === "string" ? entry.accountNumber : "",
@@ -76,6 +79,7 @@ const readBankAccounts = (value: Record<string, unknown> | null | undefined): Cr
         routingNumber: typeof entry.routingNumber === "string" ? entry.routingNumber : "",
         notes: typeof entry.notes === "string" ? entry.notes : "",
         maskInPreview: entry.maskInPreview === false ? false : true,
+        maskedAccountNumber: typeof entry.maskedAccountNumber === "string" ? entry.maskedAccountNumber : undefined,
       }))
     : [];
 
@@ -135,6 +139,7 @@ const getPanelTitle = (entityType: CatalogEntityType, mode: "create" | "edit", t
 };
 
 const createEmptyBankAccount = (): CrewBankAccountDraft => ({
+  id: undefined,
   bankName: "",
   accountHolder: "",
   accountNumber: "",
@@ -142,6 +147,7 @@ const createEmptyBankAccount = (): CrewBankAccountDraft => ({
   routingNumber: "",
   notes: "",
   maskInPreview: true,
+  maskedAccountNumber: undefined,
 });
 
 export const CatalogEditorPanel = ({
@@ -174,6 +180,8 @@ export const CatalogEditorPanel = ({
   const [contactName, setContactName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [rnc, setRnc] = useState("");
+  const [pur, setPur] = useState("");
   const [notes, setNotes] = useState("");
   const [kitAssetSelections, setKitAssetSelections] = useState<KitAssetSelectionDraft[]>([]);
   const [bankAccounts, setBankAccounts] = useState<CrewBankAccountDraft[]>([]);
@@ -195,6 +203,8 @@ export const CatalogEditorPanel = ({
     setContactName(readString(initialValue, "contactName"));
     setEmail(entityType === "manufacturer" ? readString(initialValue, "supportEmail") : readString(initialValue, "email"));
     setPhone(readString(initialValue, "phone"));
+    setRnc(readString(initialValue, "rnc"));
+    setPur(readString(initialValue, "pur"));
     setNotes(readString(initialValue, "notes"));
     setKitAssetSelections(readKitAssetSelections(initialValue));
     setBankAccounts(readBankAccounts(initialValue));
@@ -236,11 +246,12 @@ export const CatalogEditorPanel = ({
           phone: normalizeOptional(phone),
           notes: normalizeOptional(notes),
           bankAccounts: bankAccounts
-            .filter((entry) => entry.accountNumber.trim())
+            .filter((entry) => entry.id || entry.accountNumber.trim())
             .map((entry) => ({
+              id: entry.id,
               bankName: normalizeOptional(entry.bankName),
               accountHolder: normalizeOptional(entry.accountHolder),
-              accountNumber: entry.accountNumber.trim(),
+              accountNumber: normalizeOptional(entry.accountNumber),
               accountType: normalizeOptional(entry.accountType),
               routingNumber: normalizeOptional(entry.routingNumber),
               notes: normalizeOptional(entry.notes),
@@ -257,6 +268,8 @@ export const CatalogEditorPanel = ({
           contactName: normalizeOptional(contactName),
           email: normalizeOptional(email),
           phone: normalizeOptional(phone),
+          rnc: entityType === "client" ? normalizeOptional(rnc) : undefined,
+          pur: entityType === "production_company" ? normalizeOptional(pur) : undefined,
           notes: normalizeOptional(notes),
         } as CatalogEditorSubmitInput);
         return;
@@ -302,6 +315,7 @@ export const CatalogEditorPanel = ({
 
   return (
     <SurfaceCard
+      className="catalog-detail-card detail-rail-card"
       aside={
         <button aria-label={t("catalog.editor.close")} className="icon-ghost-control" onClick={onClose} type="button">
           <X size={14} />
@@ -377,6 +391,18 @@ export const CatalogEditorPanel = ({
               <span className="action-field-label">{t("catalog.fields.phone")}</span>
               <input className="action-field-control" onChange={(event) => setPhone(event.target.value)} value={phone} />
             </label>
+            {entityType === "client" ? (
+              <label className="action-field">
+                <span className="action-field-label">{t("catalog.fields.rnc")}</span>
+                <input className="action-field-control" onChange={(event) => setRnc(event.target.value)} value={rnc} />
+              </label>
+            ) : null}
+            {entityType === "production_company" ? (
+              <label className="action-field">
+                <span className="action-field-label">{t("catalog.fields.pur")}</span>
+                <input className="action-field-control" onChange={(event) => setPur(event.target.value)} value={pur} />
+              </label>
+            ) : null}
           </>
         ) : null}
 
@@ -387,7 +413,7 @@ export const CatalogEditorPanel = ({
           </label>
         ) : null}
 
-        {entityType === "crew" || entityType === "client" || entityType === "manufacturer" || entityType === "kit" ? (
+        {entityType === "crew" || entityType === "client" || entityType === "production_company" || entityType === "manufacturer" || entityType === "kit" ? (
           <label className="action-field action-field-wide">
             <span className="action-field-label">{t("catalog.fields.notes")}</span>
             <textarea
@@ -473,6 +499,7 @@ export const CatalogEditorPanel = ({
                         <span className="action-field-label">{t("catalog.fields.bankName")}</span>
                         <input
                           className="action-field-control"
+                          placeholder={entry.maskedAccountNumber || t("catalog.editor.enterAccountNumber")}
                           onChange={(event) =>
                             setBankAccounts((current) =>
                               current.map((currentEntry, currentIndex) =>
@@ -692,6 +719,7 @@ export const CatalogEditorPanel = ({
           <div className="surface-card-header catalog-kit-assets-header">
             <div>
               <h3 className="surface-card-title">{t("catalog.editor.kitMembers")}</h3>
+              <p className="surface-card-subtitle">{t("catalog.editor.kitStockHelp")}</p>
             </div>
             <span className="section-header-context-pill">
               {t("catalog.kit.memberSummary", { members: selectedKitMemberCount, units: selectedKitItemCount })}

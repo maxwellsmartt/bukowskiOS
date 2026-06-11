@@ -23,6 +23,8 @@ export type CatalogSortField =
   | "supportEmail"
   | "email"
   | "phone"
+  | "rnc"
+  | "pur"
   | "assetCount";
 
 export type CatalogListQuery = {

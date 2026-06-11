@@ -521,6 +521,7 @@ app.whenReady().then(async () => {
   registerNotificationIpc(localDatabase.notifications);
   registerAppIpc({
     database: localDatabase.database,
+    workspaceAccess: localDatabase.workspaceAccess,
     appSettings: localDatabase.appSettings,
     getDiagnosticsSnapshot: localDatabase.getDiagnosticsSnapshot,
     getSupportSnapshot: localDatabase.getSupportSnapshot,

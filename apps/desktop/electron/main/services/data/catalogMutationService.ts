@@ -80,9 +80,10 @@ const replaceCrewBankAccounts = (
   crewMemberId: string,
   bankAccounts:
     | Array<{
+        id?: string;
         bankName?: string;
         accountHolder?: string;
-        accountNumber: string;
+        accountNumber?: string;
         accountType?: string;
         routingNumber?: string;
         notes?: string;
@@ -91,12 +92,27 @@ const replaceCrewBankAccounts = (
     | undefined,
   now: string,
 ) => {
+  const existingAccounts = new Map(
+    (
+      db
+        .prepare(
+          `
+            SELECT id, account_number
+            FROM crew_bank_accounts
+            WHERE crew_member_id = ?
+          `,
+        )
+        .all(crewMemberId) as Array<{ id: string; account_number: string }>
+    ).map((row) => [row.id, row.account_number] as const),
+  );
+
   db.prepare("DELETE FROM crew_bank_accounts WHERE crew_member_id = ?").run(crewMemberId);
 
   (bankAccounts ?? [])
     .map((entry) => ({
+      id: entry.id && existingAccounts.has(entry.id) ? entry.id : undefined,
       accountHolder: optionalValue(entry.accountHolder),
-      accountNumber: ensureValue(entry.accountNumber, "Bank account number"),
+      accountNumber: ensureValue(entry.accountNumber || (entry.id ? existingAccounts.get(entry.id) : undefined), "Bank account number"),
       accountType: optionalValue(entry.accountType),
       bankName: optionalValue(entry.bankName),
       maskInPreview: entry.maskInPreview === false ? 0 : 1,
@@ -122,7 +138,7 @@ const replaceCrewBankAccounts = (
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
       ).run(
-        `crew-bank-account-${crewMemberId}-${index}-${Date.now().toString(36)}`,
+        entry.id ?? `crew-bank-account-${crewMemberId}-${index}-${Date.now().toString(36)}`,
         crewMemberId,
         entry.bankName,
         entry.accountHolder,
@@ -401,6 +417,72 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
       now,
       now,
     );
+  };
+
+  const deleteEntityRecord = (input: DeleteCatalogEntityInput) => {
+    switch (input.entityType) {
+      case "location": {
+        const result = db.prepare("DELETE FROM locations WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
+        if (!result.changes) {
+          throw new Error("Location not found.");
+        }
+        break;
+      }
+      case "department": {
+        const result = db.prepare("DELETE FROM departments WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
+        if (!result.changes) {
+          throw new Error("Department not found.");
+        }
+        break;
+      }
+      case "crew": {
+        const result = db.prepare("DELETE FROM crew_members WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
+        if (!result.changes) {
+          throw new Error("Crew member not found.");
+        }
+        break;
+      }
+      case "client": {
+        const result = db.prepare("DELETE FROM clients WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
+        if (!result.changes) {
+          throw new Error("Client not found.");
+        }
+        enqueueCatalogOutbox(input.workspaceId, "client", input.id, "delete");
+        break;
+      }
+      case "production_company": {
+        const result = db.prepare("DELETE FROM production_companies WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
+        if (!result.changes) {
+          throw new Error("Production company not found.");
+        }
+        enqueueCatalogOutbox(input.workspaceId, "production_company", input.id, "delete");
+        break;
+      }
+      case "manufacturer": {
+        const result = db.prepare("DELETE FROM manufacturers WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
+        if (!result.changes) {
+          throw new Error("Manufacturer not found.");
+        }
+        enqueueCatalogOutbox(input.workspaceId, "manufacturer", input.id, "delete");
+        break;
+      }
+      case "category": {
+        const result = db.prepare("DELETE FROM asset_categories WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
+        if (!result.changes) {
+          throw new Error("Category not found.");
+        }
+        break;
+      }
+      case "kit": {
+        db.prepare("DELETE FROM kit_assets WHERE kit_id = ?").run(input.id);
+        db.prepare("DELETE FROM scannable_codes WHERE entity_type = 'kit' AND entity_id = ?").run(input.id);
+        const result = db.prepare("DELETE FROM kits WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
+        if (!result.changes) {
+          throw new Error("Kit not found.");
+        }
+        break;
+      }
+    }
   };
 
   const service = {
@@ -869,69 +951,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
       db.exec("BEGIN");
 
       try {
-        switch (input.entityType) {
-          case "location": {
-            const result = db.prepare("DELETE FROM locations WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
-            if (!result.changes) {
-              throw new Error("Location not found.");
-            }
-            break;
-          }
-          case "department": {
-            const result = db.prepare("DELETE FROM departments WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
-            if (!result.changes) {
-              throw new Error("Department not found.");
-            }
-            break;
-          }
-          case "crew": {
-            const result = db.prepare("DELETE FROM crew_members WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
-            if (!result.changes) {
-              throw new Error("Crew member not found.");
-            }
-            break;
-          }
-          case "client": {
-            const result = db.prepare("DELETE FROM clients WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
-            if (!result.changes) {
-              throw new Error("Client not found.");
-            }
-            enqueueCatalogOutbox(input.workspaceId, "client", input.id, "delete");
-            break;
-          }
-          case "production_company": {
-            const result = db.prepare("DELETE FROM production_companies WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
-            if (!result.changes) {
-              throw new Error("Production company not found.");
-            }
-            enqueueCatalogOutbox(input.workspaceId, "production_company", input.id, "delete");
-            break;
-          }
-          case "manufacturer": {
-            const result = db.prepare("DELETE FROM manufacturers WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
-            if (!result.changes) {
-              throw new Error("Manufacturer not found.");
-            }
-            enqueueCatalogOutbox(input.workspaceId, "manufacturer", input.id, "delete");
-            break;
-          }
-          case "category": {
-            const result = db.prepare("DELETE FROM asset_categories WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
-            if (!result.changes) {
-              throw new Error("Category not found.");
-            }
-            break;
-          }
-          case "kit": {
-            db.prepare("DELETE FROM kit_assets WHERE kit_id = ?").run(input.id);
-            db.prepare("DELETE FROM scannable_codes WHERE entity_type = 'kit' AND entity_id = ?").run(input.id);
-            const result = db.prepare("DELETE FROM kits WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
-            if (!result.changes) {
-              throw new Error("Kit not found.");
-            }
-            break;
-          }
-        }
+        deleteEntityRecord(input);
 
         db.exec("COMMIT");
       } catch (error) {
@@ -955,9 +975,16 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
         }
       });
 
-      uniqueIds.forEach((id) => {
-        service.deleteEntity({ workspaceId: input.workspaceId, entityType: input.entityType, id });
-      });
+      db.exec("BEGIN");
+      try {
+        uniqueIds.forEach((id) => {
+          deleteEntityRecord({ workspaceId: input.workspaceId, entityType: input.entityType, id });
+        });
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
     },
 
     buildCsvExport(input: ExportCatalogCsvInput) {

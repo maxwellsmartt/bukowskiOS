@@ -1,13 +1,9 @@
-import fs from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 
 import type { CatalogListQuery, CatalogSnapshot } from "@contracts";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
-import { assertPathWithinRoot } from "../../security/pathSafety";
-
 const activeProjectStatuses = new Set(["Prep", "Active", "On hold"]);
-const maxInlinePreviewBytes = 5 * 1024 * 1024;
 
 const mapAssetStatus = (
   operationalStatus: string,
@@ -51,17 +47,7 @@ type CatalogReadDeps = {
   getStorageRoot?: () => string;
 };
 
-export const createCatalogReadService = (db: DatabaseSync, deps: CatalogReadDeps = {}) => {
-  const resolveStoredPath = (storagePath: string | null | undefined) => {
-    if (!storagePath) return null;
-    if (!deps.getStorageRoot) return storagePath;
-    try {
-      return assertPathWithinRoot(storagePath, deps.getStorageRoot());
-    } catch {
-      return null;
-    }
-  };
-
+export const createCatalogReadService = (db: DatabaseSync, _deps: CatalogReadDeps = {}) => {
   return {
   getSnapshot(query?: Pick<CatalogListQuery, "workspaceId">): CatalogSnapshot {
     const workspaceId = query?.workspaceId ?? DEFAULT_WORKSPACE_ID;
@@ -161,21 +147,23 @@ export const createCatalogReadService = (db: DatabaseSync, deps: CatalogReadDeps
       .prepare(
         `
           SELECT
-            id,
-            crew_member_id,
-            file_type,
-            COALESCE(storage_path, '') AS storage_path,
-            COALESCE(original_name, '') AS original_name,
-            COALESCE(byte_size, 0) AS byte_size,
-            COALESCE(mime_type, 'application/octet-stream') AS mime_type,
-            COALESCE(status, 'available') AS status,
-            uploaded_at
+            crew_documents.id,
+            crew_documents.crew_member_id,
+            crew_documents.file_type,
+            COALESCE(crew_documents.storage_path, '') AS storage_path,
+            COALESCE(crew_documents.original_name, '') AS original_name,
+            COALESCE(crew_documents.byte_size, 0) AS byte_size,
+            COALESCE(crew_documents.mime_type, 'application/octet-stream') AS mime_type,
+            COALESCE(crew_documents.status, 'available') AS status,
+            crew_documents.uploaded_at
           FROM crew_documents
-          WHERE deleted_at IS NULL
-          ORDER BY uploaded_at DESC, original_name
+          JOIN crew_members ON crew_members.id = crew_documents.crew_member_id
+          WHERE crew_documents.deleted_at IS NULL
+            AND crew_members.workspace_id = ?
+          ORDER BY crew_documents.uploaded_at DESC, crew_documents.original_name
         `,
       )
-      .all() as Array<{
+      .all(workspaceId) as Array<{
       id: string;
       crew_member_id: string;
       file_type: string;
@@ -191,20 +179,22 @@ export const createCatalogReadService = (db: DatabaseSync, deps: CatalogReadDeps
       .prepare(
         `
           SELECT
-            id,
-            crew_member_id,
-            COALESCE(bank_name, '') AS bank_name,
-            COALESCE(account_holder, '') AS account_holder,
-            account_number,
-            COALESCE(account_type, '') AS account_type,
-            COALESCE(routing_number, '') AS routing_number,
-            COALESCE(notes, '') AS notes,
-            COALESCE(mask_in_preview, 1) AS mask_in_preview
+            crew_bank_accounts.id,
+            crew_bank_accounts.crew_member_id,
+            COALESCE(crew_bank_accounts.bank_name, '') AS bank_name,
+            COALESCE(crew_bank_accounts.account_holder, '') AS account_holder,
+            crew_bank_accounts.account_number,
+            COALESCE(crew_bank_accounts.account_type, '') AS account_type,
+            COALESCE(crew_bank_accounts.routing_number, '') AS routing_number,
+            COALESCE(crew_bank_accounts.notes, '') AS notes,
+            COALESCE(crew_bank_accounts.mask_in_preview, 1) AS mask_in_preview
           FROM crew_bank_accounts
-          ORDER BY crew_member_id, sort_order, created_at
+          JOIN crew_members ON crew_members.id = crew_bank_accounts.crew_member_id
+          WHERE crew_members.workspace_id = ?
+          ORDER BY crew_bank_accounts.crew_member_id, crew_bank_accounts.sort_order, crew_bank_accounts.created_at
         `,
       )
-      .all() as Array<{
+      .all(workspaceId) as Array<{
       id: string;
       crew_member_id: string;
       bank_name: string;
@@ -293,14 +283,6 @@ export const createCatalogReadService = (db: DatabaseSync, deps: CatalogReadDeps
     });
 
     crewDocuments.forEach((row) => {
-      let previewDataUrl: string | null = null;
-      const safeStoragePath = resolveStoredPath(row.storage_path);
-
-      if (safeStoragePath && row.status === "available" && row.byte_size <= maxInlinePreviewBytes && fs.existsSync(safeStoragePath)) {
-        const encoded = fs.readFileSync(safeStoragePath).toString("base64");
-        previewDataUrl = `data:${row.mime_type};base64,${encoded}`;
-      }
-
       const documents = crewDocumentsByMember.get(row.crew_member_id) ?? [];
       documents.push({
         id: row.id,
@@ -311,7 +293,7 @@ export const createCatalogReadService = (db: DatabaseSync, deps: CatalogReadDeps
         status: row.status,
         createdAt: row.uploaded_at,
         isPreviewable: row.mime_type.startsWith("image/") || row.mime_type === "application/pdf",
-        previewDataUrl,
+        previewDataUrl: null,
       });
       crewDocumentsByMember.set(row.crew_member_id, documents);
     });
@@ -324,7 +306,7 @@ export const createCatalogReadService = (db: DatabaseSync, deps: CatalogReadDeps
         id: row.id,
         bankName: row.bank_name,
         accountHolder: row.account_holder,
-        accountNumber: normalizedNumber,
+        accountNumber: "",
         accountType: row.account_type,
         routingNumber: row.routing_number,
         notes: row.notes,

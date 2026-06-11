@@ -7464,10 +7464,26 @@ body.is-resizing-side-rail {
 }
 
 .catalog-side-rail {
-  display: grid;
-  gap: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   min-width: 0;
   min-height: 0;
+}
+
+.catalog-detail-card {
+  width: 100%;
+}
+
+.catalog-detail-card .summary-grid {
+  gap: 10px;
+}
+
+.catalog-detail-card .catalog-preview-section,
+.catalog-detail-card .catalog-crew-support-card {
+  border-color: rgba(126, 183, 178, 0.1);
+  border-radius: 12px;
+  background: rgba(7, 10, 12, 0.18);
 }
 
 .asset-side-rail {

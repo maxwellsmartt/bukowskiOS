@@ -1895,6 +1895,10 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
             return compareTextValue(String(left.email ?? ""), String(right.email ?? ""), normalizedQuery.sortDirection);
           case "phone":
             return compareTextValue(String(left.phone ?? ""), String(right.phone ?? ""), normalizedQuery.sortDirection);
+          case "rnc":
+            return compareTextValue(String(left.rnc ?? ""), String(right.rnc ?? ""), normalizedQuery.sortDirection);
+          case "pur":
+            return compareTextValue(String(left.pur ?? ""), String(right.pur ?? ""), normalizedQuery.sortDirection);
           case "assetCount":
             return compareNumberValue(Number(left.assetCount ?? 0), Number(right.assetCount ?? 0), normalizedQuery.sortDirection);
           case "name":
@@ -1930,14 +1934,14 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
         return {
           ...snapshot,
           clients: sortCatalogRows(
-            filterCatalogRows(snapshot.clients, (row) => [row.name, row.contactName, row.email, row.phone, row.notes]),
+            filterCatalogRows(snapshot.clients, (row) => [row.name, row.contactName, row.email, row.phone, row.rnc, row.notes]),
           ),
         };
       case "production_company":
         return {
           ...snapshot,
           productionCompanies: sortCatalogRows(
-            filterCatalogRows(snapshot.productionCompanies, (row) => [row.name, row.contactName, row.email, row.phone, row.notes]),
+            filterCatalogRows(snapshot.productionCompanies, (row) => [row.name, row.contactName, row.email, row.phone, row.pur, row.notes]),
           ),
         };
       case "manufacturer":

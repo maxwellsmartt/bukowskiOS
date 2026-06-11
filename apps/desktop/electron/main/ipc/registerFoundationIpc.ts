@@ -1762,6 +1762,14 @@ export const registerFoundationIpc = ({
         action: "export this catalog",
         accessLevel: "read",
       });
+      if (input.entityType === "crew" && input.mode === "data") {
+        await workspaceAccess.assertWorkspaceAccess({
+          workspaceId: input.workspaceId,
+          action: "export crew bank account data",
+          accessLevel: "read",
+          requiredPermission: "treasury.accounts.manage",
+        });
+      }
       const exportPayload = catalogMutations.buildCsvExport(input);
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: `Export ${input.entityType} CSV`,

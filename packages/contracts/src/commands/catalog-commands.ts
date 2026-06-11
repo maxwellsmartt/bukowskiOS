@@ -52,9 +52,10 @@ export type UploadCrewCatalogDocumentsInput = {
 };
 
 export type CatalogCrewBankAccountInput = {
+  id?: string;
   bankName?: string;
   accountHolder?: string;
-  accountNumber: string;
+  accountNumber?: string;
   accountType?: string;
   routingNumber?: string;
   notes?: string;

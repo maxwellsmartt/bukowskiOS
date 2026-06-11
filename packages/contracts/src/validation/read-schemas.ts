@@ -81,6 +81,8 @@ const catalogSortFieldSchema = z.enum([
   "supportEmail",
   "email",
   "phone",
+  "rnc",
+  "pur",
   "assetCount",
 ]);
 

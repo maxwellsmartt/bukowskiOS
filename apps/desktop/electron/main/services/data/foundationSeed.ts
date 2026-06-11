@@ -5,6 +5,7 @@ const now = "2026-04-09T16:00:00.000Z";
 const permissions = [
   ["perm-assets-read", "assets.read", "Read assets", "View asset registry and current state"],
   ["perm-assets-manage", "assets.manage", "Manage assets", "Create movements and update assets"],
+  ["perm-users-manage", "users.manage", "Manage users", "Create users and manage workspace access"],
   ["perm-incidents-read", "incidents.read", "Read incidents", "View incident queues and details"],
   ["perm-incidents-create", "incidents.create", "Create incidents", "Report new incidents"],
   ["perm-finance-read", "finance.read", "Read finance shell", "View finance exposure and entries"],
@@ -615,6 +616,7 @@ export const seedFoundationData = (db: DatabaseSync) => {
       [
         ["role-admin", "perm-assets-read", now],
         ["role-admin", "perm-assets-manage", now],
+        ["role-admin", "perm-users-manage", now],
         ["role-admin", "perm-incidents-read", now],
         ["role-admin", "perm-incidents-create", now],
         ["role-admin", "perm-finance-read", now],

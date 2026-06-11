@@ -3216,9 +3216,11 @@
       "package": "Package",
       "phone": "Phone",
       "primaryQr": "Primary QR",
+      "pur": "PUR",
       "qrReady": "QR ready",
       "qty": "Qty",
       "ready": "Ready",
+      "rnc": "RNC",
       "role": "Role",
       "roleLabel": "Role label",
       "routing": "Routing / ABA",
@@ -3254,7 +3256,8 @@
       "tipCrew": "Add departments and crew before assigning work",
       "tipCategories": "Define categories before creating assets",
       "action": "Create first location",
-      "table": "No {{entity}} yet. Create the first one here."
+      "table": "No {{entity}} yet. Create the first one here.",
+      "search": "No {{entity}} match this search."
     },
     "messages": {
       "update": "Catalog update"
@@ -3335,8 +3338,10 @@
       "create": "Create",
       "documents": "Documents",
       "editTitle": "Edit {{entity}}",
+      "enterAccountNumber": "Enter a new number to replace the saved one",
       "freeInStock": "Free in stock",
       "kitMembers": "Kit members",
+      "kitStockHelp": "Creating a kit does not reserve stock; availability is checked when assigning it.",
       "linkedTo": "Linked to {{user}}.",
       "liveOn": "Live on {{project}}{{unit}}",
       "moreDetails": "More details",
@@ -3358,6 +3363,7 @@
       "createUser": "Could not create the user from this crew record.",
       "exportCsv": "Could not export this CSV.",
       "importCsv": "Could not import this CSV.",
+      "loadUsers": "You do not have permission to manage users from this catalog.",
       "pickRole": "Pick a role before creating the user.",
       "previewCsv": "Could not preview this CSV.",
       "removeDocument": "Crew document removal failed.",
