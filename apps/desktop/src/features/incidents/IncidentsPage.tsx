@@ -1,5 +1,5 @@
-import { Box, Eye, FileText } from "lucide-react";
-import { useEffect, useState } from "react";
+import { AlertTriangle, Box, Eye, FileText } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -41,6 +41,12 @@ const incidentSortOptions: Array<ListSortOption<IncidentSortField>> = [
   { value: "costEstimate", label: "incidents.sort.costEstimate", columnKey: "cost" },
   { value: "status", label: "incidents.sort.status", columnKey: "status" },
 ];
+
+const incidentDefaultColumnKeys = ["title", "assetCode", "assetName", "project", "severity", "status"];
+const projectIncidentDefaultColumnKeys = ["title", "assetCode", "assetName", "responsible", "severity", "status"];
+const incidentFilterOptions = ["all", "open", "review", "high", "resolved"] as const;
+
+type IncidentFilter = (typeof incidentFilterOptions)[number];
 
 const resolveIncidentStatusTone = (status: string) => {
   if (status === "Resolved") {
@@ -112,6 +118,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
     reload: reloadIncidentDetail,
   } = useIncidentDetail(activeIncidentId);
   const focusedIncidentId = searchParams.get("focus");
+  const [incidentFilter, setIncidentFilter] = useState<IncidentFilter>("all");
 
   useEffect(() => {
     if (focusedIncidentId && data.some((row) => row.id === focusedIncidentId)) {
@@ -161,6 +168,59 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
     }
   };
 
+  const incidentStats = useMemo(() => {
+    const unresolved = data.filter((row) => row.status !== "Resolved");
+    const affectedAssets = new Set(
+      unresolved
+        .map((row) => row.assetId ?? row.assetCode ?? row.assetName)
+        .filter((value) => value && value !== "—"),
+    );
+
+    return {
+      total: data.length,
+      open: data.filter((row) => row.status === "Open").length,
+      review: data.filter((row) => row.status === "In review").length,
+      high: unresolved.filter((row) => row.severity === "High").length,
+      resolved: data.filter((row) => row.status === "Resolved").length,
+      affectedAssets: affectedAssets.size,
+      unassigned: unresolved.filter((row) => !row.responsible || row.responsible === "—").length,
+    };
+  }, [data]);
+
+  const visibleIncidents = useMemo(() => {
+    switch (incidentFilter) {
+      case "open":
+        return data.filter((row) => row.status === "Open");
+      case "review":
+        return data.filter((row) => row.status === "In review");
+      case "high":
+        return data.filter((row) => row.status !== "Resolved" && row.severity === "High");
+      case "resolved":
+        return data.filter((row) => row.status === "Resolved");
+      default:
+        return data;
+    }
+  }, [data, incidentFilter]);
+
+  const translatedFilterOptions = useMemo(
+    () =>
+      incidentFilterOptions.map((option) => ({
+        value: option,
+        label: t(`incidents.filters.${option}`),
+        count:
+          option === "open"
+            ? incidentStats.open
+            : option === "review"
+              ? incidentStats.review
+              : option === "high"
+                ? incidentStats.high
+                : option === "resolved"
+                  ? incidentStats.resolved
+                  : incidentStats.total,
+      })),
+    [incidentStats, t],
+  );
+
   const selectedOpenIncidentIds = data.filter((row) => selectedRowIds.includes(row.id) && row.status === "Open").map((row) => row.id);
 
   const bulkMarkInReview = async () => {
@@ -202,7 +262,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
     }
   };
 
-  const hasActiveSearch = Boolean(incidentControls.searchValue.trim());
+  const hasActiveSearch = Boolean(incidentControls.searchValue.trim()) || incidentFilter !== "all";
   const translatedSortOptions = incidentSortOptions.map((option) => ({ ...option, label: t(option.label) }));
 
   return (
@@ -212,6 +272,77 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       {error ? <div className="empty-state">{t("incidents.unavailable", { message: error })}</div> : null}
       {catalogError ? <div className="empty-state">{t("incidents.catalogUnavailable", { message: catalogError })}</div> : null}
       {rmaError ? <div className="empty-state">{t("incidents.repairUnavailable", { message: rmaError })}</div> : null}
+
+      {!error && isProjectMode ? (
+        <section className="project-incidents-command-card" aria-label={t("incidents.projectCommand.aria")}>
+          <div className="project-incidents-command-copy">
+            <span>{t("incidents.projectCommand.eyebrow")}</span>
+            <strong>{projectName ?? t("incidents.projectCommand.fallbackName")}</strong>
+            <p>{t("incidents.projectCommand.body")}</p>
+          </div>
+
+          <div className="project-incidents-command-metrics">
+            <button
+              className={`project-incidents-command-metric${incidentFilter === "open" ? " is-active" : ""}`}
+              onClick={() => setIncidentFilter("open")}
+              type="button"
+            >
+              <span>{t("incidents.projectCommand.metrics.open")}</span>
+              <strong>{incidentStats.open}</strong>
+            </button>
+            <button
+              className={`project-incidents-command-metric${incidentStats.high ? " is-danger" : " is-ok"}${incidentFilter === "high" ? " is-active" : ""}`}
+              onClick={() => setIncidentFilter("high")}
+              type="button"
+            >
+              <span>{t("incidents.projectCommand.metrics.high")}</span>
+              <strong>{incidentStats.high}</strong>
+            </button>
+            <button
+              className={`project-incidents-command-metric${incidentFilter === "review" ? " is-active" : ""}`}
+              onClick={() => setIncidentFilter("review")}
+              type="button"
+            >
+              <span>{t("incidents.projectCommand.metrics.review")}</span>
+              <strong>{incidentStats.review}</strong>
+            </button>
+            <div className={`project-incidents-command-metric${incidentStats.affectedAssets ? " is-warning" : " is-ok"}`}>
+              <span>{t("incidents.projectCommand.metrics.affectedAssets")}</span>
+              <strong>{incidentStats.affectedAssets}</strong>
+            </div>
+            <div className={`project-incidents-command-metric${incidentStats.unassigned ? " is-warning" : ""}`}>
+              <span>{t("incidents.projectCommand.metrics.unassigned")}</span>
+              <strong>{incidentStats.unassigned}</strong>
+            </div>
+          </div>
+
+          <div className="project-incidents-command-actions">
+            <button
+              className="action-primary-button action-row-button"
+              onClick={() => {
+                setReportOpen(true);
+                setReportError(null);
+              }}
+              type="button"
+            >
+              <AlertTriangle size={14} />
+              <span>{t("incidents.projectCommand.actions.report")}</span>
+            </button>
+            <button className="ghost-control action-row-button" onClick={() => setIncidentFilter("open")} type="button">
+              {t("incidents.projectCommand.actions.reviewOpen")}
+            </button>
+            <button className="ghost-control action-row-button" onClick={() => navigate(`/projects/${projectId}/assets`)} type="button">
+              <Box size={14} />
+              <span>{t("incidents.projectCommand.actions.assets")}</span>
+            </button>
+          </div>
+
+          <div className="project-incidents-command-footnote">
+            <span>{t("incidents.projectCommand.selectionHint", { count: selectedRowIds.length })}</span>
+            <span>{t("incidents.projectCommand.filterHint")}</span>
+          </div>
+        </section>
+      ) : null}
 
       {reportOpen ? (
         <ModalShell
@@ -300,7 +431,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           onSearchValueChange={incidentControls.setSearchValue}
           onSortByChange={incidentControls.setSortField}
           onToggleSortDirection={incidentControls.toggleSortDirection}
-          resultCount={data.length}
+          resultCount={visibleIncidents.length}
           resultLabel={t("incidents.resultLabel")}
           searchPlaceholder={isProjectMode ? t("incidents.toolbar.searchPlaceholderProject") : t("incidents.toolbar.searchPlaceholder")}
           searchValue={incidentControls.searchValue}
@@ -308,6 +439,19 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           sortDirection={incidentControls.sortDirection}
           sortOptions={translatedSortOptions}
         />
+        <div className="incident-filter-row" aria-label={t("incidents.filters.title")}>
+          {translatedFilterOptions.map((option) => (
+            <button
+              className={`filter-chip incident-filter-chip${incidentFilter === option.value ? " active" : ""}`}
+              key={option.value}
+              onClick={() => setIncidentFilter(option.value)}
+              type="button"
+            >
+              <span>{option.label}</span>
+              <strong>{option.count}</strong>
+            </button>
+          ))}
+        </div>
         {selectedRowIds.length ? (
           <div className="selection-action-bar">
             <div className="selection-action-copy">
@@ -335,6 +479,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
         <DataTable
           activeRowId={activeIncidentId}
           autoScrollToActiveRow
+          defaultVisibleColumnKeys={isProjectMode ? projectIncidentDefaultColumnKeys : incidentDefaultColumnKeys}
           shellClassName="table-shell-fill"
           emptyContent={
             <div className="table-empty-state">
@@ -397,7 +542,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
             },
           ]}
           onSortRequest={incidentControls.handleColumnSortRequest}
-          persistKey="incidents-queue"
+          persistKey={isProjectMode ? "project-incidents-queue-v2" : "incidents-queue-v2"}
           columns={[
             {
               key: "title",
@@ -434,7 +579,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
               ),
             },
           ]}
-          rows={data}
+          rows={visibleIncidents}
           selectable
           selectedRowIds={selectedRowIds}
           sortState={

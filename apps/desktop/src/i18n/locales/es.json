@@ -3755,6 +3755,35 @@
       "thisProject": "Este proyecto",
       "report": "Reportar incidente"
     },
+    "projectCommand": {
+      "aria": "Operación de incidentes del proyecto",
+      "eyebrow": "Triage del proyecto",
+      "fallbackName": "Proyecto activo",
+      "body": "Prioriza incidentes abiertos, equipos afectados y casos de alta severidad sin salir del contexto del proyecto.",
+      "metrics": {
+        "open": "Abiertos",
+        "high": "Alta severidad",
+        "review": "En revisión",
+        "affectedAssets": "Equipos afectados",
+        "unassigned": "Sin responsable"
+      },
+      "actions": {
+        "report": "Reportar incidente",
+        "reviewOpen": "Ver abiertos",
+        "assets": "Ver equipos"
+      },
+      "selectionHint_one": "{{count}} incidente seleccionado para acción rápida.",
+      "selectionHint_other": "{{count}} incidentes seleccionados para acción rápida.",
+      "filterHint": "Filtra por estado o severidad sin perder la búsqueda actual."
+    },
+    "filters": {
+      "title": "Filtros de incidentes",
+      "all": "Todos",
+      "open": "Abiertos",
+      "review": "En revisión",
+      "high": "Alta",
+      "resolved": "Resueltos"
+    },
     "severity": {
       "Low": "Baja",
       "Medium": "Media",

@@ -3751,6 +3751,35 @@
       "thisProject": "This project",
       "report": "Report incident"
     },
+    "projectCommand": {
+      "aria": "Project incident operations",
+      "eyebrow": "Project triage",
+      "fallbackName": "Active project",
+      "body": "Prioritize open incidents, affected assets and high-severity cases without leaving the project context.",
+      "metrics": {
+        "open": "Open",
+        "high": "High severity",
+        "review": "In review",
+        "affectedAssets": "Affected assets",
+        "unassigned": "Unassigned"
+      },
+      "actions": {
+        "report": "Report incident",
+        "reviewOpen": "View open",
+        "assets": "View assets"
+      },
+      "selectionHint_one": "{{count}} incident selected for quick action.",
+      "selectionHint_other": "{{count}} incidents selected for quick action.",
+      "filterHint": "Filter by status or severity without losing the current search."
+    },
+    "filters": {
+      "title": "Incident filters",
+      "all": "All",
+      "open": "Open",
+      "review": "In review",
+      "high": "High",
+      "resolved": "Resolved"
+    },
     "severity": {
       "Low": "Low",
       "Medium": "Medium",
