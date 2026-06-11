@@ -16141,6 +16141,8 @@ select.field-input {
 
 .inbox-page {
   max-width: 1180px;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .inbox-hero {
@@ -16217,9 +16219,14 @@ select.field-input {
   font-weight: 650;
 }
 
+/* Fila 1 (tabs) fija, fila 2 (pane) scrollea por dentro: sin esto el grid
+   sobre-restringido aplasta el header (overflow hidden ⇒ mínimo 0) a 10px. */
 .inbox-panel {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -16335,7 +16342,11 @@ select.field-input {
 
 .inbox-tab-pane {
   display: grid;
+  align-content: start;
   gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
   animation: inbox-tab-slide-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
