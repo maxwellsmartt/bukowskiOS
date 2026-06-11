@@ -75,6 +75,9 @@ const assetSortOptions: Array<ListSortOption<AssetSortField>> = [
   { value: "createdAt", label: "assets.sort.createdAt" },
 ];
 
+const getActivePackingPreferenceKey = (targetProjectId?: string | null) =>
+  targetProjectId ? `${uiPreferenceKeys.activePackingSlipId}:${targetProjectId}` : uiPreferenceKeys.activePackingSlipId;
+
 // Curated default: the columns that actually drive a decision. The rest (serial,
 // tracking, custody, warehouse, costs, etc.) stay one click away in the column
 // manager instead of cluttering the table with mostly-constant noise.
@@ -1262,13 +1265,17 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       });
 
       await Promise.all([reload(), refreshProjects()]);
-      writePreference(uiPreferenceKeys.activePackingSlipId, result.packingSlipId);
+      writePreference(getActivePackingPreferenceKey(formValue.projectId), result.packingSlipId);
       setPackingError(null);
       toast.success(t("assets.toasts.doneTitle"), result.summary);
       setAssignNextStep(null);
       setPackingPanelOpen(false);
       clearOperationCart();
-      navigate("/packing-slips");
+      navigate(
+        formValue.projectId
+          ? `/projects/${formValue.projectId}/packing?focus=${encodeURIComponent(result.packingSlipId)}`
+          : `/packing-slips?focus=${encodeURIComponent(result.packingSlipId)}`,
+      );
     } catch (nextError) {
       setPackingError(getUserFacingErrorMessage(nextError, t("assets.toasts.unableIssueSlip")));
     } finally {

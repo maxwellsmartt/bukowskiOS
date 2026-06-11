@@ -3660,7 +3660,10 @@
   },
   "incidents": {
     "title": "Incidents",
+    "titleProject": "{{projectName}} incidents",
+    "thisProject": "this project",
     "cardTitle": "Incidents",
+    "cardTitleProject": "Project incidents",
     "resultLabel": "incidents",
     "unavailable": "Incidents unavailable: {{message}}",
     "catalogUnavailable": "Incident catalog unavailable: {{message}}",
@@ -3808,7 +3811,9 @@
     "empty": {
       "kicker": "No incidents",
       "title": "All clear",
+      "titleProject": "No incidents in this project",
       "body": "When a problem is reported on an asset it will show up here for follow-up.",
+      "bodyProject": "Problems linked to this project will show up here for follow-up.",
       "filteredKicker": "No results",
       "filteredTitle": "Nothing matches this search",
       "filteredBody": "Try another term or clear the search to see all incidents."

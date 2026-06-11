@@ -45,6 +45,9 @@ type PendingReturnTarget = {
 
 const returnConditionOptions = ["Good", "Review", "Damaged"] as const;
 
+const getActivePackingPreferenceKey = (projectId?: string | null) =>
+  projectId ? `${uiPreferenceKeys.activePackingSlipId}:${projectId}` : uiPreferenceKeys.activePackingSlipId;
+
 const packingSortOptions: Array<ListSortOption<PackingSlipSortField>> = [
   { value: "issuedDate", label: "packing.sort.issuedDate", columnKey: "issuedDate" },
   { value: "dueDate", label: "packing.sort.dueDate", columnKey: "dueDate" },
@@ -91,8 +94,9 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   });
   const { data, error, reload } = usePackingList(packingControls.query);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const activePackingPreferenceKey = getActivePackingPreferenceKey(projectId);
   const [activePackingSlipId, setActivePackingSlipId] = useState<string | null>(() =>
-    readStringPreference(uiPreferenceKeys.activePackingSlipId),
+    readStringPreference(activePackingPreferenceKey),
   );
   // True after the user closes the detail rail with the X: blocks the
   // auto-select-first effect until they pick a slip again.
@@ -162,6 +166,12 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   );
 
   useEffect(() => {
+    setActivePackingSlipId(readStringPreference(activePackingPreferenceKey));
+    setDetailDismissed(false);
+    setReturnError(null);
+  }, [activePackingPreferenceKey]);
+
+  useEffect(() => {
     if (detailDismissed) {
       return;
     }
@@ -186,8 +196,8 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   }, [data, focusedPackingSlipId]);
 
   useEffect(() => {
-    writePreference(uiPreferenceKeys.activePackingSlipId, activePackingSlipId);
-  }, [activePackingSlipId]);
+    writePreference(activePackingPreferenceKey, activePackingSlipId);
+  }, [activePackingPreferenceKey, activePackingSlipId]);
 
   useEffect(() => {
     if (!selectedRowIds.length) {
@@ -223,7 +233,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   const openPackingSlip = (packingSlipId: string) => {
     setActivePackingSlipId(packingSlipId);
     setDetailDismissed(false);
-    writePreference(uiPreferenceKeys.activePackingSlipId, packingSlipId);
+    writePreference(activePackingPreferenceKey, packingSlipId);
     setReturnError(null);
   };
 
@@ -625,7 +635,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
           onClose={() => {
             setActivePackingSlipId(null);
             setDetailDismissed(true);
-            writePreference(uiPreferenceKeys.activePackingSlipId, null);
+            writePreference(activePackingPreferenceKey, null);
           }}
           isExportingInsurancePdf={isExportingInsurancePdf}
           isExportingPdf={isExportingPdf}

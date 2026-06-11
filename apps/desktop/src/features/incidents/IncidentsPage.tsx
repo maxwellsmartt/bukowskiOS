@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import type { AssetListQuery, IncidentListQuery, IncidentSortField } from "@contracts";
+import type { AssetListQuery, IncidentListQuery, IncidentListRow, IncidentSortField } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useAssetsList } from "@features/assets/useAssetsData";
@@ -54,7 +54,7 @@ const resolveIncidentStatusTone = (status: string) => {
   return "warning" as const;
 };
 
-export const IncidentsPage = ({ projectId = null }: IncidentsPageProps) => {
+export const IncidentsPage = ({ projectId = null, projectName = null }: IncidentsPageProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { activeWorkspaceId } = useWorkspace();
@@ -207,7 +207,7 @@ export const IncidentsPage = ({ projectId = null }: IncidentsPageProps) => {
 
   return (
     <div className={`page-stack incidents-page-stack${isProjectMode ? "" : " incidents-page-stack--fill"}`}>
-      <SectionHeader title={t("incidents.title")} />
+      <SectionHeader title={isProjectMode ? t("incidents.titleProject", { projectName: projectName ?? t("incidents.thisProject") }) : t("incidents.title")} />
 
       {error ? <div className="empty-state">{t("incidents.unavailable", { message: error })}</div> : null}
       {catalogError ? <div className="empty-state">{t("incidents.catalogUnavailable", { message: catalogError })}</div> : null}
@@ -281,7 +281,7 @@ export const IncidentsPage = ({ projectId = null }: IncidentsPageProps) => {
       >
         <SurfaceCard
           className="rail-table-card"
-          title={t("incidents.cardTitle")}
+          title={isProjectMode ? t("incidents.cardTitleProject") : t("incidents.cardTitle")}
           aside={
             <button
               className="action-primary-button"
@@ -339,8 +339,24 @@ export const IncidentsPage = ({ projectId = null }: IncidentsPageProps) => {
           emptyContent={
             <div className="table-empty-state">
               <span className="table-empty-kicker">{t(hasActiveSearch ? "incidents.empty.filteredKicker" : "incidents.empty.kicker")}</span>
-              <strong>{t(hasActiveSearch ? "incidents.empty.filteredTitle" : "incidents.empty.title")}</strong>
-              <span>{t(hasActiveSearch ? "incidents.empty.filteredBody" : "incidents.empty.body")}</span>
+              <strong>
+                {t(
+                  hasActiveSearch
+                    ? "incidents.empty.filteredTitle"
+                    : isProjectMode
+                      ? "incidents.empty.titleProject"
+                      : "incidents.empty.title",
+                )}
+              </strong>
+              <span>
+                {t(
+                  hasActiveSearch
+                    ? "incidents.empty.filteredBody"
+                    : isProjectMode
+                      ? "incidents.empty.bodyProject"
+                      : "incidents.empty.body",
+                )}
+              </span>
             </div>
           }
           getRowId={(row) => row.id}
@@ -394,7 +410,9 @@ export const IncidentsPage = ({ projectId = null }: IncidentsPageProps) => {
             },
             { key: "assetCode", label: t("incidents.columns.assetCode"), render: (row) => row.assetCode },
             { key: "assetName", label: t("incidents.columns.asset"), render: (row) => row.assetName },
-            { key: "project", label: t("incidents.columns.project"), render: (row) => row.project },
+            ...(!isProjectMode
+              ? [{ key: "project", label: t("incidents.columns.project"), render: (row: IncidentListRow) => row.project }]
+              : []),
             { key: "responsible", label: t("incidents.columns.responsible"), render: (row) => row.responsible },
             {
               key: "severity",

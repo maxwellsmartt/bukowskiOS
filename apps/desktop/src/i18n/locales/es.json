@@ -3664,7 +3664,10 @@
   },
   "incidents": {
     "title": "Incidentes",
+    "titleProject": "Incidentes de {{projectName}}",
+    "thisProject": "este proyecto",
     "cardTitle": "Incidentes",
+    "cardTitleProject": "Incidentes del proyecto",
     "resultLabel": "incidentes",
     "unavailable": "Incidentes no disponibles: {{message}}",
     "catalogUnavailable": "Catálogo de incidentes no disponible: {{message}}",
@@ -3812,7 +3815,9 @@
     "empty": {
       "kicker": "Sin incidentes",
       "title": "Todo en orden",
+      "titleProject": "Sin incidentes en este proyecto",
       "body": "Cuando se reporte un problema con un equipo aparecerá aquí para darle seguimiento.",
+      "bodyProject": "Cuando se reporte un problema vinculado a este proyecto aparecerá aquí para darle seguimiento.",
       "filteredKicker": "Sin resultados",
       "filteredTitle": "Nada coincide con esta búsqueda",
       "filteredBody": "Prueba con otro término o limpia la búsqueda para ver todos los incidentes."
