@@ -2112,6 +2112,7 @@
     "title": "Packing slips",
     "titleProject": "Packing del proyecto",
     "cardTitle": "Packing slips",
+    "cardTitleProject": "Slips del proyecto",
     "resultLabel": "slips",
     "unavailable": "Packing slips no disponibles: {{message}}",
     "toolbar": {
@@ -2123,6 +2124,28 @@
       "open": "abiertos",
       "overdue": "vencidos",
       "pendingUnits": "unidades pendientes"
+    },
+    "projectCommand": {
+      "aria": "Operación de packing del proyecto",
+      "body": "Sigue salidas, retornos pendientes y slips vencidos sin perder contexto del proyecto.",
+      "eyebrow": "Packing del proyecto",
+      "fallbackName": "Proyecto seleccionado",
+      "filterHint": "Los indicadores también filtran la tabla.",
+      "actions": {
+        "pending": "Ver pendientes",
+        "prepare": "Preparar salida",
+        "returnFirst": "Devolver primero"
+      },
+      "metrics": {
+        "open": "Abiertos",
+        "overdue": "Vencidos",
+        "pending": "Pendientes",
+        "returned": "Devueltas",
+        "returnedValue": "{{returned}} / {{total}}",
+        "staging": "Staging"
+      },
+      "selectionHint_one": "{{count}} slip seleccionado para operar.",
+      "selectionHint_other": "{{count}} slips seleccionados para operar."
     },
     "filters": {
       "title": "Filtros rápidos de packing",

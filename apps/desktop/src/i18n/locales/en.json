@@ -2108,6 +2108,7 @@
     "title": "Packing slips",
     "titleProject": "Project packing",
     "cardTitle": "Packing slips",
+    "cardTitleProject": "Project slips",
     "resultLabel": "slips",
     "unavailable": "Packing slips unavailable: {{message}}",
     "toolbar": {
@@ -2119,6 +2120,28 @@
       "open": "open",
       "overdue": "overdue",
       "pendingUnits": "pending units"
+    },
+    "projectCommand": {
+      "aria": "Project packing operations",
+      "body": "Track check-outs, pending returns and overdue slips without losing project context.",
+      "eyebrow": "Project packing",
+      "fallbackName": "Selected project",
+      "filterHint": "Indicators also filter the table.",
+      "actions": {
+        "pending": "View pending",
+        "prepare": "Prepare checkout",
+        "returnFirst": "Return first"
+      },
+      "metrics": {
+        "open": "Open",
+        "overdue": "Overdue",
+        "pending": "Pending",
+        "returned": "Returned",
+        "returnedValue": "{{returned}} / {{total}}",
+        "staging": "Staging"
+      },
+      "selectionHint_one": "{{count}} slip selected for operations.",
+      "selectionHint_other": "{{count}} slips selected for operations."
     },
     "filters": {
       "title": "Packing quick filters",

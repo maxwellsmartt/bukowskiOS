@@ -1,7 +1,7 @@
 import { FileText, MoreHorizontal, Printer, RotateCcw, ShieldCheck, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import type { PackingInsuranceExportOptions, PackingSlipListQuery, PackingSlipSortField } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
@@ -59,6 +59,8 @@ const packingSortOptions: Array<ListSortOption<PackingSlipSortField>> = [
   { value: "itemCount", label: "packing.sort.itemCount", columnKey: "itemCount" },
   { value: "returnedCount", label: "packing.sort.returnedCount", columnKey: "returnedCount" },
 ];
+const defaultPackingColumnKeys = ["number", "project", "dueDate", "progress", "status"];
+const projectPackingColumnKeys = ["number", "department", "responsible", "dueDate", "progress", "status"];
 
 const isPrinterUnavailableError = (error: unknown) => {
   const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
@@ -69,6 +71,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
   const isProjectMode = Boolean(projectId);
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const packingControls = useListControls<PackingSlipSortField, PackingSlipListQuery>({
     viewKey: isProjectMode ? "project-packing-list" : "packing-list",
@@ -123,6 +126,10 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
       open: data.filter((row) => row.status !== "Closed").length,
       overdue: data.filter((row) => row.status === "Overdue").length,
       pendingSlips: data.filter((row) => Math.max(0, row.itemCount - row.returnedCount) > 0).length,
+      pendingUnits: data.reduce((total, row) => total + Math.max(0, row.itemCount - row.returnedCount), 0),
+      returnedUnits: data.reduce((total, row) => total + row.returnedCount, 0),
+      totalUnits: data.reduce((total, row) => total + row.itemCount, 0),
+      staging: data.filter((row) => row.lifecycleState === "staging").length,
     }),
     [data],
   );
@@ -153,6 +160,10 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   );
   const selectedPackingSlips = useMemo(() => visiblePackingSlips.filter((row) => selectedRowIds.includes(row.id)), [selectedRowIds, visiblePackingSlips]);
   const firstSelectedPackingSlip = selectedRowIds.length ? visiblePackingSlips.find((row) => row.id === selectedRowIds[0]) ?? null : null;
+  const firstPendingPackingSlip = useMemo(
+    () => data.find((row) => Math.max(0, row.itemCount - row.returnedCount) > 0) ?? null,
+    [data],
+  );
   const hasActiveFilters = Boolean(packingControls.searchValue.trim()) || statusFilter !== "all";
   const filterOptions = useMemo(
     () => [
@@ -368,6 +379,96 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
       {error ? <div className="empty-state">{t("packing.unavailable", { message: error })}</div> : null}
       {returnError ? <div className="action-feedback action-feedback-error">{returnError}</div> : null}
 
+      {!error && isProjectMode ? (
+        <section className="project-packing-command-card" aria-label={t("packing.projectCommand.aria")}>
+          <div className="project-packing-command-copy">
+            <span>{t("packing.projectCommand.eyebrow")}</span>
+            <strong>{projectName ?? t("packing.projectCommand.fallbackName")}</strong>
+            <p>{t("packing.projectCommand.body")}</p>
+          </div>
+
+          <div className="project-packing-command-metrics">
+            <button
+              className={`project-packing-command-metric${statusFilter === "open" ? " is-active" : ""}`}
+              onClick={() => setStatusFilter("open")}
+              type="button"
+            >
+              <span>{t("packing.projectCommand.metrics.open")}</span>
+              <strong>{packingStats.open}</strong>
+            </button>
+            <button
+              className={`project-packing-command-metric${statusFilter === "pending" ? " is-active" : ""}`}
+              onClick={() => setStatusFilter("pending")}
+              type="button"
+            >
+              <span>{t("packing.projectCommand.metrics.pending")}</span>
+              <strong>{packingStats.pendingUnits}</strong>
+            </button>
+            <button
+              className={`project-packing-command-metric${packingStats.overdue ? " is-danger" : " is-ok"}${statusFilter === "overdue" ? " is-active" : ""}`}
+              onClick={() => setStatusFilter("overdue")}
+              type="button"
+            >
+              <span>{t("packing.projectCommand.metrics.overdue")}</span>
+              <strong>{packingStats.overdue}</strong>
+            </button>
+            <div className="project-packing-command-metric">
+              <span>{t("packing.projectCommand.metrics.returned")}</span>
+              <strong>{t("packing.projectCommand.metrics.returnedValue", {
+                returned: packingStats.returnedUnits,
+                total: packingStats.totalUnits,
+              })}</strong>
+            </div>
+            <div className={`project-packing-command-metric${packingStats.staging ? " is-warning" : ""}`}>
+              <span>{t("packing.projectCommand.metrics.staging")}</span>
+              <strong>{packingStats.staging}</strong>
+            </div>
+          </div>
+
+          <div className="project-packing-command-actions">
+            <button
+              className="action-primary-button action-row-button"
+              onClick={() => navigate(`/projects/${projectId}/assets`)}
+              type="button"
+            >
+              <FileText size={14} />
+              <span>{t("packing.projectCommand.actions.prepare")}</span>
+            </button>
+            <button
+              className="ghost-control action-row-button"
+              onClick={() => setStatusFilter("pending")}
+              type="button"
+            >
+              {t("packing.projectCommand.actions.pending")}
+            </button>
+            <button
+              className="ghost-control action-row-button"
+              disabled={!firstPendingPackingSlip || isSubmittingReturn}
+              onClick={() => {
+                if (!firstPendingPackingSlip) {
+                  return;
+                }
+                setPendingReturnCondition("Good");
+                setPendingReturnTarget({
+                  packingSlipId: firstPendingPackingSlip.id,
+                  number: firstPendingPackingSlip.number,
+                  pendingCount: Math.max(0, firstPendingPackingSlip.itemCount - firstPendingPackingSlip.returnedCount),
+                });
+              }}
+              type="button"
+            >
+              <RotateCcw size={14} />
+              <span>{t("packing.projectCommand.actions.returnFirst")}</span>
+            </button>
+          </div>
+
+          <div className="project-packing-command-footnote">
+            <span>{t("packing.projectCommand.selectionHint", { count: selectedRowIds.length })}</span>
+            <span>{t("packing.projectCommand.filterHint")}</span>
+          </div>
+        </section>
+      ) : null}
+
       <ResizableSideRailLayout
         className="split-layout"
         defaultWidth={420}
@@ -375,7 +476,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
         minWidth={320}
         storageKey={uiPreferenceKeys.splitSideRailWidth}
       >
-        <SurfaceCard className="rail-table-card" title={t("packing.cardTitle")}>
+        <SurfaceCard className="rail-table-card" title={isProjectMode ? t("packing.cardTitleProject") : t("packing.cardTitle")}>
           <ListToolbar
             activeSortLabel={packingControls.activeSortOption ? t(packingControls.activeSortOption.label) : undefined}
             onSearchValueChange={packingControls.setSearchValue}
@@ -496,7 +597,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
           <DataTable
             activeRowId={activePackingSlipId}
             autoScrollToActiveRow
-            defaultVisibleColumnKeys={["number", "project", "dueDate", "progress", "status"]}
+            defaultVisibleColumnKeys={isProjectMode ? projectPackingColumnKeys : defaultPackingColumnKeys}
             emptyContent={
               <div className="packing-empty-state">
                 <span className="packing-empty-kicker">{t(hasActiveFilters ? "packing.empty.filteredKicker" : "packing.empty.kicker")}</span>
@@ -506,7 +607,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             }
             getRowId={(row) => row.id}
             onSortRequest={packingControls.handleColumnSortRequest}
-            persistKey="packing-slips-v2"
+            persistKey={isProjectMode ? "project-packing-slips-v2" : "packing-slips-v2"}
             shellClassName="table-shell-fill"
             columns={[
               { key: "number", label: t("packing.columns.slip"), width: 92, minWidth: 82, render: (row) => row.number },
