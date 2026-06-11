@@ -4471,7 +4471,13 @@
       "rolesCardUsers_other": "{{count}} users",
       "rolesCardNoAccess": "No access",
       "permissionMatrixTitle": "Permission matrix",
-      "permissionMatrixSummary": "Detailed access by role"
+      "permissionMatrixSummary": "Detailed access by role",
+      "groups": {
+        "people": "People",
+        "roles": "Roles & permissions",
+        "automation": "Automation",
+        "appAccounts": "App accounts & templates"
+      }
     },
     "data": {
       "healthTitle": "Data health",
@@ -4516,10 +4522,19 @@
         "syncing": "Syncing…",
         "runSync": "Run sync now",
         "openSync": "Open sync activity",
-        "retryFailed": "Retry all failed"
+        "retryFailed": "Retry all failed",
+        "restoreBackup": "Restore backup",
+        "restoringBackup": "Restoring…"
       },
       "syncPointerBody": "Cloud upload/download status, per-area coverage and the change queue live in Sync.",
-      "exportHelp": "Generates a JSON file with the workspace data, for controlled backup or support."
+      "exportHelp": "Generates a JSON file with the workspace data, for controlled backup or support.",
+      "restoreConfirm": {
+        "title": "Restore the backup?",
+        "body": "Current data will be replaced by the backup from {{date}}. Local changes made after that date will be lost (anything already synced to the cloud is untouched). The app will restart when done.",
+        "action": "Restore and restart",
+        "restartingTitle": "Backup restored",
+        "restartingBody": "The app is restarting…"
+      }
     },
     "sync": {
       "title": "Sync",
@@ -4746,7 +4761,8 @@
           "loadIssue": "A screen failed to load",
           "generic": "An internal error was recorded"
         },
-        "logFilesSummary": "{{count}} files · {{size}} total"
+        "logFilesSummary": "{{count}} files · {{size}} total",
+        "lastIssue": "Last recorded issue"
       },
       "dataExport": {
         "cardTitle": "Data export",

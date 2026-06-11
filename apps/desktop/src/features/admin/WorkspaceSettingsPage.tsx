@@ -766,6 +766,7 @@ export const WorkspaceSettingsPage = ({ variant = "workspace" }: WorkspaceSettin
 
   const accessSections = (
     <>
+      <span className="settings-group-label">{t("settings.team.groups.people")}</span>
       <WorkspaceDisclosure
         defaultOpen
         title={t("settings.workspace.sections.members")}
@@ -775,7 +776,6 @@ export const WorkspaceSettingsPage = ({ variant = "workspace" }: WorkspaceSettin
         })}
       >
         <SurfaceCard
-          title={t("settings.workspace.sections.members")}
           aside={
             <button
               className="action-primary-button"
@@ -842,7 +842,10 @@ export const WorkspaceSettingsPage = ({ variant = "workspace" }: WorkspaceSettin
                 key: "permissions",
                 label: t("settings.workspace.members.column.permissions"),
                 align: "right",
-                render: (row) => row.permissionKeys.length,
+                render: (row) =>
+                  row.roleName?.toLowerCase().includes("admin")
+                    ? t("settings.workspace.generalInfo.fullAccess")
+                    : row.permissionKeys.length,
               },
               {
                 key: "actions",
@@ -883,7 +886,7 @@ export const WorkspaceSettingsPage = ({ variant = "workspace" }: WorkspaceSettin
             : t("settings.workspace.summaries.noPending")
         }
       >
-        <SurfaceCard title={t("settings.workspace.sections.pendingInvites")}>
+        <SurfaceCard>
           {pendingInvites.length === 0 ? (
             <p className="surface-card-subtitle">
               {t("settings.workspace.invites.empty")}
@@ -934,6 +937,19 @@ export const WorkspaceSettingsPage = ({ variant = "workspace" }: WorkspaceSettin
       </WorkspaceDisclosure>
 
       {supabase && !isLocalFallback ? (
+        <>
+        <span className="settings-group-label">{t("settings.team.groups.roles")}</span>
+        <WorkspaceDisclosure
+          title={t("settings.workspace.sections.roles")}
+          summary={t("settings.workspace.summaries.rolesCount", { count: usersSnapshot.roles.length })}
+        >
+          <CustomRolesEditor supabase={supabase} workspaceId={activeWorkspaceId} />
+        </WorkspaceDisclosure>
+        </>
+      ) : null}
+      {supabase && !isLocalFallback ? (
+        <>
+        <span className="settings-group-label">{t("settings.team.groups.automation")}</span>
         <WorkspaceDisclosure
           title={t("settings.workspace.sections.systemActors")}
           summary={
@@ -942,7 +958,7 @@ export const WorkspaceSettingsPage = ({ variant = "workspace" }: WorkspaceSettin
               : t("settings.workspace.summaries.noActors")
           }
         >
-          <SurfaceCard title={t("settings.workspace.systemActors.title")}>
+          <SurfaceCard>
             <p className="surface-card-subtitle">
               {t("settings.workspace.systemActors.subtitle")}
             </p>
@@ -986,15 +1002,7 @@ export const WorkspaceSettingsPage = ({ variant = "workspace" }: WorkspaceSettin
             />
           </SurfaceCard>
         </WorkspaceDisclosure>
-      ) : null}
-
-      {supabase && !isLocalFallback ? (
-        <WorkspaceDisclosure
-          title={t("settings.workspace.sections.roles")}
-          summary={t("settings.workspace.summaries.rolesCount", { count: usersSnapshot.roles.length })}
-        >
-          <CustomRolesEditor supabase={supabase} workspaceId={activeWorkspaceId} />
-        </WorkspaceDisclosure>
+        </>
       ) : null}
     </>
   );

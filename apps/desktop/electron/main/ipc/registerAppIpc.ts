@@ -43,6 +43,7 @@ type RegisterAppIpcOptions = {
   revokeTelegramLink: (input: import("@contracts").RevokeTelegramLinkCommand) => import("@contracts").AppUserMutationResult;
   deleteUser: (input: import("@contracts").DeleteAppUserCommand) => import("@contracts").AppUserMutationResult;
   createBackupNow: () => import("@contracts").AppDiagnosticsSnapshot;
+  restoreFromBackupNow: () => import("@contracts").AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => import("@contracts").AppDiagnosticsSnapshot;
   ensureLocalWorkspaces: (workspaces: import("@contracts").EnsureLocalWorkspaceInput[]) => import("@contracts").AppDiagnosticsSnapshot;
   getLocalWorkspaces: (query?: { userId?: string | null }) => import("@contracts").AppLocalWorkspaceRow[];
@@ -432,6 +433,7 @@ export const registerAppIpc = ({
   revokeTelegramLink,
   deleteUser,
   createBackupNow,
+  restoreFromBackupNow,
   runIntegrityCheckNow,
   ensureLocalWorkspaces,
   getLocalWorkspaces,
@@ -778,6 +780,14 @@ export const registerAppIpc = ({
       diagnostics: createBackupNow(),
     }),
     "The app could not create a backup.",
+  );
+  safeHandleRead(
+    ipcChannels.app.restoreBackup,
+    () => ({
+      summary: "Backup restored. The app will restart now.",
+      diagnostics: restoreFromBackupNow(),
+    }),
+    "The app could not restore the backup.",
   );
   safeHandleRead(
     ipcChannels.app.runIntegrityCheck,

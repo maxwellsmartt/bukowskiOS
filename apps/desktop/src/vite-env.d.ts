@@ -160,6 +160,7 @@ declare global {
       getSupportSnapshot: () => Promise<AppSupportSnapshot>;
       getUsersSnapshot: (query?: AppUsersSnapshotQuery) => Promise<AppUsersSnapshot>;
       createBackup: () => Promise<AppActionResult>;
+      restoreBackup: () => Promise<AppActionResult>;
       createUser: (input: CreateAppUserCommand) => Promise<AppUserMutationResult>;
       updateUser: (input: UpdateAppUserCommand) => Promise<AppUserMutationResult>;
       setUserActive: (input: SetAppUserActiveCommand) => Promise<AppUserMutationResult>;

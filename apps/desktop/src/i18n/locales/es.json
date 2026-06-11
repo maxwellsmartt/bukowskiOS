@@ -4475,7 +4475,13 @@
       "rolesCardUsers_other": "{{count}} usuarios",
       "rolesCardNoAccess": "Sin acceso",
       "permissionMatrixTitle": "Matriz de permisos",
-      "permissionMatrixSummary": "Acceso detallado por rol"
+      "permissionMatrixSummary": "Acceso detallado por rol",
+      "groups": {
+        "people": "Personas",
+        "roles": "Roles y permisos",
+        "automation": "Automatización",
+        "appAccounts": "Cuentas y plantillas del app"
+      }
     },
     "data": {
       "healthTitle": "Salud de los datos",
@@ -4520,10 +4526,19 @@
         "syncing": "Sincronizando…",
         "runSync": "Sincronizar ahora",
         "openSync": "Abrir actividad de sincronización",
-        "retryFailed": "Reintentar todos los fallidos"
+        "retryFailed": "Reintentar todos los fallidos",
+        "restoreBackup": "Restaurar respaldo",
+        "restoringBackup": "Restaurando…"
       },
       "syncPointerBody": "El estado de subida y bajada a la nube, la cobertura por área y la cola de cambios viven en Sincronización.",
-      "exportHelp": "Genera un archivo JSON con los datos del workspace, para respaldo controlado o soporte."
+      "exportHelp": "Genera un archivo JSON con los datos del workspace, para respaldo controlado o soporte.",
+      "restoreConfirm": {
+        "title": "¿Restaurar el respaldo?",
+        "body": "Los datos actuales se reemplazarán por el respaldo del {{date}}. Los cambios locales hechos después de esa fecha se perderán (lo ya sincronizado a la nube no se toca). La app se reiniciará al terminar.",
+        "action": "Restaurar y reiniciar",
+        "restartingTitle": "Respaldo restaurado",
+        "restartingBody": "La app se está reiniciando…"
+      }
     },
     "sync": {
       "title": "Sincronización",
@@ -4750,7 +4765,8 @@
           "loadIssue": "Hubo un problema al cargar una pantalla",
           "generic": "Se registró un error interno"
         },
-        "logFilesSummary": "{{count}} archivos · {{size}} en total"
+        "logFilesSummary": "{{count}} archivos · {{size}} en total",
+        "lastIssue": "Último problema registrado"
       },
       "dataExport": {
         "cardTitle": "Exportar datos",

@@ -531,6 +531,15 @@ app.whenReady().then(async () => {
     revokeTelegramLink: (input) => localDatabase.userAdmin.revokeTelegramLink(input),
     deleteUser: (input) => localDatabase.userAdmin.deleteUser(input),
     createBackupNow: localDatabase.createBackupNow,
+    restoreFromBackupNow: () => {
+      const snapshot = localDatabase.restoreFromBackupNow();
+      // Give the IPC reply time to reach the renderer before restarting.
+      setTimeout(() => {
+        app.relaunch();
+        app.exit(0);
+      }, 600);
+      return snapshot;
+    },
     runIntegrityCheckNow: localDatabase.runIntegrityCheckNow,
     ensureLocalWorkspaces: localDatabase.ensureLocalWorkspaces,
     getLocalWorkspaces: localDatabase.getLocalWorkspaces,

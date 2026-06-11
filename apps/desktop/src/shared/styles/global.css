@@ -12160,6 +12160,20 @@ select.field-input {
   width: 100%;
 }
 
+/* Typographic kicker that groups related settings disclosures. */
+.settings-group-label {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 10px);
+  font-weight: var(--weight-semibold, 600);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.settings-group-label:first-child {
+  margin-top: 0;
+}
+
 .settings-shell-layout {
   --settings-nav-width: clamp(190px, 18vw, 230px);
   display: grid;

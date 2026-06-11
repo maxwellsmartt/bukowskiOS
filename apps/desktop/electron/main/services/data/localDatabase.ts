@@ -219,6 +219,7 @@ type LocalDatabaseRuntime = {
   getDiagnosticsSnapshot: () => AppDiagnosticsSnapshot;
   getSupportSnapshot: () => AppSupportSnapshot;
   createBackupNow: () => AppDiagnosticsSnapshot;
+  restoreFromBackupNow: () => AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => AppDiagnosticsSnapshot;
   ensureLocalWorkspaces: (workspaces: EnsureLocalWorkspaceInput[]) => AppDiagnosticsSnapshot;
   getLocalWorkspaces: (query?: { userId?: string | null }) => import("@contracts").AppLocalWorkspaceRow[];
@@ -784,6 +785,35 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     createEncryptedDatabaseBackup(rawDatabase, backupPath);
     logger.info("Created backup on demand from Settings.");
     return getDiagnosticsSnapshot();
+  };
+
+  // Replaces the live database with the on-disk backup. The caller must
+  // relaunch the app immediately afterwards — every open handle still points
+  // at the old file contents. The current database is preserved next to it
+  // (pre-restore copy) so a restore is itself reversible with support help.
+  const restoreFromBackupNow = () => {
+    if (!fs.existsSync(backupPath)) {
+      throw new Error("There is no backup to restore yet.");
+    }
+
+    const snapshot = getDiagnosticsSnapshot();
+    const preRestorePath = path.join(userDataPath, "bukowski-foundation.pre-restore.sqlite");
+
+    try {
+      rawDatabase.close();
+    } catch (error) {
+      logger.warn("Database handle was already closed before restore.", error);
+    }
+
+    if (fs.existsSync(databasePath)) {
+      fs.copyFileSync(databasePath, preRestorePath);
+      ensurePrivateFile(preRestorePath);
+    }
+
+    fs.copyFileSync(backupPath, databasePath);
+    ensurePrivateFile(databasePath);
+    logger.info("Restored local database from backup; the app must relaunch now.");
+    return snapshot;
   };
 
   const runIntegrityCheckNow = () => {
@@ -2099,6 +2129,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     getDiagnosticsSnapshot,
     getSupportSnapshot: () => supportDiagnostics.getSupportSnapshot(),
     createBackupNow,
+    restoreFromBackupNow,
     runIntegrityCheckNow,
     ensureLocalWorkspaces,
     getLocalWorkspaces,

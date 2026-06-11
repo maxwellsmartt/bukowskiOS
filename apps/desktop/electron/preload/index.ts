@@ -218,6 +218,7 @@ const bukowskiApp = {
   getUsersSnapshot: (query?: AppUsersSnapshotQuery) =>
     ipcRenderer.invoke(ipcChannels.app.getUsersSnapshot, query) as Promise<AppUsersSnapshot>,
   createBackup: () => ipcRenderer.invoke(ipcChannels.app.createBackup) as Promise<AppActionResult>,
+  restoreBackup: () => ipcRenderer.invoke(ipcChannels.app.restoreBackup) as Promise<AppActionResult>,
   createUser: (input: CreateAppUserCommand) => ipcRenderer.invoke(ipcChannels.app.createUser, input) as Promise<AppUserMutationResult>,
   updateUser: (input: UpdateAppUserCommand) => ipcRenderer.invoke(ipcChannels.app.updateUser, input) as Promise<AppUserMutationResult>,
   setUserActive: (input: SetAppUserActiveCommand) =>

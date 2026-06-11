@@ -5,6 +5,7 @@ export const ipcChannels = {
     getSupportSnapshot: "bukowskiApp:getSupportSnapshot",
     getUsersSnapshot: "bukowskiApp:getUsersSnapshot",
     createBackup: "bukowskiApp:createBackup",
+    restoreBackup: "bukowskiApp:restoreBackup",
     createUser: "bukowskiApp:createUser",
     updateUser: "bukowskiApp:updateUser",
     setUserActive: "bukowskiApp:setUserActive",

@@ -377,6 +377,7 @@ export const SettingsPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(false);
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+  const [isRestoringBackup, setIsRestoringBackup] = useState(false);
   const [isRunningLocalSync, setIsRunningLocalSync] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingSupportBundle, setIsExportingSupportBundle] = useState(false);
@@ -649,6 +650,23 @@ export const SettingsPage = () => {
     return platform;
   };
 
+  // The three captured-event slots often hold the same underlying incident
+  // (e.g. one restart logs crash + error + load failure with equal text).
+  // Collapse equal values into a single row so the support card reads cleanly.
+  const supportEventRows = useMemo(() => {
+    const rows = [
+      { label: t("settings.advanced.support.lastCrash"), value: formatSupportEvent(supportSnapshot.lastCrash, t("settings.advanced.support.noneCaptured")) },
+      { label: t("settings.advanced.support.lastError"), value: formatSupportEvent(supportSnapshot.lastError, t("settings.advanced.support.noneCaptured")) },
+      { label: t("settings.advanced.support.lastLoadIssue"), value: formatSupportEvent(supportSnapshot.lastLoadFailure, t("settings.advanced.support.noLoadIssues")) },
+    ];
+    const uniqueValues = new Set(rows.map((row) => row.value));
+    if (uniqueValues.size === 1 && supportSnapshot.lastCrash) {
+      return [{ label: t("settings.advanced.support.lastIssue"), value: rows[0].value }];
+    }
+    return rows;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supportSnapshot, t]);
+
   const supportSummaryText = useMemo(
     () =>
       [
@@ -855,6 +873,8 @@ export const SettingsPage = () => {
         <div className="page-stack">
           <WorkspaceSettingsPage variant="access" />
 
+          <span className="settings-group-label">{t("settings.team.groups.appAccounts")}</span>
+
           <SettingsDisclosure
             title={t("settings.team.usersDisclosure.title")}
             summary={t("settings.team.usersDisclosure.summary", {
@@ -863,7 +883,7 @@ export const SettingsPage = () => {
             })}
           >
             <div className="settings-team-layout">
-              <SurfaceCard title={t("settings.team.usersCardTitle")}>
+              <SurfaceCard>
                 <button className={`settings-user-row${selectedUserId === "new" ? " is-selected" : ""}`} onClick={() => setSelectedUserId("new")} type="button">
                   <span className="settings-user-create-mark">+</span>
                   <span className="settings-user-row-copy">
@@ -1064,7 +1084,7 @@ export const SettingsPage = () => {
             title={t("settings.team.rolesDisclosure.title")}
             summary={t("settings.team.rolesDisclosure.summary", { count: usersSnapshot.roles.length })}
           >
-            <SurfaceCard title={t("settings.team.rolesCardTitle")}>
+            <SurfaceCard>
               <div className="settings-role-grid">
                 {usersSnapshot.roles.map((role) => {
                   const coverageLabels = getRoleCoverageIds(role.permissionKeys).map((id) =>
@@ -1098,7 +1118,7 @@ export const SettingsPage = () => {
             title={t("settings.team.permissionMatrixTitle")}
             summary={t("settings.team.permissionMatrixSummary")}
           >
-            <SurfaceCard title={t("settings.team.permissionMatrixTitle")}>
+            <SurfaceCard>
               <RolesPermissionMatrix roles={usersSnapshot.roles} />
             </SurfaceCard>
           </SettingsDisclosure>
@@ -1130,6 +1150,32 @@ export const SettingsPage = () => {
                 type="button"
               >
                 {isCreatingBackup ? t("settings.data.actions.creatingBackup") : t("settings.data.actions.createBackup")}
+              </button>
+              <button
+                className="ghost-control is-danger"
+                disabled={!diagnostics.backupExists || isRestoringBackup}
+                onClick={async () => {
+                  const confirmed = await confirm({
+                    title: t("settings.data.restoreConfirm.title"),
+                    body: t("settings.data.restoreConfirm.body", {
+                      date: formatDateLabel(diagnostics.lastBackupAt),
+                    }),
+                    confirmLabel: t("settings.data.restoreConfirm.action"),
+                    tone: "danger",
+                  });
+                  if (!confirmed) return;
+                  try {
+                    setIsRestoringBackup(true);
+                    await window.bukowskiApp!.restoreBackup();
+                    toast.info(t("settings.data.restoreConfirm.restartingTitle"), t("settings.data.restoreConfirm.restartingBody"));
+                  } catch (nextError) {
+                    setIsRestoringBackup(false);
+                    setError(getUserFacingErrorMessage(nextError, t("settings.actions.couldNotComplete")));
+                  }
+                }}
+                type="button"
+              >
+                {isRestoringBackup ? t("settings.data.actions.restoringBackup") : t("settings.data.actions.restoreBackup")}
               </button>
               <button
                 className="ghost-control"
@@ -1177,20 +1223,12 @@ export const SettingsPage = () => {
         <div className="settings-advanced-layout">
           <SurfaceCard className="settings-advanced-card settings-advanced-card-wide" title={t("settings.advanced.support.cardTitle")}>
             <div className="summary-grid settings-stat-grid">
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.support.lastCrash")}</span>
-                <span className="summary-value">{formatSupportEvent(supportSnapshot.lastCrash, t("settings.advanced.support.noneCaptured"))}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.support.lastError")}</span>
-                <span className="summary-value">{formatSupportEvent(supportSnapshot.lastError, t("settings.advanced.support.noneCaptured"))}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.support.lastLoadIssue")}</span>
-                <span className="summary-value">
-                  {formatSupportEvent(supportSnapshot.lastLoadFailure, t("settings.advanced.support.noLoadIssues"))}
-                </span>
-              </div>
+              {supportEventRows.map((row) => (
+                <div className="summary-row" key={row.label}>
+                  <span className="summary-label">{row.label}</span>
+                  <span className="summary-value">{row.value}</span>
+                </div>
+              ))}
               <div className="summary-row">
                 <span className="summary-label">{t("settings.advanced.support.logLocation")}</span>
                 <span className="summary-value">
