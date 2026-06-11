@@ -762,7 +762,7 @@ const resolveIncidentComparator = (
 ): ((left: IncidentListRow & { reportedAt: string }, right: IncidentListRow & { reportedAt: string }) => number) => (left, right) => {
   switch (sortBy) {
     case "asset":
-      return compareTextValue(left.asset, right.asset, direction);
+      return compareTextValue(left.assetName, right.assetName, direction);
     case "project":
       return compareTextValue(left.project, right.project, direction);
     case "responsible":
@@ -1810,7 +1810,8 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
           SELECT
             incidents.id,
             incidents.title,
-            COALESCE(assets.internal_code, '—') AS asset_code,
+            COALESCE(legacy_rentman_items.legacy_code, assets.internal_code, '—') AS asset_code,
+            COALESCE(assets.name, '—') AS asset_name,
             incidents.asset_id,
             incidents.project_id,
             COALESCE(projects.name, '—') AS project,
@@ -1821,6 +1822,8 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
             incidents.reported_at
           FROM incidents
           LEFT JOIN assets ON assets.id = incidents.asset_id
+          LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
+          LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
           LEFT JOIN projects ON projects.id = incidents.project_id
           LEFT JOIN users ON users.id = incidents.responsible_user_id
           WHERE (? IS NULL OR incidents.workspace_id = ?)
@@ -1830,6 +1833,7 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
       id: string;
       title: string;
       asset_code: string;
+      asset_name: string;
       asset_id: string | null;
       project_id: string | null;
       project: string;
@@ -1845,6 +1849,8 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
         id: row.id,
         title: row.title,
         asset: row.asset_code,
+        assetCode: row.asset_code,
+        assetName: row.asset_name,
         assetId: row.asset_id,
         projectId: row.project_id,
         project: row.project,
@@ -1856,7 +1862,7 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
       }))
       .filter((row) => !query.scopeProjectId || row.projectId === query.scopeProjectId)
       .filter((row) =>
-        matchesSearch(query.search, [row.title, row.asset, row.project, row.responsible, row.severity, row.status]),
+        matchesSearch(query.search, [row.title, row.assetCode, row.assetName, row.project, row.responsible, row.severity, row.status]),
       );
 
     return sortRows(

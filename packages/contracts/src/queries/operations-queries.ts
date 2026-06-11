@@ -90,6 +90,8 @@ export type IncidentListRow = {
   id: string;
   title: string;
   asset: string;
+  assetCode: string;
+  assetName: string;
   assetId: string | null;
   projectId: string | null;
   project: string;

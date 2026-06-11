@@ -3645,6 +3645,8 @@
     },
     "columns": {
       "incident": "Incident",
+      "assetCode": "Code",
+      "asset": "Asset",
       "project": "Project",
       "responsible": "Responsible",
       "severity": "Severity",

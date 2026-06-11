@@ -34,7 +34,7 @@ type IncidentsPageProps = {
 const incidentSortOptions: Array<ListSortOption<IncidentSortField>> = [
   { value: "reportedAt", label: "incidents.sort.reportedAt" },
   { value: "title", label: "incidents.sort.title", columnKey: "title" },
-  { value: "asset", label: "incidents.sort.asset", columnKey: "title" },
+  { value: "asset", label: "incidents.sort.asset", columnKey: "assetName" },
   { value: "project", label: "incidents.sort.project", columnKey: "project" },
   { value: "responsible", label: "incidents.sort.responsible", columnKey: "responsible" },
   { value: "severity", label: "incidents.sort.severity", columnKey: "severity" },
@@ -389,10 +389,11 @@ export const IncidentsPage = ({ projectId = null }: IncidentsPageProps) => {
               render: (row) => (
                 <div className="identity-cell">
                   <span className="identity-title">{row.title}</span>
-                  <span className="identity-meta">{row.asset}</span>
                 </div>
               ),
             },
+            { key: "assetCode", label: t("incidents.columns.assetCode"), render: (row) => row.assetCode },
+            { key: "assetName", label: t("incidents.columns.asset"), render: (row) => row.assetName },
             { key: "project", label: t("incidents.columns.project"), render: (row) => row.project },
             { key: "responsible", label: t("incidents.columns.responsible"), render: (row) => row.responsible },
             {
