@@ -26,38 +26,95 @@ import { useProjectDetail } from "./useProjectsData";
 
 const buildBudgetTargetKey = (projectId: string) => `bukowski:project-budget-target:${projectId}`;
 
-const readBudgetTarget = (projectId: string | null): number | null => {
+type LocalBudgetTargetState = {
+  amount: number | null;
+  currency: string;
+  updatedAt: string | null;
+  pendingSync: boolean;
+  deleted?: boolean;
+  lastSyncError?: string | null;
+};
+
+type FinanceEntryLike = {
+  type: string;
+  amountValue?: number;
+  currency?: string;
+};
+
+const getEntryCurrency = (row: { currency?: string }) => row.currency?.trim().toUpperCase() || "USD";
+
+const normalizeBudgetCurrency = (currency?: string | null) => currency?.trim().toUpperCase() || "USD";
+
+const parseBudgetTargetState = (raw: string | null): LocalBudgetTargetState | null => {
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<LocalBudgetTargetState>;
+    const amount = typeof parsed.amount === "number" && Number.isFinite(parsed.amount) ? parsed.amount : null;
+    return {
+      amount,
+      currency: normalizeBudgetCurrency(parsed.currency),
+      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : null,
+      pendingSync: Boolean(parsed.pendingSync),
+      deleted: Boolean(parsed.deleted),
+      lastSyncError: typeof parsed.lastSyncError === "string" ? parsed.lastSyncError : null,
+    };
+  } catch {
+    const legacyAmount = Number.parseFloat(raw);
+    return Number.isFinite(legacyAmount)
+      ? {
+          amount: legacyAmount,
+          currency: "USD",
+          updatedAt: null,
+          pendingSync: false,
+          deleted: false,
+          lastSyncError: null,
+        }
+      : null;
+  }
+};
+
+const readBudgetTargetState = (projectId: string | null): LocalBudgetTargetState | null => {
   if (!projectId || typeof window === "undefined") {
     return null;
   }
   try {
-    const raw = window.localStorage.getItem(buildBudgetTargetKey(projectId));
-    if (!raw) {
-      return null;
-    }
-    const parsed = Number.parseFloat(raw);
-    return Number.isFinite(parsed) ? parsed : null;
+    return parseBudgetTargetState(window.localStorage.getItem(buildBudgetTargetKey(projectId)));
   } catch {
     return null;
   }
 };
 
-const writeBudgetTarget = (projectId: string, value: number | null) => {
+const writeBudgetTargetState = (projectId: string, state: LocalBudgetTargetState | null) => {
   if (typeof window === "undefined") {
     return;
   }
   try {
-    if (value == null) {
+    if (state == null) {
       window.localStorage.removeItem(buildBudgetTargetKey(projectId));
     } else {
-      window.localStorage.setItem(buildBudgetTargetKey(projectId), String(value));
+      window.localStorage.setItem(buildBudgetTargetKey(projectId), JSON.stringify(state));
     }
   } catch {
     // ignore storage errors
   }
 };
 
-const sumEntriesByType = (rows: Array<{ type: string; amountValue?: number }>) => {
+const isRemoteNewer = (remoteUpdatedAt: string | null, localUpdatedAt: string | null) => {
+  if (!remoteUpdatedAt || !localUpdatedAt) {
+    return Boolean(remoteUpdatedAt);
+  }
+  const remoteTime = Date.parse(remoteUpdatedAt);
+  const localTime = Date.parse(localUpdatedAt);
+  if (!Number.isFinite(remoteTime) || !Number.isFinite(localTime)) {
+    return Boolean(remoteUpdatedAt);
+  }
+  return remoteTime >= localTime;
+};
+
+const sumEntriesByType = (rows: FinanceEntryLike[]) => {
   let income = 0;
   let expense = 0;
   for (const row of rows) {
@@ -71,6 +128,22 @@ const sumEntriesByType = (rows: Array<{ type: string; amountValue?: number }>) =
   return { income, expense };
 };
 
+const buildCurrencyBreakdown = (rows: FinanceEntryLike[]) => {
+  const totals = new Map<string, { income: number; expense: number }>();
+  rows.forEach((row) => {
+    const currency = getEntryCurrency(row);
+    const current = totals.get(currency) ?? { income: 0, expense: 0 };
+    const value = row.amountValue ?? 0;
+    if (row.type.toLowerCase().includes("income")) {
+      current.income += value;
+    } else {
+      current.expense += value;
+    }
+    totals.set(currency, current);
+  });
+  return totals;
+};
+
 export const ProjectBudgetPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -80,6 +153,23 @@ export const ProjectBudgetPage = () => {
   const { formatMoney } = useLocale();
   const formatCurrency = (value: number, code = "USD") =>
     formatMoney(value, code, { maximumFractionDigits: 0 });
+  const formatCurrencyBreakdown = (totalsByCurrency: Map<string, { income: number; expense: number }>, field: "income" | "expense" | "net") => {
+    if (!totalsByCurrency.size) {
+      return formatCurrency(0, "USD");
+    }
+    return Array.from(totalsByCurrency.entries())
+      .sort(([leftCurrency], [rightCurrency]) => leftCurrency.localeCompare(rightCurrency))
+      .map(([currencyCode, totalsForCurrency]) => {
+        const value =
+          field === "income"
+            ? totalsForCurrency.income
+            : field === "expense"
+              ? totalsForCurrency.expense
+              : totalsForCurrency.expense - totalsForCurrency.income;
+        return formatCurrency(value, currencyCode);
+      })
+      .join(" / ");
+  };
   const { projectId } = useProjectMode();
   const { data, error, isLoading } = useProjectDetail(projectId);
   const { data: financeEntries, error: financeError } = useFinanceEntries({
@@ -91,15 +181,33 @@ export const ProjectBudgetPage = () => {
 
   const cloudEnabled = Boolean(supabase) && !isLocalFallback;
   const [budgetTarget, setBudgetTarget] = useState<number | null>(null);
+  const [budgetTargetCurrency, setBudgetTargetCurrency] = useState("USD");
+  const [targetSyncState, setTargetSyncState] = useState<"synced" | "local" | "pending">("synced");
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [targetDraft, setTargetDraft] = useState("");
   const [isSavingTarget, setIsSavingTarget] = useState(false);
 
+  const projectEntries = useMemo(
+    () => (projectId ? financeEntries.filter((entry) => entry.projectId === projectId) : []),
+    [financeEntries, projectId],
+  );
+
+  const totalsByCurrency = useMemo(() => buildCurrencyBreakdown(projectEntries), [projectEntries]);
+  const entryCurrencies = useMemo(() => Array.from(totalsByCurrency.keys()).sort(), [totalsByCurrency]);
+  const hasMixedCurrencies = entryCurrencies.length > 1;
+  const singleEntryCurrency = entryCurrencies[0] ?? budgetTargetCurrency;
+  const displayCurrency = budgetTargetCurrency || singleEntryCurrency || "USD";
+  const targetCurrencyMismatch = Boolean(budgetTarget != null && entryCurrencies.length === 1 && singleEntryCurrency !== displayCurrency);
+  const canCompareBudgetTarget = budgetTarget != null && !hasMixedCurrencies && !targetCurrencyMismatch;
+  const comparableEntries = projectEntries.filter((entry) => getEntryCurrency(entry) === displayCurrency);
+
   useEffect(() => {
     let cancelled = false;
-    const localValue = readBudgetTarget(projectId);
-    setBudgetTarget(localValue);
-    setTargetDraft(localValue != null ? String(localValue) : "");
+    const localState = readBudgetTargetState(projectId);
+    setBudgetTarget(localState?.deleted ? null : localState?.amount ?? null);
+    setBudgetTargetCurrency(localState?.currency ?? singleEntryCurrency ?? "USD");
+    setTargetDraft(!localState?.deleted && localState?.amount != null ? String(localState.amount) : "");
+    setTargetSyncState(localState?.pendingSync ? "pending" : localState ? "local" : "synced");
 
     if (!cloudEnabled || !supabase || !projectId) {
       return () => {
@@ -109,27 +217,72 @@ export const ProjectBudgetPage = () => {
 
     void (async () => {
       try {
+        let effectiveLocalState = localState;
+        if (localState?.pendingSync) {
+          if (localState.deleted) {
+            await deleteProjectBudgetTarget(supabase, projectId);
+            writeBudgetTargetState(projectId, null);
+            effectiveLocalState = null;
+            if (!cancelled) {
+              setTargetSyncState("synced");
+            }
+          } else if (localState.amount != null) {
+            await upsertProjectBudgetTarget(supabase, {
+              projectId,
+              workspaceId: activeWorkspaceId,
+              amount: localState.amount,
+              currency: localState.currency,
+            });
+            const syncedState = { ...localState, pendingSync: false, lastSyncError: null };
+            writeBudgetTargetState(projectId, syncedState);
+            effectiveLocalState = syncedState;
+            if (!cancelled) {
+              setBudgetTarget(syncedState.amount);
+              setBudgetTargetCurrency(syncedState.currency);
+              setTargetDraft(String(syncedState.amount));
+              setTargetSyncState("synced");
+            }
+          }
+        }
+
         const remote = await fetchProjectBudgetTarget(supabase, projectId);
         if (cancelled) return;
         if (remote) {
+          if (effectiveLocalState?.pendingSync || (effectiveLocalState && !isRemoteNewer(remote.updatedAt, effectiveLocalState.updatedAt))) {
+            setTargetSyncState(effectiveLocalState.pendingSync ? "pending" : "local");
+            return;
+          }
           setBudgetTarget(remote.amount);
+          setBudgetTargetCurrency(remote.currency);
           setTargetDraft(String(remote.amount));
-          writeBudgetTarget(projectId, remote.amount); // mirror locally for offline fallback
+          writeBudgetTargetState(projectId, {
+            amount: remote.amount,
+            currency: remote.currency,
+            updatedAt: remote.updatedAt,
+            pendingSync: false,
+            deleted: false,
+            lastSyncError: null,
+          });
+          setTargetSyncState("synced");
         } else {
-          // remote authoritative: if no remote target, clear local mirror
-          setBudgetTarget(null);
-          setTargetDraft("");
-          writeBudgetTarget(projectId, null);
+          if (effectiveLocalState && !effectiveLocalState.deleted) {
+            setTargetSyncState(effectiveLocalState.pendingSync ? "pending" : "local");
+            return;
+          }
+          writeBudgetTargetState(projectId, null);
+          setTargetSyncState("synced");
         }
       } catch {
-        // Silently keep local fallback when remote is unreachable.
+        if (!cancelled && localState) {
+          setTargetSyncState(localState.pendingSync ? "pending" : "local");
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [cloudEnabled, projectId, supabase]);
+  }, [activeWorkspaceId, cloudEnabled, projectId, singleEntryCurrency, supabase]);
 
   const handleSaveTarget = async () => {
     if (!projectId) return;
@@ -137,16 +290,29 @@ export const ProjectBudgetPage = () => {
 
     if (!trimmed) {
       setIsSavingTarget(true);
+      const updatedAt = new Date().toISOString();
       try {
         if (cloudEnabled && supabase) {
           await deleteProjectBudgetTarget(supabase, projectId);
         }
-        writeBudgetTarget(projectId, null);
+        writeBudgetTargetState(projectId, null);
         setBudgetTarget(null);
         setIsEditingTarget(false);
+        setTargetSyncState("synced");
         toast.success(t("projects.budget.toasts.targetClearedTitle"), t("projects.budget.toasts.targetClearedBody"));
       } catch (nextError) {
-        toast.error(t("projects.budget.toasts.clearFailed"), getUserFacingErrorMessage(nextError, t("common.tryAgain")));
+        writeBudgetTargetState(projectId, {
+          amount: null,
+          currency: budgetTargetCurrency,
+          updatedAt,
+          pendingSync: true,
+          deleted: true,
+          lastSyncError: getUserFacingErrorMessage(nextError, t("common.tryAgain")),
+        });
+        setBudgetTarget(null);
+        setIsEditingTarget(false);
+        setTargetSyncState("pending");
+        toast.error(t("projects.budget.toasts.clearFailed"), t("projects.budget.toasts.clearPendingBody"));
       } finally {
         setIsSavingTarget(false);
       }
@@ -160,44 +326,58 @@ export const ProjectBudgetPage = () => {
     }
 
     setIsSavingTarget(true);
+    const updatedAt = new Date().toISOString();
+    const currencyForTarget = displayCurrency;
     try {
       if (cloudEnabled && supabase) {
         await upsertProjectBudgetTarget(supabase, {
           projectId,
           workspaceId: activeWorkspaceId,
           amount: parsed,
-          currency: "USD",
+          currency: currencyForTarget,
         });
       }
-      writeBudgetTarget(projectId, parsed);
+      writeBudgetTargetState(projectId, {
+        amount: parsed,
+        currency: currencyForTarget,
+        updatedAt,
+        pendingSync: false,
+        deleted: false,
+        lastSyncError: null,
+      });
       setBudgetTarget(parsed);
+      setBudgetTargetCurrency(currencyForTarget);
       setIsEditingTarget(false);
+      setTargetSyncState(cloudEnabled ? "synced" : "local");
       toast.success(
         t("projects.budget.toasts.targetSavedTitle"),
         cloudEnabled ? t("projects.budget.toasts.targetSavedCloud") : t("projects.budget.toasts.targetSavedLocal"),
       );
     } catch (nextError) {
-      // If cloud failed, still keep local copy.
-      writeBudgetTarget(projectId, parsed);
+      const message = getUserFacingErrorMessage(nextError, t("projects.budget.toasts.cloudFailedBody"));
+      writeBudgetTargetState(projectId, {
+        amount: parsed,
+        currency: currencyForTarget,
+        updatedAt,
+        pendingSync: true,
+        deleted: false,
+        lastSyncError: message,
+      });
       setBudgetTarget(parsed);
+      setBudgetTargetCurrency(currencyForTarget);
       setIsEditingTarget(false);
+      setTargetSyncState("pending");
       toast.error(
         t("projects.budget.toasts.cloudFailedTitle"),
-        getUserFacingErrorMessage(nextError, t("projects.budget.toasts.cloudFailedBody")),
+        message,
       );
     } finally {
       setIsSavingTarget(false);
     }
   };
 
-  const projectEntries = useMemo(
-    () => (projectId ? financeEntries.filter((entry) => entry.projectId === projectId) : []),
-    [financeEntries, projectId],
-  );
-
-  const totals = useMemo(() => sumEntriesByType(projectEntries), [projectEntries]);
+  const totals = useMemo(() => sumEntriesByType(comparableEntries), [comparableEntries]);
   const netExposure = totals.expense - totals.income;
-  const currency = projectEntries[0]?.currency ?? "USD";
 
   if (error) {
     return <div className="empty-state">{t("projects.budget.unavailable", { message: error })}</div>;
@@ -217,9 +397,14 @@ export const ProjectBudgetPage = () => {
 
   const showEntriesEmpty = !financeError && projectEntries.length === 0;
 
-  const targetUsage = budgetTarget && budgetTarget > 0 ? Math.min(1, totals.expense / budgetTarget) : 0;
-  const remainingTarget = budgetTarget ? budgetTarget - totals.expense : 0;
-  const overTarget = budgetTarget != null && totals.expense > budgetTarget;
+  const targetUsage = canCompareBudgetTarget && budgetTarget > 0 ? Math.min(1, totals.expense / budgetTarget) : 0;
+  const remainingTarget = canCompareBudgetTarget && budgetTarget ? budgetTarget - totals.expense : 0;
+  const overTarget = canCompareBudgetTarget && budgetTarget != null && totals.expense > budgetTarget;
+  const currencyWarning = hasMixedCurrencies
+    ? t("projects.budget.currency.mixedWarning", { currencies: entryCurrencies.join(", ") })
+    : targetCurrencyMismatch
+      ? t("projects.budget.currency.targetMismatch", { targetCurrency: displayCurrency, entryCurrency: singleEntryCurrency })
+      : null;
 
   return (
     <div className="page-stack page-stack-project">
@@ -250,7 +435,7 @@ export const ProjectBudgetPage = () => {
           {isEditingTarget ? (
             <div className="agent-form-grid">
               <label className="field-block">
-                <span className="field-label">{t("projects.budget.target.amount", { currency })}</span>
+                <span className="field-label">{t("projects.budget.target.amount", { currency: displayCurrency })}</span>
                 <input
                   className="field-input"
                   inputMode="decimal"
@@ -285,37 +470,56 @@ export const ProjectBudgetPage = () => {
             </div>
           ) : budgetTarget != null ? (
             <>
+              {targetSyncState !== "synced" ? (
+                <div className={`action-feedback ${targetSyncState === "pending" ? "action-feedback-warning" : "action-feedback-info"}`}>
+                  {targetSyncState === "pending"
+                    ? t("projects.budget.target.pendingSync")
+                    : t("projects.budget.target.localOnly")}
+                </div>
+              ) : null}
+              {currencyWarning ? <div className="action-feedback action-feedback-warning">{currencyWarning}</div> : null}
               <div className="project-budget-grid">
                 <div className="summary-row">
                   <span className="summary-label">{t("projects.budget.target.target")}</span>
-                  <span className="summary-value">{formatCurrency(budgetTarget, currency)}</span>
+                  <span className="summary-value">{formatCurrency(budgetTarget, displayCurrency)}</span>
                 </div>
                 <div className="summary-row">
                   <span className="summary-label">{t("projects.budget.target.spent")}</span>
-                  <span className="summary-value">{formatCurrency(totals.expense, currency)}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">{overTarget ? t("projects.budget.target.overBy") : t("projects.budget.target.remaining")}</span>
                   <span className="summary-value">
-                    {formatCurrency(Math.abs(remainingTarget), currency)}
+                    {canCompareBudgetTarget
+                      ? formatCurrency(totals.expense, displayCurrency)
+                      : formatCurrencyBreakdown(totalsByCurrency, "expense")}
                   </span>
                 </div>
+                {canCompareBudgetTarget ? (
+                  <div className="summary-row">
+                    <span className="summary-label">{overTarget ? t("projects.budget.target.overBy") : t("projects.budget.target.remaining")}</span>
+                    <span className="summary-value">{formatCurrency(Math.abs(remainingTarget), displayCurrency)}</span>
+                  </div>
+                ) : null}
               </div>
-              <div
-                aria-label={t("projects.budget.target.usageAria", { percent: (targetUsage * 100).toFixed(0) })}
-                className={`budget-progress${overTarget ? " is-over" : ""}`}
-                role="progressbar"
-                aria-valuenow={Math.round(targetUsage * 100)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              >
-                <span className="budget-progress-fill" style={{ width: `${Math.round(targetUsage * 100)}%` }} />
-              </div>
+              {canCompareBudgetTarget ? (
+                <div
+                  aria-label={t("projects.budget.target.usageAria", { percent: (targetUsage * 100).toFixed(0) })}
+                  className={`budget-progress${overTarget ? " is-over" : ""}`}
+                  role="progressbar"
+                  aria-valuenow={Math.round(targetUsage * 100)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <span className="budget-progress-fill" style={{ width: `${Math.round(targetUsage * 100)}%` }} />
+                </div>
+              ) : null}
             </>
           ) : (
-            <p className="surface-card-subtitle">
-              {t("projects.budget.target.noTargetPrefix")} <strong>{t("projects.budget.target.set")}</strong> {t("projects.budget.target.noTargetSuffix")}
-            </p>
+            <>
+              {targetSyncState === "pending" ? (
+                <div className="action-feedback action-feedback-warning">{t("projects.budget.target.pendingSync")}</div>
+              ) : null}
+              <p className="surface-card-subtitle">
+                {t("projects.budget.target.noTargetPrefix")} <strong>{t("projects.budget.target.set")}</strong> {t("projects.budget.target.noTargetSuffix")}
+              </p>
+            </>
           )}
         </SurfaceCard>
 
@@ -346,15 +550,17 @@ export const ProjectBudgetPage = () => {
             <div className="project-budget-grid">
               <div className="summary-row">
                 <span className="summary-label">{t("projects.budget.spend.loggedIncome")}</span>
-                <span className="summary-value">{formatCurrency(totals.income, currency)}</span>
+                <span className="summary-value">{formatCurrencyBreakdown(totalsByCurrency, "income")}</span>
               </div>
               <div className="summary-row">
                 <span className="summary-label">{t("projects.budget.spend.loggedExpense")}</span>
-                <span className="summary-value">{formatCurrency(totals.expense, currency)}</span>
+                <span className="summary-value">{formatCurrencyBreakdown(totalsByCurrency, "expense")}</span>
               </div>
               <div className="summary-row">
                 <span className="summary-label">{t("projects.budget.spend.net")}</span>
-                <span className="summary-value">{formatCurrency(netExposure, currency)}</span>
+                <span className="summary-value">
+                  {hasMixedCurrencies ? formatCurrencyBreakdown(totalsByCurrency, "net") : formatCurrency(netExposure, displayCurrency)}
+                </span>
               </div>
               <div className="summary-row">
                 <span className="summary-label">{t("projects.budget.spend.entriesOnProject")}</span>
@@ -363,29 +569,29 @@ export const ProjectBudgetPage = () => {
             </div>
           </SurfaceCard>
 
-          <SurfaceCard className="project-scroll-card" title="Honorarios de crew">
+          <SurfaceCard className="project-scroll-card" title={t("projects.budget.collaborators.title")}>
             <div className="project-budget-grid">
               <div className="summary-row">
-                <span className="summary-label">Pendiente</span>
-                <span className="summary-value">{formatCurrency(collaboratorSummary.pendingAmount, currency)}</span>
+                <span className="summary-label">{t("projects.budget.collaborators.pending")}</span>
+                <span className="summary-value">{formatCurrency(collaboratorSummary.pendingAmount, displayCurrency)}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Aprobado</span>
-                <span className="summary-value">{formatCurrency(collaboratorSummary.approvedAmount, currency)}</span>
+                <span className="summary-label">{t("projects.budget.collaborators.approved")}</span>
+                <span className="summary-value">{formatCurrency(collaboratorSummary.approvedAmount, displayCurrency)}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Pagado este mes</span>
-                <span className="summary-value">{formatCurrency(collaboratorSummary.paidThisMonth, currency)}</span>
+                <span className="summary-label">{t("projects.budget.collaborators.paidThisMonth")}</span>
+                <span className="summary-value">{formatCurrency(collaboratorSummary.paidThisMonth, displayCurrency)}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Con balance</span>
+                <span className="summary-label">{t("projects.budget.collaborators.withBalance")}</span>
                 <span className="summary-value">{collaboratorSummary.collaboratorsWithBalance}</span>
               </div>
             </div>
             <div className="surface-card-actions" style={{ justifyContent: "flex-end", marginTop: 12 }}>
               <button className="ghost-control" onClick={() => navigate("/finance/collaborators")} type="button">
                 <ArrowUpRight size={14} />
-                <span>Abrir honorarios</span>
+                <span>{t("projects.budget.collaborators.open")}</span>
               </button>
             </div>
           </SurfaceCard>

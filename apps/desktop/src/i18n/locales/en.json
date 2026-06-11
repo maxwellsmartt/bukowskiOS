@@ -4201,7 +4201,8 @@
         "targetSavedCloud": "Synced to the cloud — visible to teammates.",
         "targetSavedLocal": "Saved locally; cloud sync resumes when you reconnect.",
         "cloudFailedTitle": "Saved locally — cloud failed",
-        "cloudFailedBody": "We kept your value on this device. We'll retry on next sync."
+        "cloudFailedBody": "We kept your value on this device. We'll retry on next sync.",
+        "clearPendingBody": "We removed the target on this device. The deletion will sync when the cloud responds."
       },
       "target": {
         "title": "Budget target",
@@ -4217,7 +4218,13 @@
         "remaining": "Remaining",
         "usageAria": "Budget usage {{percent}} percent",
         "noTargetPrefix": "No target set yet. Click",
-        "noTargetSuffix": "to declare what this project should cap at."
+        "noTargetSuffix": "to declare what this project should cap at.",
+        "pendingSync": "A budget change is waiting to sync. We'll retry automatically when the connection is back.",
+        "localOnly": "Showing a target saved on this device. The cloud has not confirmed a newer version."
+      },
+      "currency": {
+        "mixedWarning": "This project has entries in multiple currencies ({{currencies}}). We do not combine currencies without a confirmed conversion, so the progress bar is paused.",
+        "targetMismatch": "The target is in {{targetCurrency}}, but entries are in {{entryCurrency}}. Update the target or convert the entries before comparing."
       },
       "summary": {
         "title": "Budget summary",
@@ -4232,6 +4239,14 @@
         "loggedExpense": "Logged expense",
         "net": "Net",
         "entriesOnProject": "Entries on this project"
+      },
+      "collaborators": {
+        "title": "Crew fees",
+        "pending": "Pending",
+        "approved": "Approved",
+        "paidThisMonth": "Paid this month",
+        "withBalance": "With balance",
+        "open": "Open fees"
       },
       "finance": {
         "title": "Finance entries",
