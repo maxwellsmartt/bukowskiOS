@@ -27,7 +27,7 @@ export const FinanceEntriesPage = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId: workspaceId } = useWorkspace();
   const toast = useToast();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const financeEntrySortOptions = useMemo<Array<ListSortOption<FinanceEntrySortField>>>(
     () => [
       { value: "date", label: t("finance.entries.sort.entryDate"), columnKey: "date" },
@@ -66,10 +66,13 @@ export const FinanceEntriesPage = () => {
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [initialProjectIdForCreate, setInitialProjectIdForCreate] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingDocuments, setIsUploadingDocuments] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const focusedEntryId = searchParams.get("focus");
+  const newEntryProjectId = searchParams.get("projectId");
+  const shouldOpenNewEntry = searchParams.get("new") === "1";
 
   const editingEntry = useMemo(() => data.find((entry) => entry.id === editingEntryId) ?? null, [data, editingEntryId]);
   const { data: documents, reload: reloadDocuments } = useFinanceEntryDocuments(editingEntryId);
@@ -83,6 +86,22 @@ export const FinanceEntriesPage = () => {
     setSubmitError(null);
     setIsEditorOpen(true);
   }, [data, focusedEntryId]);
+
+  useEffect(() => {
+    if (!shouldOpenNewEntry) {
+      return;
+    }
+
+    setEditingEntryId(null);
+    setInitialProjectIdForCreate(newEntryProjectId);
+    setSubmitError(null);
+    setIsEditorOpen(true);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("new");
+    nextParams.delete("projectId");
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams, shouldOpenNewEntry]);
 
   const handleSubmit = async (draft: FinanceEntryEditorDraft) => {
     try {
@@ -108,6 +127,7 @@ export const FinanceEntriesPage = () => {
       toast.success(editingEntry ? t("finance.entries.toasts.updated") : t("finance.entries.toasts.created"), result.summary);
       setIsEditorOpen(false);
       setEditingEntryId(null);
+      setInitialProjectIdForCreate(null);
       reload();
     } catch (nextError) {
       setSubmitError(getUserFacingErrorMessage(nextError, t("finance.entries.errors.save")));
@@ -131,6 +151,7 @@ export const FinanceEntriesPage = () => {
           className="action-primary-button"
           onClick={() => {
             setEditingEntryId(null);
+            setInitialProjectIdForCreate(null);
             setSubmitError(null);
             setIsEditorOpen(true);
           }}
@@ -178,6 +199,7 @@ export const FinanceEntriesPage = () => {
           assets={assets}
           documents={documents}
           error={submitError}
+          initialProjectId={initialProjectIdForCreate}
           incidents={incidents}
           initialValue={editingEntry}
           isSubmitting={isSubmitting}
@@ -203,6 +225,7 @@ export const FinanceEntriesPage = () => {
           onClose={() => {
             setIsEditorOpen(false);
             setEditingEntryId(null);
+            setInitialProjectIdForCreate(null);
             setSubmitError(null);
           }}
           onOpenDocument={async (fileId) => {
@@ -253,6 +276,7 @@ export const FinanceEntriesPage = () => {
                   ? () => financeControls.setSearchValue("")
                   : () => {
                       setEditingEntryId(null);
+                      setInitialProjectIdForCreate(null);
                       setSubmitError(null);
                       setIsEditorOpen(true);
                     }

@@ -29,6 +29,7 @@ type FinanceEntryEditorPanelProps = {
   incidents: IncidentListRow[];
   projects: ProjectCardRow[];
   error: string | null;
+  initialProjectId?: string | null;
   initialValue?: FinanceEntryRow | null;
   isSubmitting: boolean;
   isUploadingDocuments: boolean;
@@ -70,6 +71,7 @@ export const FinanceEntryEditorPanel = ({
   incidents,
   projects,
   error,
+  initialProjectId,
   initialValue,
   isSubmitting,
   isUploadingDocuments,
@@ -100,7 +102,7 @@ export const FinanceEntryEditorPanel = ({
       setAmount("");
       setCurrency("USD");
       setStatus("Draft");
-      setProjectId("");
+      setProjectId(initialProjectId ?? "");
       setAssetId("");
       setIncidentId("");
       setEntryDate(resolveDefaultDate());
@@ -120,7 +122,7 @@ export const FinanceEntryEditorPanel = ({
     setEntryDate(initialValue.date);
     setDescription(initialValue.description ?? "");
     setNotes(initialValue.notes ?? "");
-  }, [initialValue]);
+  }, [initialProjectId, initialValue]);
 
   const selectedProjectLabel = useMemo(
     () => projects.find((project) => project.id === projectId)?.name ?? null,

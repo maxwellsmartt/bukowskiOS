@@ -605,7 +605,13 @@ export const ProjectBudgetPage = () => {
                 <ArrowUpRight size={14} />
                 <span>{t("projects.budget.finance.open")}</span>
               </button>
-              <button className="action-primary-button" onClick={() => navigate("/finance/entries")} type="button">
+              <button
+                className="action-primary-button"
+                onClick={() =>
+                  navigate(projectId ? `/finance/entries?new=1&projectId=${encodeURIComponent(projectId)}` : "/finance/entries")
+                }
+                type="button"
+              >
                 <Plus size={14} />
                 <span>{t("projects.budget.finance.addEntry")}</span>
               </button>
@@ -678,6 +684,11 @@ export const ProjectBudgetPage = () => {
             persistKey="project-budget-incidents"
             rows={data.incidents}
             emptyMessage={t("projects.budget.incidents.empty")}
+            onRowClick={(row) => {
+              if (projectId) {
+                navigate(`/projects/${projectId}/incidents?focus=${encodeURIComponent(row.id)}`);
+              }
+            }}
           />
         </SurfaceCard>
       </div>
