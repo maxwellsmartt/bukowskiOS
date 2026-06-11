@@ -82,6 +82,7 @@ const getActivePackingPreferenceKey = (targetProjectId?: string | null) =>
 // tracking, custody, warehouse, costs, etc.) stay one click away in the column
 // manager instead of cluttering the table with mostly-constant noise.
 const assetDefaultColumnKeys = ["asset", "category", "quantity", "location", "project", "status"];
+const projectAssetDefaultColumnKeys = ["asset", "projectUnit", "quantity", "responsible", "status", "condition", "incidents"];
 
 const normalizeCsvHeader = (value: string) =>
   value
@@ -1031,6 +1032,19 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     () => (csvImportPreview ? buildAssetCsvDerivedSummary(csvImportPreview, assets) : null),
     [assets, csvImportPreview],
   );
+  const projectAssetSummary = useMemo(
+    () => ({
+      assetCount: assets.length,
+      totalUnits: assets.reduce((total, asset) => total + asset.totalQuantity, 0),
+      assignedUnits: assets.reduce((total, asset) => total + asset.assignedQuantity, 0),
+      checkedOutUnits: assets.reduce((total, asset) => total + asset.checkedOutQuantity, 0),
+      openIncidents: assets.reduce((total, asset) => total + asset.incidentsOpen, 0),
+      unitCount: new Set(assets.map((asset) => cleanDisplay(asset.projectUnit)).filter((value) => value && value !== "—")).size,
+      responsibleCount: new Set(assets.map((asset) => cleanDisplay(asset.responsible)).filter((value) => value && value !== "—")).size,
+      lockedKitCount: assets.filter((asset) => asset.linkedKitCount > 0).length,
+    }),
+    [assets],
+  );
   const csvReviewDrafts = csvShowAllRows
     ? csvDerivedSummary?.importableDrafts ?? []
     : csvDerivedSummary?.importableDrafts.slice(0, 8) ?? [];
@@ -1721,6 +1735,88 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         </div>
       ) : null}
 
+      {!error && !isLoading && isProjectMode ? (
+        <section className="project-assets-command-card" aria-label={t("assets.projectInventory.aria")}>
+          <div className="project-assets-command-copy">
+            <span>{t("assets.projectInventory.eyebrow")}</span>
+            <strong>{projectName ?? t("assets.projectInventory.fallbackName")}</strong>
+            <p>{t("assets.projectInventory.body")}</p>
+          </div>
+
+          <div className="project-assets-command-metrics">
+            <div className="project-assets-command-metric">
+              <span>{t("assets.projectInventory.metrics.assets")}</span>
+              <strong>{t("assets.projectInventory.metrics.assetsValue", {
+                records: projectAssetSummary.assetCount,
+                units: projectAssetSummary.totalUnits,
+              })}</strong>
+            </div>
+            <div className="project-assets-command-metric">
+              <span>{t("assets.projectInventory.metrics.ready")}</span>
+              <strong>{projectAssetSummary.assignedUnits}</strong>
+            </div>
+            <div className="project-assets-command-metric">
+              <span>{t("assets.projectInventory.metrics.out")}</span>
+              <strong>{projectAssetSummary.checkedOutUnits}</strong>
+            </div>
+            <div className={`project-assets-command-metric${projectAssetSummary.openIncidents ? " is-warning" : " is-ok"}`}>
+              <span>{t("assets.projectInventory.metrics.incidents")}</span>
+              <strong>{projectAssetSummary.openIncidents}</strong>
+            </div>
+            <div className={`project-assets-command-metric${projectAssetSummary.lockedKitCount ? " is-warning" : ""}`}>
+              <span>{t("assets.projectInventory.metrics.kits")}</span>
+              <strong>{projectAssetSummary.lockedKitCount}</strong>
+            </div>
+          </div>
+
+          <div className="project-assets-command-actions">
+            <button
+              className="action-primary-button action-row-button"
+              onClick={() =>
+                navigate("/assets", {
+                  state: {
+                    assignProjectId: projectId ?? undefined,
+                    assignProjectName: projectName ?? undefined,
+                  } satisfies AssetsRouteState,
+                })
+              }
+              type="button"
+            >
+              <Plus size={14} />
+              <span>{t("assets.projectActions.assignAssets")}</span>
+            </button>
+            <button
+              className="ghost-control action-row-button"
+              disabled={!selectedRowIds.length}
+              onClick={() => {
+                setPackingPanelOpen(true);
+                setActionPanelOpen(false);
+                setPackingError(null);
+              }}
+              type="button"
+            >
+              <ClipboardList size={14} />
+              <span>{t("assets.projectInventory.actions.packing")}</span>
+            </button>
+            <button
+              className="ghost-control action-row-button"
+              onClick={() => navigate(`/projects/${projectId}/packing`)}
+              type="button"
+            >
+              {t("assets.projectInventory.actions.returns")}
+            </button>
+          </div>
+
+          <div className="project-assets-command-footnote">
+            <span>{t("assets.projectInventory.unitsAndOwners", {
+              units: projectAssetSummary.unitCount,
+              owners: projectAssetSummary.responsibleCount,
+            })}</span>
+            <span>{t("assets.projectInventory.selectionHint", { count: selectedRowIds.length })}</span>
+          </div>
+        </section>
+      ) : null}
+
       {!error && !isLoading && assets.length === 0 && !assetControls.searchValue.trim() ? (
         <GuidedEmptyState
           title={isProjectMode ? t("assets.empty.projectTitle") : t("assets.empty.globalTitle")}
@@ -2285,7 +2381,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 onSelect: (target) => navigate(`/assets/${target.id}?report=incident`),
               },
             ]}
-            defaultVisibleColumnKeys={assetDefaultColumnKeys}
+            defaultVisibleColumnKeys={isProjectMode ? projectAssetDefaultColumnKeys : assetDefaultColumnKeys}
             emptyContent={
               <GuidedEmptyState
                 title={

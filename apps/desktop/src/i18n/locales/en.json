@@ -668,6 +668,27 @@
       "openProjectAssets": "Open Project Assets",
       "kitLocked": "These assets are part of active kits and cannot be assigned or moved individually: {{summary}}. Remove them from the kit first if you need to operate them as standalone items."
     },
+    "projectInventory": {
+      "aria": "Project inventory",
+      "body": "Control what is assigned, what is ready to leave, and what needs follow-up before the next movement.",
+      "eyebrow": "Project inventory",
+      "fallbackName": "Selected project",
+      "actions": {
+        "packing": "Create packing",
+        "returns": "View returns"
+      },
+      "metrics": {
+        "assets": "Assets",
+        "assetsValue": "{{records}} records · {{units}} units",
+        "incidents": "Incidents",
+        "kits": "Kits",
+        "out": "Out",
+        "ready": "Assigned"
+      },
+      "selectionHint_one": "{{count}} asset selected for operations.",
+      "selectionHint_other": "{{count}} assets selected for operations.",
+      "unitsAndOwners": "{{units}} units · {{owners}} owners"
+    },
     "sideRail": {
       "preview": "Quick preview",
       "selection": "Operation selection",

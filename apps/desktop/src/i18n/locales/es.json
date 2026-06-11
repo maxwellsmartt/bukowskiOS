@@ -670,6 +670,27 @@
       "openProjectAssets": "Abrir Equipos del proyecto",
       "kitLocked": "Estos equipos forman parte de kits activos y no se pueden asignar ni mover individualmente: {{summary}}. Quítalos del kit primero si necesitas operarlos por separado."
     },
+    "projectInventory": {
+      "aria": "Inventario del proyecto",
+      "body": "Controla qué está asignado, qué está listo para salir y qué necesita seguimiento antes del próximo movimiento.",
+      "eyebrow": "Inventario del proyecto",
+      "fallbackName": "Proyecto seleccionado",
+      "actions": {
+        "packing": "Crear packing",
+        "returns": "Ver retornos"
+      },
+      "metrics": {
+        "assets": "Equipos",
+        "assetsValue": "{{records}} registros · {{units}} unidades",
+        "incidents": "Incidentes",
+        "kits": "Kits",
+        "out": "Fuera",
+        "ready": "Asignado"
+      },
+      "selectionHint_one": "{{count}} equipo seleccionado para operar.",
+      "selectionHint_other": "{{count}} equipos seleccionados para operar.",
+      "unitsAndOwners": "{{units}} unidades · {{owners}} responsables"
+    },
     "sideRail": {
       "preview": "Vista rápida",
       "selection": "Selección operativa",

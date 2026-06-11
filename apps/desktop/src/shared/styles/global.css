@@ -7651,6 +7651,136 @@ body.is-resizing-side-rail {
   padding-bottom: 0;
 }
 
+.project-assets-command-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(360px, 2fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(126, 183, 178, 0.14);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.09), transparent 36%),
+    rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.project-assets-command-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.project-assets-command-copy span,
+.project-assets-command-metric span,
+.project-assets-command-footnote {
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 10px);
+}
+
+.project-assets-command-copy span,
+.project-assets-command-metric span {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.project-assets-command-copy strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-size: var(--font-md, 16px);
+}
+
+.project-assets-command-copy p {
+  max-width: 560px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-xs, 11px);
+  line-height: 1.45;
+}
+
+.project-assets-command-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.project-assets-command-metric {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  background: rgba(7, 10, 12, 0.22);
+}
+
+.project-assets-command-metric strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-size: var(--font-sm, 12px);
+}
+
+.project-assets-command-metric.is-ok {
+  border-color: rgba(114, 196, 146, 0.18);
+  background: rgba(114, 196, 146, 0.06);
+}
+
+.project-assets-command-metric.is-warning {
+  border-color: rgba(212, 170, 83, 0.22);
+  background: rgba(212, 170, 83, 0.08);
+}
+
+.project-assets-command-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.project-assets-command-actions .action-row-button {
+  min-height: 30px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.project-assets-command-footnote {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+@media (max-width: 1180px) {
+  .project-assets-command-card {
+    grid-template-columns: 1fr;
+  }
+
+  .project-assets-command-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .project-assets-command-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-assets-command-footnote {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .asset-list-layout {
   flex: 1 1 auto;
   min-height: 0;
