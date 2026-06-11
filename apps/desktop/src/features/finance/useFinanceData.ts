@@ -66,6 +66,7 @@ const emptyCollaboratorSummary: CollaboratorFeeSummary = {
 };
 
 const defaultFinanceEntryListQuery: FinanceEntryListQuery = {
+  projectId: null,
   search: "",
   sortBy: "date",
   sortDirection: "desc",
@@ -141,7 +142,7 @@ export const useFinanceEntries = (query: FinanceEntryListQuery = defaultFinanceE
         return window.bukowskiFinance.getEntries({ ...query, workspaceId: activeWorkspaceId });
       },
       emptyEntries,
-      [activeWorkspaceId, canReadFinance, isWorkspaceReady, query.search, query.sortBy, query.sortDirection, refreshVersion],
+      [activeWorkspaceId, canReadFinance, isWorkspaceReady, query.projectId, query.search, query.sortBy, query.sortDirection, refreshVersion],
     );
   };
 

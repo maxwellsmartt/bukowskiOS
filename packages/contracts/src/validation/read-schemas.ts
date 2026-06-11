@@ -189,6 +189,7 @@ export const projectListReadArgsSchema = z.tuple([projectListQuerySchema.optiona
 
 export const financeEntryListQuerySchema = z.object({
   workspaceId: nonEmptyId.optional(),
+  projectId: nonEmptyId.nullable().optional(),
   search: boundedSearch.optional(),
   sortBy: financeEntrySortFieldSchema,
   sortDirection: sortDirectionSchema,

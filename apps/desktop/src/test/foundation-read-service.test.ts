@@ -42,6 +42,8 @@ describe("foundation read service", () => {
     expect(reads.getFinanceOverview().monthlyBurn).toHaveLength(6);
     expect(Array.isArray(reads.getFinanceOverview().categoryBreakdown)).toBe(true);
     expect(reads.getFinanceEntries()).toHaveLength(2);
+    expect(reads.getFinanceEntries({ projectId: "project-aurora", search: "", sortBy: "date", sortDirection: "desc" })).toHaveLength(2);
+    expect(reads.getFinanceEntries({ projectId: "project-wave", search: "", sortBy: "date", sortDirection: "desc" })).toHaveLength(0);
 
     cleanup();
   });

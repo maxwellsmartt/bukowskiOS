@@ -173,6 +173,7 @@ export const ProjectBudgetPage = () => {
   const { projectId } = useProjectMode();
   const { data, error, isLoading } = useProjectDetail(projectId);
   const { data: financeEntries, error: financeError } = useFinanceEntries({
+    projectId: projectId ?? "__no_project__",
     search: "",
     sortBy: "date",
     sortDirection: "desc",
@@ -187,10 +188,7 @@ export const ProjectBudgetPage = () => {
   const [targetDraft, setTargetDraft] = useState("");
   const [isSavingTarget, setIsSavingTarget] = useState(false);
 
-  const projectEntries = useMemo(
-    () => (projectId ? financeEntries.filter((entry) => entry.projectId === projectId) : []),
-    [financeEntries, projectId],
-  );
+  const projectEntries = financeEntries;
 
   const totalsByCurrency = useMemo(() => buildCurrencyBreakdown(projectEntries), [projectEntries]);
   const entryCurrencies = useMemo(() => Array.from(totalsByCurrency.keys()).sort(), [totalsByCurrency]);

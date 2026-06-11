@@ -245,6 +245,19 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
     },
 
     getAssets(query: AssetListQuery = deps.defaultAssetListQuery): AssetListRow[] {
+      const whereClauses = ["assets.is_active = 1"];
+      const params: Array<string> = [];
+
+      if (query.workspaceId) {
+        whereClauses.push("assets.workspace_id = ?");
+        params.push(query.workspaceId);
+      }
+
+      if (query.scopeProjectId) {
+        whereClauses.push("asset_current_state.current_project_id = ?");
+        params.push(query.scopeProjectId);
+      }
+
       const rows = db
         .prepare(
           `
@@ -299,11 +312,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
             LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
             LEFT JOIN project_units ON project_units.id = asset_current_state.project_unit_id
             LEFT JOIN users ON users.id = asset_current_state.current_responsible_user_id
-            WHERE assets.is_active = 1
-              AND (? IS NULL OR assets.workspace_id = ?)
+            WHERE ${whereClauses.join(" AND ")}
           `,
         )
-        .all(query.workspaceId ?? null, query.workspaceId ?? null) as Array<{
+        .all(...params) as Array<{
         id: string;
         name: string;
         code: string;
@@ -377,7 +389,6 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           createdAt: row.created_at,
           updatedAt: row.updated_at,
         }))
-        .filter((row) => !query.scopeProjectId || row.projectId === query.scopeProjectId)
         .filter((row) =>
           deps.matchesSearch(query.search, [
             row.name,

@@ -338,6 +338,14 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
 
   getFinanceEntries(query: FinanceEntryListQuery = deps.defaultFinanceEntryListQuery): FinanceEntryRow[] {
     const workspaceId = resolveWorkspaceId(query.workspaceId);
+    const whereClauses = ["financial_entries.workspace_id = ?"];
+    const params: Array<string> = [workspaceId];
+
+    if (query.projectId) {
+      whereClauses.push("financial_entries.project_id = ?");
+      params.push(query.projectId);
+    }
+
     const rows = db
       .prepare(
         `
@@ -360,10 +368,10 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
           LEFT JOIN projects ON projects.id = financial_entries.project_id
           LEFT JOIN incidents ON incidents.id = financial_entries.incident_id
           LEFT JOIN assets ON assets.id = financial_entries.asset_id
-          WHERE financial_entries.workspace_id = ?
+          WHERE ${whereClauses.join(" AND ")}
         `,
       )
-      .all(workspaceId) as Array<{
+      .all(...params) as Array<{
       id: string;
       entry_date: string;
       entry_type: string;

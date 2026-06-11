@@ -676,6 +676,7 @@ const defaultProjectListQuery: ProjectListQuery = {
 };
 
 const defaultFinanceEntryListQuery: FinanceEntryListQuery = {
+  projectId: null,
   search: "",
   sortBy: "date",
   sortDirection: "desc",
@@ -1540,6 +1541,19 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
   ...assetReads,
 
   getPackingSlips(query: PackingSlipListQuery = defaultPackingListQuery): PackingSlipRow[] {
+    const whereClauses = ["COALESCE(packing_slips.lifecycle_state, 'operational') != 'staging'"];
+    const params: Array<string> = [];
+
+    if (query.workspaceId) {
+      whereClauses.push("packing_slips.workspace_id = ?");
+      params.push(query.workspaceId);
+    }
+
+    if (query.scopeProjectId) {
+      whereClauses.push("packing_slips.project_id = ?");
+      params.push(query.scopeProjectId);
+    }
+
     const rows = db
       .prepare(
         `
@@ -1560,7 +1574,7 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
           LEFT JOIN departments ON departments.id = packing_slips.department_id
           LEFT JOIN users ON users.id = packing_slips.responsible_user_id
           LEFT JOIN packing_slip_items ON packing_slip_items.packing_slip_id = packing_slips.id
-          WHERE (? IS NULL OR packing_slips.workspace_id = ?)
+          WHERE ${whereClauses.join(" AND ")}
           GROUP BY
             packing_slips.id,
             packing_slips.status,
@@ -1573,7 +1587,7 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
             users.full_name
         `,
       )
-      .all(query.workspaceId ?? null, query.workspaceId ?? null) as Array<{
+      .all(...params) as Array<{
       id: string;
       status: string;
       lifecycle_state: "operational" | "staging";
@@ -1604,8 +1618,6 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
         issueDateRaw: row.issue_date,
         dueDateRaw: row.return_due_date,
       }))
-      .filter((row) => row.lifecycleState !== "staging")
-      .filter((row) => !query.scopeProjectId || row.projectId === query.scopeProjectId)
       .filter((row) => matchesSearch(query.search, [row.number, row.project, row.department, row.responsible, row.status]));
 
     return sortRows(
@@ -1804,6 +1816,19 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
   },
 
   getIncidents(query: IncidentListQuery = defaultIncidentListQuery): IncidentListRow[] {
+    const whereClauses: string[] = [];
+    const params: Array<string> = [];
+
+    if (query.workspaceId) {
+      whereClauses.push("incidents.workspace_id = ?");
+      params.push(query.workspaceId);
+    }
+
+    if (query.scopeProjectId) {
+      whereClauses.push("incidents.project_id = ?");
+      params.push(query.scopeProjectId);
+    }
+
     const rows = db
       .prepare(
         `
@@ -1826,10 +1851,10 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
           LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
           LEFT JOIN projects ON projects.id = incidents.project_id
           LEFT JOIN users ON users.id = incidents.responsible_user_id
-          WHERE (? IS NULL OR incidents.workspace_id = ?)
+          ${whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : ""}
         `,
       )
-      .all(query.workspaceId ?? null, query.workspaceId ?? null) as Array<{
+      .all(...params) as Array<{
       id: string;
       title: string;
       asset_code: string;
@@ -1860,7 +1885,6 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
         status: row.status,
         reportedAt: row.reported_at,
       }))
-      .filter((row) => !query.scopeProjectId || row.projectId === query.scopeProjectId)
       .filter((row) =>
         matchesSearch(query.search, [row.title, row.assetCode, row.assetName, row.project, row.responsible, row.severity, row.status]),
       );

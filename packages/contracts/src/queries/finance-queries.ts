@@ -65,6 +65,7 @@ export type FinanceEntrySortField = "date" | "type" | "category" | "reference" |
 
 export type FinanceEntryListQuery = {
   workspaceId?: string;
+  projectId?: string | null;
   search?: string;
   sortBy: FinanceEntrySortField;
   sortDirection: ListSortDirection;
