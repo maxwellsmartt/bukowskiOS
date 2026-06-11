@@ -10,32 +10,18 @@ import {
   type LocaleContext,
 } from "@shared/lib/locale";
 import {
-  SUPPORTED_LANGUAGES,
   userSettingKeys,
   type DateFormatMode,
   type SupportedLanguage,
 } from "@shared/lib/userSettings";
 
-const DEFAULT_LANGUAGE: SupportedLanguage = "en";
-
-const detectBrowserLanguage = (): SupportedLanguage => {
-  if (typeof navigator === "undefined") return DEFAULT_LANGUAGE;
-  const candidates = [navigator.language, ...(navigator.languages ?? [])];
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    const short = candidate.slice(0, 2).toLowerCase();
-    if ((SUPPORTED_LANGUAGES as readonly string[]).includes(short)) {
-      return short as SupportedLanguage;
-    }
-  }
-  return DEFAULT_LANGUAGE;
-};
+const DEFAULT_LANGUAGE: SupportedLanguage = "es";
 
 /**
  * Unified locale hook. Combines:
  *   - user setting (authoritative when set),
  *   - active workspace's base currency (fallback for `currency`),
- *   - the browser's preferred language (fallback for `language`).
+ *   - the app's Spanish product default (fallback for `language`).
  *
  * Every component that renders dates, numbers or money should consume
  * this hook — never `toLocaleDateString` directly — so a setting change
@@ -47,7 +33,7 @@ export const useLocale = () => {
   const [userDateFormat] = useUserSetting(userSettingKeys.dateFormatMode);
   const [userCurrency] = useUserSetting(userSettingKeys.defaultCurrency);
 
-  const language: SupportedLanguage = userLanguage ?? detectBrowserLanguage();
+  const language: SupportedLanguage = userLanguage ?? DEFAULT_LANGUAGE;
   const dateFormatMode: DateFormatMode = userDateFormat ?? "locale";
   const currency: string = (userCurrency ?? activeMembership?.baseCurrency ?? "USD").toUpperCase();
 

@@ -154,7 +154,32 @@ export const applyNotificationLocalMigration = (db: DatabaseSync) => {
   `);
 };
 
+const outboxEntityTypeForTable = {
+  notifications: "notification",
+  todos: "todo",
+  reminders: "reminder",
+} as const;
+
 export const createNotificationLocalService = (db: DatabaseSync) => {
+  // Local rows with un-pushed changes are the source of truth: a remote fetch
+  // that lands between the local write and the outbox push must not clobber
+  // them (the push reads the row at send time, so a clobber would also ship
+  // the stale value back to Supabase).
+  const pendingOutboxIds = (table: keyof typeof outboxEntityTypeForTable): Set<string> =>
+    new Set(
+      (
+        db
+          .prepare(
+            `
+              SELECT entity_id
+              FROM sync_outbox
+              WHERE entity_type = ? AND status IN ('pending', 'processing', 'failed')
+            `,
+          )
+          .all(outboxEntityTypeForTable[table]) as Array<{ entity_id: string }>
+      ).map((row) => String(row.entity_id)),
+    );
+
   const getNotificationById = (userId: string, workspaceId: string, id: string): NotificationRow => {
     const row = db
       .prepare(
@@ -422,6 +447,10 @@ export const createNotificationLocalService = (db: DatabaseSync) => {
 
     applyRemoteRows(input: { table: "notifications" | "todos" | "reminders"; rows: Record<string, unknown>[] }): void {
       const now = new Date().toISOString();
+      const pendingIds = pendingOutboxIds(input.table);
+      if (pendingIds.size) {
+        input = { ...input, rows: input.rows.filter((row) => !pendingIds.has(String(row.id))) };
+      }
       if (input.table === "notifications") {
         const statement = db.prepare(
           `
@@ -499,6 +528,36 @@ export const createNotificationLocalService = (db: DatabaseSync) => {
           String(row.created_at ?? now),
         ),
       );
+    },
+
+    // Deletes made on another machine never reach this one through
+    // applyRemoteRows (it only upserts), so the caller passes the full remote
+    // id set and we drop local rows that no longer exist remotely. Rows with
+    // un-pushed local changes are kept — they may simply not have synced yet.
+    reconcileRemoteRows(input: {
+      table: "todos" | "reminders";
+      userId: string;
+      workspaceId: string;
+      remoteIds: string[];
+    }): number {
+      const remoteIds = new Set(input.remoteIds.map(String));
+      const pendingIds = pendingOutboxIds(input.table);
+      const localIds = (
+        db
+          .prepare(`SELECT id FROM ${input.table === "todos" ? "todos" : "reminders"} WHERE user_id = ? AND workspace_id = ?`)
+          .all(input.userId, input.workspaceId) as Array<{ id: string }>
+      ).map((row) => String(row.id));
+
+      const staleIds = localIds.filter((id) => !remoteIds.has(id) && !pendingIds.has(id));
+      if (!staleIds.length) {
+        return 0;
+      }
+
+      const deleteStatement = db.prepare(
+        `DELETE FROM ${input.table === "todos" ? "todos" : "reminders"} WHERE id = ? AND user_id = ? AND workspace_id = ?`,
+      );
+      staleIds.forEach((id) => deleteStatement.run(id, input.userId, input.workspaceId));
+      return staleIds.length;
     },
   };
 };

@@ -44,8 +44,8 @@ if (!i18n.isInitialized) {
     .use(initReactI18next)
     .init({
       resources: RESOURCES,
-      lng: "en",
-      fallbackLng: "en",
+      lng: "es",
+      fallbackLng: "es",
       defaultNS: "translation",
       ns: ["translation"],
       interpolation: { escapeValue: false },

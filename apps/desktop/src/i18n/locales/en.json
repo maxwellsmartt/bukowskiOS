@@ -86,12 +86,18 @@
       "assets_one": "{{count}} asset",
       "assets_other": "{{count}} assets",
       "editProject": "Edit details",
+      "hiddenFromTimeline": "Hidden from timeline",
+      "hideFromTimeline": "Hide from timeline",
+      "hideFromTimelineAria": "Hide {{name}} from the timeline",
       "hideArchived": "Hide archived projects",
       "incidents_one": "{{count}} incident",
       "incidents_other": "{{count}} incidents",
       "newProject": "Create project",
       "restoreProject": "Restore project",
-      "showArchived": "Show archived projects"
+      "showArchived": "Show archived projects",
+      "showInTimeline": "Show in timeline",
+      "showInTimelineAria": "Show {{name}} in the timeline",
+      "timelineVisibilityFailed": "Could not update this project's timeline visibility."
     },
     "notifications": {
       "title": "Notifications",
@@ -2444,6 +2450,7 @@
       "nextWindow": "View next window",
       "previousWindow": "View previous window",
       "projectsUnits": "Projects / units",
+      "reorderProject": "Reorder {{name}} in the timeline",
       "showMore": "Show more projects",
       "summary": {
         "activeSignals": "Signals",
@@ -2582,7 +2589,9 @@
     "actions": {
       "markAllRead": "Mark all read",
       "done": "Done",
-      "snooze": "Snooze"
+      "snooze": "Snooze",
+      "snooze1h": "Snooze 1h",
+      "snoozeTomorrow": "Tomorrow 9:00"
     },
     "summary": {
       "unread": "Unread",
@@ -2614,6 +2623,7 @@
       "add": "Add todo",
       "due": "Due {{date}}",
       "noDueDate": "No due date",
+      "completed": "Completed",
       "emptyTitle": "No todos yet",
       "emptyBody": "Add one above or ask an agent to create a follow-up."
     },

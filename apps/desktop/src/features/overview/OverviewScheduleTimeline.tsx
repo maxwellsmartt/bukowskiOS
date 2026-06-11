@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   Crosshair,
+  GripVertical,
 } from "lucide-react";
 import {
   useEffect,
@@ -11,6 +12,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type DragEvent as ReactDragEvent,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
@@ -484,6 +486,50 @@ const resolveWindowSegments = (segments: ScheduleTimelineSegment[]) =>
       return leftStart.localeCompare(rightStart);
     });
 
+const orderTimelineProjects = (projects: ScheduleTimelineProjectLane[], order: string[]) => {
+  if (!order.length) {
+    return projects;
+  }
+
+  const orderIndex = new Map(order.map((projectId, index) => [projectId, index]));
+  return projects
+    .map((project, originalIndex) => ({ originalIndex, project }))
+    .sort((left, right) => {
+      const leftOrder = orderIndex.get(left.project.id) ?? Number.POSITIVE_INFINITY;
+      const rightOrder = orderIndex.get(right.project.id) ?? Number.POSITIVE_INFINITY;
+      return leftOrder - rightOrder || left.originalIndex - right.originalIndex;
+    })
+    .map(({ project }) => project);
+};
+
+const moveProjectInOrder = (
+  projects: ScheduleTimelineProjectLane[],
+  existingOrder: string[],
+  sourceProjectId: string,
+  targetProjectId: string,
+) => {
+  if (sourceProjectId === targetProjectId) {
+    return existingOrder;
+  }
+
+  const visibleIds = projects.map((project) => project.id);
+  const sourceIndex = visibleIds.indexOf(sourceProjectId);
+  const targetIndex = visibleIds.indexOf(targetProjectId);
+
+  if (sourceIndex < 0 || targetIndex < 0) {
+    return existingOrder;
+  }
+
+  const nextVisibleIds = [...visibleIds];
+  const [movedProjectId] = nextVisibleIds.splice(sourceIndex, 1);
+  nextVisibleIds.splice(targetIndex, 0, movedProjectId);
+
+  return [
+    ...nextVisibleIds,
+    ...existingOrder.filter((projectId) => !nextVisibleIds.includes(projectId)),
+  ];
+};
+
 const formatWindowSegmentChip = (segment: ScheduleTimelineSegment, language: string) => {
   const baseLabel = formatRangeLabel(segment.startDate, segment.endDate, language);
   return segment.kind === "preproduction" ? `${language.toLowerCase().startsWith("es") ? "Pre" : "Pre"} · ${baseLabel}` : baseLabel;
@@ -931,7 +977,13 @@ const TimelineIncidentMarkers = ({
 
 const TimelineLane = ({
   bands,
+  dragOverProjectId,
+  draggingProjectId,
   isExpanded,
+  onProjectDragEnd,
+  onProjectDragOver,
+  onProjectDragStart,
+  onProjectDrop,
   onBarHover,
   onBarLeave,
   onSignalHover,
@@ -945,7 +997,13 @@ const TimelineLane = ({
   language,
 }: {
   bands: ReturnType<typeof buildTimelineBands>;
+  dragOverProjectId: string | null;
+  draggingProjectId: string | null;
   isExpanded: boolean;
+  onProjectDragEnd: () => void;
+  onProjectDragOver: (event: ReactDragEvent<HTMLDivElement>, projectId: string) => void;
+  onProjectDragStart: (event: ReactDragEvent<HTMLButtonElement>, projectId: string) => void;
+  onProjectDrop: (event: ReactDragEvent<HTMLDivElement>, projectId: string) => void;
   onBarHover: (
     event: ReactPointerEvent<HTMLDivElement>,
     row: ScheduleTimelineProjectLane | ScheduleTimelineUnitLane,
@@ -970,11 +1028,28 @@ const TimelineLane = ({
   const { t } = useTranslation();
   const projectPalette = resolveTimelinePalette(project.colorKey);
   const projectBars = resolveSegmentGeometries(project, rangeStart, rangeEnd, projectPalette);
+  const isDragging = draggingProjectId === project.id;
+  const isDragTarget = dragOverProjectId === project.id && draggingProjectId !== project.id;
 
   return (
-    <div className="timeline-lane-block">
+    <div
+      className={`timeline-lane-block${isDragging ? " is-dragging" : ""}${isDragTarget ? " is-drag-target" : ""}`}
+      onDragOver={(event) => onProjectDragOver(event, project.id)}
+      onDrop={(event) => onProjectDrop(event, project.id)}
+    >
       <div className="timeline-lane-row">
         <div className="timeline-lane-meta">
+          <button
+            aria-label={t("overview.timeline.reorderProject", { name: project.name })}
+            className="timeline-lane-reorder-handle"
+            draggable
+            onDragEnd={onProjectDragEnd}
+            onDragStart={(event) => onProjectDragStart(event, project.id)}
+            title={t("overview.timeline.reorderProject", { name: project.name })}
+            type="button"
+          >
+            <GripVertical size={14} />
+          </button>
           <button
             className={`timeline-lane-toggle${project.units.length ? "" : " is-static"}`}
             disabled={!project.units.length}
@@ -1197,11 +1272,14 @@ const TimelineLane = ({
 
 type OverviewScheduleTimelineProps = {
   anchorDate: string;
+  hiddenProjectIds?: string[];
   isLoading: boolean;
   onAnchorDateChange: (anchorDate: string) => void;
   onLoadMoreProjects: () => void;
+  onProjectOrderChange?: (order: string[]) => void | Promise<void>;
   onRangeChange: (range: ScheduleTimelineRange) => void;
   onScaleChange: (scale: ScheduleTimelineScale) => void;
+  projectOrder?: string[];
   range: ScheduleTimelineRange;
   scale: ScheduleTimelineScale;
   snapshot: ScheduleTimelineSnapshot;
@@ -1209,11 +1287,14 @@ type OverviewScheduleTimelineProps = {
 
 export const OverviewScheduleTimeline = ({
   anchorDate,
+  hiddenProjectIds = [],
   isLoading,
   onAnchorDateChange,
   onLoadMoreProjects,
+  onProjectOrderChange,
   onRangeChange,
   onScaleChange,
+  projectOrder = [],
   range,
   scale,
   snapshot,
@@ -1244,6 +1325,8 @@ export const OverviewScheduleTimeline = ({
   const [previewAnchorDate, setPreviewAnchorDate] = useState(anchorDate || todayDateOnly());
   const [tooltip, setTooltip] = useState<TimelineTooltipState | null>(null);
   const [signalPopover, setSignalPopover] = useState<TimelineSignalPopoverState | null>(null);
+  const [draggingProjectId, setDraggingProjectId] = useState<string | null>(null);
+  const [dragOverProjectId, setDragOverProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     writeJsonPreference(uiPreferenceKeys.overviewTimelineExpandedProjects, expandedProjectIds);
@@ -1312,16 +1395,25 @@ export const OverviewScheduleTimeline = ({
   }, []);
 
   const effectiveAnchorDate = previewAnchorDate || anchorDate || todayDateOnly();
+  const hiddenProjectIdSet = useMemo(() => new Set(hiddenProjectIds), [hiddenProjectIds]);
+  const visibleProjects = useMemo(
+    () => orderTimelineProjects(snapshot.projects.filter((project) => !hiddenProjectIdSet.has(project.id)), projectOrder),
+    [hiddenProjectIdSet, projectOrder, snapshot.projects],
+  );
+  const visibleUnscheduled = useMemo(
+    () => snapshot.unscheduled.filter((project) => !hiddenProjectIdSet.has(project.id)),
+    [hiddenProjectIdSet, snapshot.unscheduled],
+  );
   const visibleWindow = useMemo(
     () => resolveRenderedTimelineWindow(range, scale, effectiveAnchorDate, gridDensity),
     [effectiveAnchorDate, gridDensity, range, scale],
   );
   const visibleWindowDays = diffDaysInclusive(visibleWindow.start, visibleWindow.end);
   const timelineSummary = useMemo(() => {
-    const loadedProjects = snapshot.projects.length;
-    const visibleUnits = snapshot.projects.reduce((total, project) => total + project.units.length, 0);
-    const conflicts = snapshot.projects.reduce((total, project) => total + project.conflictCount, 0);
-    const incidents = snapshot.projects.reduce((total, project) => total + project.activeIncidentCount, 0);
+    const loadedProjects = visibleProjects.length;
+    const visibleUnits = visibleProjects.reduce((total, project) => total + project.units.length, 0);
+    const conflicts = visibleProjects.reduce((total, project) => total + project.conflictCount, 0);
+    const incidents = visibleProjects.reduce((total, project) => total + project.activeIncidentCount, 0);
     const activeSignals = conflicts + incidents;
 
     return {
@@ -1329,10 +1421,10 @@ export const OverviewScheduleTimeline = ({
       conflicts,
       incidents,
       loadedProjects,
-      unscheduled: snapshot.unscheduled.length,
+      unscheduled: visibleUnscheduled.length,
       visibleUnits,
     };
-  }, [snapshot.projects, snapshot.unscheduled.length]);
+  }, [visibleProjects, visibleUnscheduled.length]);
   const hasTimelineData = timelineSummary.loadedProjects > 0 || timelineSummary.unscheduled > 0;
   const clampedPlayheadDate =
     visibleWindow.start && visibleWindow.end
@@ -1456,6 +1548,47 @@ export const OverviewScheduleTimeline = ({
 
   const clearSignalPopover = () => setSignalPopover(null);
 
+  const handleProjectDragStart = (event: ReactDragEvent<HTMLButtonElement>, projectId: string) => {
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", projectId);
+    setDraggingProjectId(projectId);
+    setDragOverProjectId(projectId);
+    setTooltip(null);
+    setSignalPopover(null);
+  };
+
+  const handleProjectDragOver = (event: ReactDragEvent<HTMLDivElement>, projectId: string) => {
+    if (!draggingProjectId || draggingProjectId === projectId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDragOverProjectId(projectId);
+  };
+
+  const handleProjectDrop = (event: ReactDragEvent<HTMLDivElement>, targetProjectId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const sourceProjectId = event.dataTransfer.getData("text/plain") || draggingProjectId;
+
+    setDraggingProjectId(null);
+    setDragOverProjectId(null);
+
+    if (!sourceProjectId || sourceProjectId === targetProjectId) {
+      return;
+    }
+
+    const nextOrder = moveProjectInOrder(visibleProjects, projectOrder, sourceProjectId, targetProjectId);
+    void onProjectOrderChange?.(nextOrder);
+  };
+
+  const handleProjectDragEnd = () => {
+    setDraggingProjectId(null);
+    setDragOverProjectId(null);
+  };
+
   const handleTrackPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) {
       return;
@@ -1576,6 +1709,11 @@ export const OverviewScheduleTimeline = ({
       title={t("overview.timeline.title")}
       aside={
         <div className="timeline-toolbar">
+          <div className="timeline-window-indicator" aria-label={t("overview.timeline.summary.window")}>
+            <span>{t("overview.timeline.summary.window")}</span>
+            <strong>{formatRangeLabel(visibleWindow.start, visibleWindow.end, language)}</strong>
+          </div>
+
           <div className="timeline-toolbar-cluster">
             <span className="timeline-toolbar-label">{t("overview.timeline.controls.view")}</span>
             <div className="timeline-control-group">
@@ -1670,46 +1808,6 @@ export const OverviewScheduleTimeline = ({
         </div>
       }
     >
-      <div className="timeline-summary-strip">
-        <span>
-          <small>{t("overview.timeline.summary.window")}</small>
-          <strong>{formatRangeLabel(visibleWindow.start, visibleWindow.end, language)}</strong>
-        </span>
-        <span>
-          <small>{t("overview.timeline.summary.loadedProjects")}</small>
-          <strong>
-            {t("overview.timeline.summary.projectsUnits", {
-              projects: timelineSummary.loadedProjects,
-              units: timelineSummary.visibleUnits,
-            })}
-          </strong>
-        </span>
-        <span>
-          <small>{t("overview.timeline.summary.unscheduled")}</small>
-          <strong>{timelineSummary.unscheduled}</strong>
-        </span>
-        <span className={timelineSummary.activeSignals ? "has-alerts" : ""}>
-          <small>{t("overview.timeline.summary.activeSignals")}</small>
-          <strong>
-            {timelineSummary.activeSignals
-              ? t("overview.timeline.summary.signalBreakdown", {
-                  conflicts: timelineSummary.conflicts,
-                  incidents: timelineSummary.incidents,
-                })
-              : t("overview.timeline.summary.noActiveSignals")}
-          </strong>
-        </span>
-        <span>
-          <small>{t("overview.timeline.summary.pageStatus")}</small>
-          <strong>{snapshot.hasMoreProjects ? t("overview.timeline.summary.moreAvailable") : t("overview.timeline.summary.complete")}</strong>
-        </span>
-      </div>
-
-      <div className="timeline-interaction-hints" aria-label={t("overview.timeline.hints.label")}>
-        <span>{t("overview.timeline.hints.drag")}</span>
-        <span>{t("overview.timeline.hints.zoom")}</span>
-      </div>
-
       {isLoading && !snapshot.projects.length && !snapshot.unscheduled.length ? <div className="empty-state">{t("overview.timeline.loading")}</div> : null}
 
       {!isLoading && !hasTimelineData ? (
@@ -1730,12 +1828,12 @@ export const OverviewScheduleTimeline = ({
         ref={timelineRootRef}
       >
         <div className="timeline-main">
-          <div className="timeline-shared-playhead" style={sharedPlayheadStyle} />
-          <div className="timeline-shared-playhead-chip" style={sharedPlayheadStyle}>
-            {playheadLabel}
-          </div>
-
           <div className="timeline-header-row">
+            <div className="timeline-sticky-playhead-line" style={sharedPlayheadStyle} />
+            <div className="timeline-sticky-playhead-marker" style={sharedPlayheadStyle} />
+            <div className="timeline-sticky-playhead-chip" style={sharedPlayheadStyle}>
+              {playheadLabel}
+            </div>
             <div className="timeline-header-copy">
               <span className="timeline-header-label">{t("overview.timeline.projectsUnits")}</span>
             </div>
@@ -1788,13 +1886,19 @@ export const OverviewScheduleTimeline = ({
           </div>
 
           <div className="timeline-lanes">
-            {snapshot.projects.map((project) => (
+            {visibleProjects.map((project) => (
               <TimelineLane
                 key={project.id}
                 bands={bands}
+                dragOverProjectId={dragOverProjectId}
+                draggingProjectId={draggingProjectId}
                 isExpanded={expandedProjectIds.includes(project.id)}
                 onBarHover={updateTooltip}
                 onBarLeave={clearTooltip}
+                onProjectDragEnd={handleProjectDragEnd}
+                onProjectDragOver={handleProjectDragOver}
+                onProjectDragStart={handleProjectDragStart}
+                onProjectDrop={handleProjectDrop}
                 onSignalHover={updateSignalPopover}
                 onSignalLeave={clearSignalPopover}
                 onToggle={() =>
@@ -1827,7 +1931,7 @@ export const OverviewScheduleTimeline = ({
           ) : null}
         </div>
 
-        {snapshot.unscheduled.length ? (
+        {visibleUnscheduled.length ? (
           <div className="timeline-unscheduled">
             <div className="timeline-unscheduled-header">
               <strong>{t("overview.timeline.unscheduled.title")}</strong>
@@ -1835,7 +1939,7 @@ export const OverviewScheduleTimeline = ({
             </div>
 
             <div className="timeline-unscheduled-list">
-              {snapshot.unscheduled.map((project) => (
+              {visibleUnscheduled.map((project) => (
                 <div key={project.id} className="timeline-unscheduled-item">
                   <div className="timeline-lane-title-row">
                     <strong className="timeline-lane-title">{project.name}</strong>

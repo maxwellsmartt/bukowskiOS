@@ -262,6 +262,7 @@ declare global {
       updateReminder: (input: import("@contracts").ReminderUpdateCommand) => Promise<void>;
       deleteReminder: (input: { userId: string; workspaceId: string; id: string }) => Promise<void>;
       applyRemoteRows: (input: { table: "notifications" | "todos" | "reminders"; rows: Record<string, unknown>[] }) => Promise<void>;
+      reconcileRemoteRows: (input: { table: "todos" | "reminders"; userId: string; workspaceId: string; remoteIds: string[] }) => Promise<number>;
       showNative: (input: import("@contracts").ShowNativeNotificationCommand) => Promise<void>;
       setDockBadge: (count: number) => Promise<void>;
       getForegroundState: () => Promise<{

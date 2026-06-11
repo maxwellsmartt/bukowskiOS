@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { AgentCreatedBadge } from "@shared/components/AgentCreatedBadge";
+import { SelectField } from "@shared/components/SelectField";
 import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { useLocale } from "@shared/hooks/useLocale";
 
@@ -38,7 +39,54 @@ const getRecurrenceLabel = (rule: string | null | undefined, t: TFunction) => {
   return option ? t(option.labelKey) : t("inbox.recurrence.repeats");
 };
 
-const isLicenseReminder = (title: string) => title.startsWith("License renewal:");
+const licenseReminderPrefixes = ["License renewal:", "Renovación de licencia:"];
+
+const isLicenseReminder = (title: string) => licenseReminderPrefixes.some((prefix) => title.startsWith(prefix));
+
+const getTimeValue = (value: string | null, fallback = Number.MAX_SAFE_INTEGER) => {
+  if (!value) return fallback;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : fallback;
+};
+
+const sortTodosForInbox = <T extends { dueAt: string | null; completedAt: string | null; createdAt: string }>(rows: T[]) =>
+  [...rows].sort((left, right) => {
+    if (Boolean(left.completedAt) !== Boolean(right.completedAt)) return left.completedAt ? 1 : -1;
+    if (!left.completedAt) {
+      return getTimeValue(left.dueAt) - getTimeValue(right.dueAt);
+    }
+    return getTimeValue(right.completedAt, 0) - getTimeValue(left.completedAt, 0);
+  });
+
+const sortRemindersForInbox = <T extends { remindAt: string; snoozedUntil: string | null; completedAt: string | null }>(rows: T[]) =>
+  [...rows].sort((left, right) => {
+    if (Boolean(left.completedAt) !== Boolean(right.completedAt)) return left.completedAt ? 1 : -1;
+    if (!left.completedAt) {
+      return getTimeValue(left.snoozedUntil ?? left.remindAt) - getTimeValue(right.snoozedUntil ?? right.remindAt);
+    }
+    return getTimeValue(right.completedAt, 0) - getTimeValue(left.completedAt, 0);
+  });
+
+const getVisibleSecondaryText = (primary: string, secondary: string | null | undefined) => {
+  const value = secondary?.trim();
+  if (!value) return null;
+  const normalizedPrimary = primary.trim().toLocaleLowerCase();
+  const normalizedSecondary = value.toLocaleLowerCase();
+  return normalizedPrimary && normalizedSecondary.startsWith(normalizedPrimary) ? null : value;
+};
+
+const getTomorrowMorningSnoozeMinutes = () => {
+  const target = new Date();
+  target.setDate(target.getDate() + 1);
+  target.setHours(9, 0, 0, 0);
+  return Math.max(1, Math.ceil((target.getTime() - Date.now()) / 60_000));
+};
+
+const getNotificationTitle = (title: string, t: TFunction) => {
+  if (title === "Reminder scheduled") return t("notifications.events.reminderScheduledTitle");
+  if (title === "Todo added") return t("notifications.events.todoAddedTitle");
+  return title;
+};
 
 const getDueTone = (value: string | null) => {
   if (!value) return "neutral";
@@ -62,7 +110,7 @@ const toDateTimeLocalValue = (value: string | null) => {
 };
 
 export const InboxPage = () => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const navigate = useNavigate();
   const { formatDate } = useLocale();
   const {
@@ -87,10 +135,12 @@ export const InboxPage = () => {
   const [todoTitle, setTodoTitle] = useState("");
   const [todoDueAt, setTodoDueAt] = useState("");
   const [todoRecurrenceRule, setTodoRecurrenceRule] = useState("");
+  const [isTodoComposerOpen, setIsTodoComposerOpen] = useState(true);
   const [reminderTitle, setReminderTitle] = useState("");
   const [reminderAt, setReminderAt] = useState("");
   const [reminderRecurrenceRule, setReminderRecurrenceRule] = useState("");
   const [reminderBody, setReminderBody] = useState("");
+  const [isReminderComposerOpen, setIsReminderComposerOpen] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
   const [editingTodoTitle, setEditingTodoTitle] = useState("");
@@ -102,9 +152,10 @@ export const InboxPage = () => {
   const [editingReminderRecurrenceRule, setEditingReminderRecurrenceRule] = useState("");
   const [editingReminderBody, setEditingReminderBody] = useState("");
   const { confirm, confirmDialog } = useConfirmDialog();
-  const openTodos = todos.filter((todo) => !todo.completedAt);
-  const pendingReminders = reminders.filter((reminder) => !reminder.completedAt);
-  const nextReminder = pendingReminders[0] ?? null;
+  const visibleTodos = sortTodosForInbox(todos);
+  const visibleReminders = sortRemindersForInbox(reminders);
+  const openTodos = visibleTodos.filter((todo) => !todo.completedAt);
+  const pendingReminders = visibleReminders.filter((reminder) => !reminder.completedAt);
 
   const requestDeleteTodo = async (id: string, title: string) => {
     const confirmed = await confirm({
@@ -139,7 +190,6 @@ export const InboxPage = () => {
   const handleCreateTodo = async () => {
     const title = todoTitle.trim();
     if (!title) {
-      setFormError(t("inbox.errors.todoTitle"));
       return;
     }
 
@@ -205,7 +255,6 @@ export const InboxPage = () => {
   const handleCreateReminder = async () => {
     const title = reminderTitle.trim();
     if (!title || !reminderAt) {
-      setFormError(t("inbox.errors.reminderTitleTime"));
       return;
     }
 
@@ -235,24 +284,6 @@ export const InboxPage = () => {
           </button>
         </div>
       </header>
-
-      <div className="inbox-summary-grid">
-        <article className={unreadCount > 0 ? "is-hot" : ""}>
-          <span>{t("inbox.summary.unread")}</span>
-          <strong>{unreadCount}</strong>
-          <small>{unreadCount ? t("inbox.summary.needsAttention") : t("inbox.summary.allCaughtUp")}</small>
-        </article>
-        <article>
-          <span>{t("inbox.summary.openTodos")}</span>
-          <strong>{openTodos.length}</strong>
-          <small>{t("inbox.summary.totalVisible", { count: todos.length })}</small>
-        </article>
-        <article>
-          <span>{t("inbox.summary.nextReminder")}</span>
-          <strong>{nextReminder ? formatDate(nextReminder.remindAt, SHORT_DATE_FORMAT) : t("common.none")}</strong>
-          <small>{t("inbox.summary.scheduled", { count: pendingReminders.length })}</small>
-        </article>
-      </div>
 
       <section className="surface-panel inbox-panel">
         <div className={`inbox-panel-header inbox-panel-header-${activeTab}`}>
@@ -308,7 +339,7 @@ export const InboxPage = () => {
                 <span className="inbox-row-copy">
                   <span>{formatDate(item.createdAt, LONG_DATE_FORMAT)}</span>
                   <strong className="inbox-copy-title">
-                    <span>{item.title}</span>
+                    <span>{getNotificationTitle(item.title, t)}</span>
                   </strong>
                   {item.body ? <span>{item.body}</span> : null}
                 </span>
@@ -321,30 +352,49 @@ export const InboxPage = () => {
           </div>
         ) : activeTab === "todos" ? (
           <div className="inbox-list">
-            <div className="inbox-composer">
-              <div>
-                <p className="inbox-composer-title">{t("inbox.quickAdd")}</p>
+            {isTodoComposerOpen ? (
+              <div className="inbox-composer">
+                <div className="inbox-composer-header">
+                  <p className="inbox-composer-title">{t("inbox.quickAdd")}</p>
+                  <button
+                    aria-label={t("common.close")}
+                    className="icon-ghost-control inbox-composer-close"
+                    onClick={() => {
+                      setIsTodoComposerOpen(false);
+                      setFormError(null);
+                    }}
+                    type="button"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="inbox-quick-form">
+                  <input className="action-field-control" aria-label={t("inbox.todos.titleAria")} value={todoTitle} onChange={(event) => setTodoTitle(event.target.value)} placeholder={t("inbox.todos.placeholder")} />
+                  <input className="action-field-control" lang={i18n.language} aria-label={t("inbox.todos.dueDateAria")} value={todoDueAt} onChange={(event) => setTodoDueAt(event.target.value)} type="datetime-local" />
+                  <SelectField aria-label={t("inbox.todos.frequencyAria")} value={todoRecurrenceRule} onChange={(event) => setTodoRecurrenceRule(event.target.value)} wrapperClassName="inbox-select-field">
+                    {recurrenceOptions.map((option) => (
+                      <option key={option.value || "one-time"} value={option.value}>
+                        {t(option.labelKey)}
+                      </option>
+                    ))}
+                  </SelectField>
+                  <button className="inbox-add-button" onClick={() => void handleCreateTodo()} type="button">
+                    <Plus size={14} />
+                    <span>{t("inbox.todos.add")}</span>
+                  </button>
+                </div>
               </div>
-              <div className="inbox-quick-form">
-                <input aria-label={t("inbox.todos.titleAria")} value={todoTitle} onChange={(event) => setTodoTitle(event.target.value)} placeholder={t("inbox.todos.placeholder")} />
-                <input aria-label={t("inbox.todos.dueDateAria")} value={todoDueAt} onChange={(event) => setTodoDueAt(event.target.value)} type="datetime-local" />
-                <select aria-label={t("inbox.todos.frequencyAria")} value={todoRecurrenceRule} onChange={(event) => setTodoRecurrenceRule(event.target.value)}>
-                  {recurrenceOptions.map((option) => (
-                    <option key={option.value || "one-time"} value={option.value}>
-                      {t(option.labelKey)}
-                    </option>
-                  ))}
-                </select>
-                <button className="inbox-add-button" onClick={() => void handleCreateTodo()} type="button">
-                  <Plus size={14} />
-                  <span>{t("inbox.todos.add")}</span>
-                </button>
-              </div>
-            </div>
+            ) : (
+              <button className="inbox-composer-reopen" onClick={() => setIsTodoComposerOpen(true)} type="button">
+                <Plus size={14} />
+                <span>{t("inbox.todos.add")}</span>
+              </button>
+            )}
             {todos.length ? (
               <div className="inbox-card-grid">
-                {todos.map((todo) => {
+                {visibleTodos.map((todo) => {
                   const isEditing = editingTodoId === todo.id;
+                  const visibleNotes = getVisibleSecondaryText(todo.title, todo.notes);
                   return (
                     <article key={todo.id} className={`inbox-task-card tone-${getCardTone(todo.dueAt, todo.completedAt)}`}>
                       {todo.createdBy === "agent" ? <AgentCreatedBadge variant="corner" /> : null}
@@ -352,29 +402,32 @@ export const InboxPage = () => {
                         <span className="inbox-row-icon">
                           <ListTodo size={14} />
                         </span>
-                        <span className={`inbox-meta-pill tone-${getDueTone(todo.dueAt)}`}>
-                          {todo.dueAt ? t("inbox.todos.due", { date: formatDate(todo.dueAt, SHORT_DATE_FORMAT) }) : t("inbox.todos.noDueDate")}
-                        </span>
+                        {todo.completedAt ? <span className="inbox-meta-pill tone-neutral">{t("inbox.todos.completed")}</span> : null}
+                        {!todo.completedAt && todo.dueAt ? (
+                          <span className={`inbox-meta-pill tone-${getDueTone(todo.dueAt)}`}>
+                            {t("inbox.todos.due", { date: formatDate(todo.dueAt, SHORT_DATE_FORMAT) })}
+                          </span>
+                        ) : null}
                         {todo.recurrenceRule ? <span className="inbox-meta-pill tone-info">{getRecurrenceLabel(todo.recurrenceRule, t)}</span> : null}
                       </div>
                       {isEditing ? (
                         <div className="inbox-edit-form">
                           <input aria-label={t("inbox.todos.titleAria")} value={editingTodoTitle} onChange={(event) => setEditingTodoTitle(event.target.value)} />
-                          <input aria-label={t("inbox.todos.dueDateAria")} value={editingTodoDueAt} onChange={(event) => setEditingTodoDueAt(event.target.value)} type="datetime-local" />
-                          <select aria-label={t("inbox.todos.frequencyAria")} value={editingTodoRecurrenceRule} onChange={(event) => setEditingTodoRecurrenceRule(event.target.value)}>
+                          <input lang={i18n.language} aria-label={t("inbox.todos.dueDateAria")} value={editingTodoDueAt} onChange={(event) => setEditingTodoDueAt(event.target.value)} type="datetime-local" />
+                          <SelectField aria-label={t("inbox.todos.frequencyAria")} value={editingTodoRecurrenceRule} onChange={(event) => setEditingTodoRecurrenceRule(event.target.value)} wrapperClassName="inbox-select-field">
                             {recurrenceOptions.map((option) => (
                               <option key={option.value || "one-time"} value={option.value}>
                                 {t(option.labelKey)}
                               </option>
                             ))}
-                          </select>
+                          </SelectField>
                         </div>
                       ) : (
                         <div className="inbox-task-card-copy">
                           <strong className="inbox-copy-title">
                             <span>{todo.title}</span>
                           </strong>
-                          {todo.notes ? <span>{todo.notes}</span> : <span>{t("inbox.noNotes")}</span>}
+                          {visibleNotes ? <span>{visibleNotes}</span> : null}
                         </div>
                       )}
                       <div className="inbox-task-card-actions">
@@ -422,31 +475,50 @@ export const InboxPage = () => {
           </div>
         ) : (
           <div className="inbox-list">
-            <div className="inbox-composer">
-              <div>
-                <p className="inbox-composer-title">{t("inbox.quickAdd")}</p>
+            {isReminderComposerOpen ? (
+              <div className="inbox-composer">
+                <div className="inbox-composer-header">
+                  <p className="inbox-composer-title">{t("inbox.quickAdd")}</p>
+                  <button
+                    aria-label={t("common.close")}
+                    className="icon-ghost-control inbox-composer-close"
+                    onClick={() => {
+                      setIsReminderComposerOpen(false);
+                      setFormError(null);
+                    }}
+                    type="button"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="inbox-quick-form inbox-reminder-form">
+                  <input className="action-field-control" aria-label={t("inbox.reminders.titleAria")} value={reminderTitle} onChange={(event) => setReminderTitle(event.target.value)} placeholder={t("inbox.reminders.placeholder")} />
+                  <input className="action-field-control" lang={i18n.language} aria-label={t("inbox.reminders.timeAria")} value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} type="datetime-local" />
+                  <SelectField aria-label={t("inbox.reminders.frequencyAria")} value={reminderRecurrenceRule} onChange={(event) => setReminderRecurrenceRule(event.target.value)} wrapperClassName="inbox-select-field">
+                    {recurrenceOptions.map((option) => (
+                      <option key={option.value || "one-time"} value={option.value}>
+                        {t(option.labelKey)}
+                      </option>
+                    ))}
+                  </SelectField>
+                  <input className="action-field-control" aria-label={t("inbox.reminders.notesAria")} value={reminderBody} onChange={(event) => setReminderBody(event.target.value)} placeholder={t("inbox.reminders.notesPlaceholder")} />
+                  <button className="inbox-add-button" onClick={() => void handleCreateReminder()} type="button">
+                    <Plus size={14} />
+                    <span>{t("inbox.reminders.add")}</span>
+                  </button>
+                </div>
               </div>
-              <div className="inbox-quick-form inbox-reminder-form">
-                <input aria-label={t("inbox.reminders.titleAria")} value={reminderTitle} onChange={(event) => setReminderTitle(event.target.value)} placeholder={t("inbox.reminders.placeholder")} />
-                <input aria-label={t("inbox.reminders.timeAria")} value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} type="datetime-local" />
-                <select aria-label={t("inbox.reminders.frequencyAria")} value={reminderRecurrenceRule} onChange={(event) => setReminderRecurrenceRule(event.target.value)}>
-                  {recurrenceOptions.map((option) => (
-                    <option key={option.value || "one-time"} value={option.value}>
-                      {t(option.labelKey)}
-                    </option>
-                  ))}
-                </select>
-                <input aria-label={t("inbox.reminders.notesAria")} value={reminderBody} onChange={(event) => setReminderBody(event.target.value)} placeholder={t("inbox.reminders.notesPlaceholder")} />
-                <button className="inbox-add-button" onClick={() => void handleCreateReminder()} type="button">
-                  <Plus size={14} />
-                  <span>{t("inbox.reminders.add")}</span>
-                </button>
-              </div>
-            </div>
+            ) : (
+              <button className="inbox-composer-reopen" onClick={() => setIsReminderComposerOpen(true)} type="button">
+                <Plus size={14} />
+                <span>{t("inbox.reminders.add")}</span>
+              </button>
+            )}
             {reminders.length ? (
               <div className="inbox-card-grid">
-                {reminders.map((reminder) => {
+                {visibleReminders.map((reminder) => {
                   const isEditing = editingReminderId === reminder.id;
+                  const visibleBody = getVisibleSecondaryText(reminder.title, reminder.body);
                   const reminderMeta = reminder.completedAt
                     ? t("inbox.reminders.delivered")
                     : reminder.snoozedUntil
@@ -471,14 +543,14 @@ export const InboxPage = () => {
                       {isEditing ? (
                         <div className="inbox-edit-form">
                           <input aria-label={t("inbox.reminders.titleAria")} value={editingReminderTitle} onChange={(event) => setEditingReminderTitle(event.target.value)} />
-                          <input aria-label={t("inbox.reminders.timeAria")} value={editingReminderAt} onChange={(event) => setEditingReminderAt(event.target.value)} type="datetime-local" />
-                          <select aria-label={t("inbox.reminders.frequencyAria")} value={editingReminderRecurrenceRule} onChange={(event) => setEditingReminderRecurrenceRule(event.target.value)}>
+                          <input lang={i18n.language} aria-label={t("inbox.reminders.timeAria")} value={editingReminderAt} onChange={(event) => setEditingReminderAt(event.target.value)} type="datetime-local" />
+                          <SelectField aria-label={t("inbox.reminders.frequencyAria")} value={editingReminderRecurrenceRule} onChange={(event) => setEditingReminderRecurrenceRule(event.target.value)} wrapperClassName="inbox-select-field">
                             {recurrenceOptions.map((option) => (
                               <option key={option.value || "one-time"} value={option.value}>
                                 {t(option.labelKey)}
                               </option>
                             ))}
-                          </select>
+                          </SelectField>
                           <input aria-label={t("inbox.reminders.bodyAria")} value={editingReminderBody} onChange={(event) => setEditingReminderBody(event.target.value)} />
                         </div>
                       ) : (
@@ -486,7 +558,7 @@ export const InboxPage = () => {
                           <strong className="inbox-copy-title">
                             <span>{reminder.title}</span>
                           </strong>
-                          {reminder.body ? <span>{reminder.body}</span> : <span>{t("inbox.noNotes")}</span>}
+                          {visibleBody ? <span>{visibleBody}</span> : null}
                         </div>
                       )}
                       <div className="inbox-task-card-actions">
@@ -505,8 +577,11 @@ export const InboxPage = () => {
                           <>
                             {!reminder.completedAt ? (
                               <>
-                                <button className="secondary-button compact" onClick={() => void snoozeReminder(reminder.id, 15)} type="button">
-                                  {t("inbox.actions.snooze")}
+                                <button className="secondary-button compact" onClick={() => void snoozeReminder(reminder.id, 60)} type="button">
+                                  {t("inbox.actions.snooze1h")}
+                                </button>
+                                <button className="secondary-button compact" onClick={() => void snoozeReminder(reminder.id, getTomorrowMorningSnoozeMinutes())} type="button">
+                                  {t("inbox.actions.snoozeTomorrow")}
                                 </button>
                                 <button className="inbox-card-done-button" onClick={() => void markReminderDone(reminder.id)} type="button">
                                   <Check size={14} />

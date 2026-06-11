@@ -44,6 +44,8 @@ export const userSettingKeys = {
   chartAnimations: "chartAnimations",
   /** Cross-device table layouts for user-controlled columns in high-value screens. */
   tablePreferences: "tablePreferences",
+  /** Cross-device project timeline ordering and visibility per workspace. */
+  projectTimelinePreferences: "projectTimelinePreferences",
 } as const;
 
 export type UserSettingKey = (typeof userSettingKeys)[keyof typeof userSettingKeys];
@@ -65,6 +67,7 @@ export type UserSettingsMap = {
   [userSettingKeys.nativeNotifications]?: NativeNotificationPreferences;
   [userSettingKeys.chartAnimations]?: boolean;
   [userSettingKeys.tablePreferences]?: TablePreferencesMap;
+  [userSettingKeys.projectTimelinePreferences]?: ProjectTimelinePreferencesMap;
 };
 
 export type TablePreference = {
@@ -73,6 +76,13 @@ export type TablePreference = {
 };
 
 export type TablePreferencesMap = Record<string, TablePreference>;
+
+export type ProjectTimelineWorkspacePreference = {
+  hiddenProjectIds?: string[];
+  order?: string[];
+};
+
+export type ProjectTimelinePreferencesMap = Record<string, ProjectTimelineWorkspacePreference>;
 
 type Listener = (settings: UserSettingsMap) => void;
 
@@ -126,6 +136,18 @@ const isDateFormatMode = (value: unknown): value is DateFormatMode =>
 const isCurrencyCode = (value: unknown): value is string =>
   typeof value === "string" && /^[A-Z]{3}$/.test(value);
 
+const isSafePreferenceId = (value: unknown): value is string =>
+  typeof value === "string" && /^[a-zA-Z0-9:_-]{1,128}$/.test(value);
+
+const uniqueSafeIds = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const ids = Array.from(new Set(value.filter(isSafePreferenceId)));
+  return ids.length ? ids.slice(0, 240) : undefined;
+};
+
 const sanitizeTablePreferences = (raw: unknown): TablePreferencesMap | undefined => {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return undefined;
@@ -160,6 +182,36 @@ const sanitizeTablePreferences = (raw: unknown): TablePreferencesMap | undefined
     }
     if (tablePreference.columnWidths || tablePreference.visibleColumnKeys) {
       next[tableKey] = tablePreference;
+    }
+  }
+
+  return Object.keys(next).length ? next : undefined;
+};
+
+const sanitizeProjectTimelinePreferences = (raw: unknown): ProjectTimelinePreferencesMap | undefined => {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return undefined;
+  }
+
+  const next: ProjectTimelinePreferencesMap = {};
+  for (const [workspaceId, preference] of Object.entries(raw as Record<string, unknown>)) {
+    if (!isSafePreferenceId(workspaceId) || !preference || typeof preference !== "object" || Array.isArray(preference)) {
+      continue;
+    }
+
+    const source = preference as Record<string, unknown>;
+    const workspacePreference: ProjectTimelineWorkspacePreference = {};
+    const order = uniqueSafeIds(source.order);
+    const hiddenProjectIds = uniqueSafeIds(source.hiddenProjectIds);
+
+    if (order) {
+      workspacePreference.order = order;
+    }
+    if (hiddenProjectIds) {
+      workspacePreference.hiddenProjectIds = hiddenProjectIds;
+    }
+    if (workspacePreference.order || workspacePreference.hiddenProjectIds) {
+      next[workspaceId] = workspacePreference;
     }
   }
 
@@ -249,6 +301,11 @@ const sanitizeRemoteSettings = (raw: unknown): UserSettingsMap => {
   const tablePreferences = sanitizeTablePreferences(source[userSettingKeys.tablePreferences]);
   if (tablePreferences) {
     next[userSettingKeys.tablePreferences] = tablePreferences;
+  }
+
+  const projectTimelinePreferences = sanitizeProjectTimelinePreferences(source[userSettingKeys.projectTimelinePreferences]);
+  if (projectTimelinePreferences) {
+    next[userSettingKeys.projectTimelinePreferences] = projectTimelinePreferences;
   }
 
   return next;

@@ -119,7 +119,7 @@ export const buildContentSecurityPolicy = (
   devServerUrl?: string,
   remoteConnectUrls: Array<string | undefined> = [],
 ) => {
-  const connectSources = ["'self'", "https://api.openai.com"];
+  const connectSources = ["'self'", "https://api.openai.com", "https://api.github.com"];
   const scriptSources = ["'self'"];
   const styleSources = ["'self'", "'unsafe-inline'"];
   const imageSources = ["'self'", "data:", "blob:"];

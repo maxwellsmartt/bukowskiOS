@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -8,6 +8,7 @@ import {
   type ProjectSetupDraft,
   type WizardTab,
 } from "@features/projects/ProjectSetupWizard";
+import { useProjectTimelinePreferences } from "@features/projects/useProjectTimelinePreferences";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
@@ -31,6 +32,7 @@ export const ShellProjectsPanel = () => {
   const { t } = useTranslation();
   const {
     activeProjectId,
+    activeWorkspaceId,
     archiveProject,
     deleteProject,
     getProjectDeletePreview,
@@ -42,6 +44,8 @@ export const ShellProjectsPanel = () => {
     setShowArchivedProjects,
     unarchiveProject,
   } = useShellContext();
+  const { hiddenProjectIds, toggleProjectHidden } = useProjectTimelinePreferences(activeWorkspaceId);
+  const hiddenProjectIdSet = new Set(hiddenProjectIds);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardTab, setWizardTab] = useState<WizardTab>("general");
   const [wizardDraft, setWizardDraft] = useState<ProjectSetupDraft>(createEmptyProjectSetupDraft());
@@ -71,6 +75,16 @@ export const ShellProjectsPanel = () => {
           project.isArchived ? "Could not restore this project." : "Could not archive this project.",
         ),
       );
+    }
+  };
+
+  const handleToggleTimelineVisibility = async (project: ProjectCardRow) => {
+    setActionError(null);
+
+    try {
+      await toggleProjectHidden(project.id);
+    } catch (error) {
+      setActionError(getUserFacingErrorMessage(error, t("shell.projectsPanel.timelineVisibilityFailed")));
     }
   };
 
@@ -156,71 +170,94 @@ export const ShellProjectsPanel = () => {
       {projectsError || actionError ? <div className="shell-project-error">{projectsError ?? actionError}</div> : null}
 
       <div className="shell-project-list">
-        {projects.map((project) => (
-          <div
-            key={project.id}
-            className={`shell-project-item${scopeMode === "project" && project.id === activeProjectId ? " active" : ""}${project.isArchived ? " is-archived" : ""}`}
-            onClick={() => openProject(project.id)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                openProject(project.id);
-              }
-            }}
-          >
-            <div className="shell-project-copy">
-              <div className="shell-project-title-row">
-                <span className="shell-project-code-badge">{project.code}</span>
-                <span className="shell-project-name">{project.name}</span>
-                {project.isArchived ? <span className="shell-project-archived-badge">{t("shell.projectsPanel.archived")}</span> : null}
+        {projects.map((project) => {
+          const isTimelineHidden = hiddenProjectIdSet.has(project.id);
+
+          return (
+            <div
+              key={project.id}
+              className={`shell-project-item${scopeMode === "project" && project.id === activeProjectId ? " active" : ""}${project.isArchived ? " is-archived" : ""}${isTimelineHidden ? " is-timeline-hidden" : ""}`}
+              onClick={() => openProject(project.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openProject(project.id);
+                }
+              }}
+            >
+              <div className="shell-project-copy">
+                <div className="shell-project-title-row">
+                  <span className="shell-project-code-badge">{project.code}</span>
+                  <span className="shell-project-name">{project.name}</span>
+                  {project.isArchived ? <span className="shell-project-archived-badge">{t("shell.projectsPanel.archived")}</span> : null}
+                </div>
+                <span className="shell-project-meta">
+                  {t("shell.projectsPanel.assets", { count: project.assetCount })} · {t("shell.projectsPanel.incidents", { count: project.incidentCount })}
+                </span>
               </div>
-              <span className="shell-project-meta">
-                {t("shell.projectsPanel.assets", { count: project.assetCount })} · {t("shell.projectsPanel.incidents", { count: project.incidentCount })}
-              </span>
+              <div className="shell-project-item-actions" aria-label={`${project.name} actions`}>
+                <button
+                  aria-label={`Edit ${project.name}`}
+                  className="shell-project-action"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleEditProject(project.id);
+                  }}
+                  title={t("shell.projectsPanel.editProject")}
+                  type="button"
+                >
+                  <Pencil size={13} />
+                </button>
+                <button
+                  aria-label={project.isArchived ? `Restore ${project.name}` : `Archive ${project.name}`}
+                  className="shell-project-action"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleToggleArchive(project);
+                  }}
+                  title={project.isArchived ? t("shell.projectsPanel.restoreProject") : t("shell.projectsPanel.archiveProject")}
+                  type="button"
+                >
+                  {project.isArchived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
+                </button>
+                <button
+                  aria-label={
+                    isTimelineHidden
+                      ? t("shell.projectsPanel.showInTimelineAria", { name: project.name })
+                      : t("shell.projectsPanel.hideFromTimelineAria", { name: project.name })
+                  }
+                  className="shell-project-action shell-project-visibility-action"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (event.detail > 0) {
+                      event.currentTarget.blur();
+                    }
+                    void handleToggleTimelineVisibility(project);
+                  }}
+                  title={isTimelineHidden ? t("shell.projectsPanel.showInTimeline") : t("shell.projectsPanel.hideFromTimeline")}
+                  type="button"
+                >
+                  {isTimelineHidden ? <Eye size={13} /> : <EyeOff size={13} />}
+                </button>
+                <button
+                  aria-label={`Delete ${project.name}`}
+                  className="shell-project-action is-danger"
+                  disabled={deletingProjectId === project.id}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleRequestDelete(project);
+                  }}
+                  title="Delete permanently (with backup)"
+                  type="button"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
-            <div className="shell-project-item-actions" aria-label={`${project.name} actions`}>
-              <button
-                aria-label={`Edit ${project.name}`}
-                className="shell-project-action"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleEditProject(project.id);
-                }}
-                title={t("shell.projectsPanel.editProject")}
-                type="button"
-              >
-                <Pencil size={13} />
-              </button>
-              <button
-                aria-label={project.isArchived ? `Restore ${project.name}` : `Archive ${project.name}`}
-                className="shell-project-action"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void handleToggleArchive(project);
-                }}
-                title={project.isArchived ? t("shell.projectsPanel.restoreProject") : t("shell.projectsPanel.archiveProject")}
-                type="button"
-              >
-                {project.isArchived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
-              </button>
-              <button
-                aria-label={`Delete ${project.name}`}
-                className="shell-project-action is-danger"
-                disabled={deletingProjectId === project.id}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void handleRequestDelete(project);
-                }}
-                title="Delete permanently (with backup)"
-                type="button"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <ProjectSetupWizard

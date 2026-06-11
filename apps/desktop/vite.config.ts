@@ -63,6 +63,10 @@ const trustedRemoteImageOrigins = [
   "https://secure.gravatar.com",
 ];
 
+const trustedRemoteConnectOrigins = [
+  "https://api.github.com",
+];
+
 const rendererManualChunks = (id: string) => {
   if (!id.includes("node_modules")) return undefined;
   if (id.includes("bwip-js")) return "vendor-barcodes";
@@ -79,6 +83,9 @@ export default defineConfig(async ({ mode }) => {
   const supabaseOrigin = toHttpsOrigin(env.VITE_SUPABASE_URL);
   let htmlCsp = appendConnectSource(env.VITE_HTML_CSP ?? "", supabaseOrigin);
   htmlCsp = appendConnectSource(htmlCsp, toWebSocketOrigin(env.VITE_SUPABASE_URL));
+  for (const connectOrigin of trustedRemoteConnectOrigins) {
+    htmlCsp = appendConnectSource(htmlCsp, connectOrigin);
+  }
   htmlCsp = appendImageSource(htmlCsp, supabaseOrigin);
   for (const imageOrigin of trustedRemoteImageOrigins) {
     htmlCsp = appendImageSource(htmlCsp, imageOrigin);

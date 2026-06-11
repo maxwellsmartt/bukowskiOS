@@ -216,11 +216,12 @@ const sortNotifications = (rows: NotificationRow[]) =>
 const isRecentSelfEcho = (row: NotificationRow, seenIds: Set<string>) => seenIds.has(row.id);
 const reminderPollMs = 30_000;
 const notificationRefreshMs = 20_000;
+const remoteRefreshFailureBackoffMs = 2 * 60 * 1000;
 const appUpdateCheckIntervalMs = 24 * 60 * 60 * 1000;
 const appUpdateFailureRetryMs = 60 * 60 * 1000;
 const appUpdateLastCheckKey = "bukowski:notifications:last-app-update-check";
 const appUpdateLastNotifiedKey = "bukowski:notifications:last-app-update-notified";
-const appReleaseApiUrl = "https://api.github.com/repos/maxwellsmartt/bukowskiOS/releases/latest";
+const appReleaseApiUrl = "https://api.github.com/repos/maxwellsmartt/bukowskiOS/releases?per_page=1";
 const appReleasePageUrl = "https://github.com/maxwellsmartt/bukowskiOS/releases/latest";
 const todoColumnsBase = "id,user_id,workspace_id,title,notes,due_at,priority,completed_at,created_by,agent_action_ref,created_at,updated_at";
 const todoColumnsWithRecurrence =
@@ -257,6 +258,8 @@ const parseBasicRecurrenceNext = (rule: string | null, current: string) => {
 const asLooseSupabase = (supabase: NonNullable<ReturnType<typeof useSession>["supabase"]>) =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase as any;
+
+const isNavigatorOnline = () => typeof navigator === "undefined" || navigator.onLine !== false;
 
 const parseVersionParts = (value: string) =>
   value
@@ -306,9 +309,11 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [isTrayOpen, setTrayOpen] = useState(false);
   const [trayAnchor, setTrayAnchor] = useState<DOMRect | null>(null);
+  const [isOnline, setIsOnline] = useState(isNavigatorOnline);
   const seenIdsRef = useRef(new Set<string>());
   const firedReminderIdsRef = useRef(new Set<string>());
   const processedAgentIntentKeysRef = useRef(new Set<string>());
+  const remotePausedUntilRef = useRef(0);
   const activeUserId = user?.id ?? null;
   const nativePreferences = useMemo(
     () => mergeNativeNotificationPreferences(nativeNotificationSettings ?? defaultNativeNotificationPreferences),
@@ -324,6 +329,34 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       Object.fromEntries(actions.map((action) => [action, t(`notifications.nativeActions.${action}`)])),
     [t],
   );
+
+  const canAttemptRemoteRefresh = useCallback(
+    () => Boolean(canUseRemote && supabase && isOnline && Date.now() >= remotePausedUntilRef.current),
+    [canUseRemote, isOnline, supabase],
+  );
+
+  const pauseRemoteAfterFailure = useCallback(() => {
+    remotePausedUntilRef.current = Date.now() + remoteRefreshFailureBackoffMs;
+  }, []);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      remotePausedUntilRef.current = 0;
+      setIsOnline(true);
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    setIsOnline(isNavigatorOnline());
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   const showNewNotification = useCallback(
     async (row: NotificationRow) => {
@@ -377,31 +410,35 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       setItems(sortNotifications(localRows));
     }
 
-    if (!canUseRemote || !supabase) {
+    if (!canAttemptRemoteRefresh() || !supabase) {
       return;
     }
 
-    const looseSupabase = asLooseSupabase(supabase);
-    const { data } = await looseSupabase
-      .from("notifications")
-      .select("id,user_id,workspace_id,kind,title,body,source_type,source_ref,link_to,read_at,created_at")
-      .eq("user_id", activeUserId)
-      .eq("workspace_id", activeWorkspaceId)
-      .order("created_at", { ascending: false })
-      .limit(maxTrayItems);
+    try {
+      const looseSupabase = asLooseSupabase(supabase);
+      const { data } = await looseSupabase
+        .from("notifications")
+        .select("id,user_id,workspace_id,kind,title,body,source_type,source_ref,link_to,read_at,created_at")
+        .eq("user_id", activeUserId)
+        .eq("workspace_id", activeWorkspaceId)
+        .order("created_at", { ascending: false })
+        .limit(maxTrayItems);
 
-    await window.bukowskiNotifications?.applyRemoteRows({
-      table: "notifications",
-      rows: (data ?? []) as Record<string, unknown>[],
-    });
-    const nextItems = await window.bukowskiNotifications?.list({
-      userId: activeUserId,
-      workspaceId: activeWorkspaceId,
-      limit: maxTrayItems,
-    }) ?? ((data ?? []) as Parameters<typeof toNotificationRow>[0][]).map(toNotificationRow);
-    nextItems.forEach((item) => boundedAdd(seenIdsRef.current, item.id, seenIdsCap));
-    setItems(sortNotifications(nextItems));
-  }, [activeUserId, activeWorkspaceId, canUseLocal, canUseRemote, supabase]);
+      await window.bukowskiNotifications?.applyRemoteRows({
+        table: "notifications",
+        rows: (data ?? []) as Record<string, unknown>[],
+      });
+      const nextItems = await window.bukowskiNotifications?.list({
+        userId: activeUserId,
+        workspaceId: activeWorkspaceId,
+        limit: maxTrayItems,
+      }) ?? ((data ?? []) as Parameters<typeof toNotificationRow>[0][]).map(toNotificationRow);
+      nextItems.forEach((item) => boundedAdd(seenIdsRef.current, item.id, seenIdsCap));
+      setItems(sortNotifications(nextItems));
+    } catch {
+      pauseRemoteAfterFailure();
+    }
+  }, [activeUserId, activeWorkspaceId, canAttemptRemoteRefresh, canUseLocal, pauseRemoteAfterFailure, supabase]);
 
   const refreshPersonalWork = useCallback(async () => {
     if (!canUseLocal || !activeUserId || !activeWorkspaceId) {
@@ -415,55 +452,71 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     if (localTodos) setTodos(localTodos);
     if (localReminders) setReminders(localReminders);
 
-    if (!canUseRemote || !supabase) {
+    if (!canAttemptRemoteRefresh() || !supabase) {
       return;
     }
 
-    const looseSupabase = asLooseSupabase(supabase);
-    const [todosResultWithRecurrence, remindersResult] = await Promise.all([
-      looseSupabase
-        .from("todos")
-        .select(todoColumnsWithRecurrence)
-        .eq("user_id", activeUserId)
-        .eq("workspace_id", activeWorkspaceId)
-        .order("created_at", { ascending: false })
-        .limit(80),
-      looseSupabase
-        .from("reminders")
-        .select("id,user_id,workspace_id,title,body,remind_at,recurrence_rule,snoozed_until,completed_at,created_by,created_at")
-        .eq("user_id", activeUserId)
-        .eq("workspace_id", activeWorkspaceId)
-        .order("remind_at", { ascending: true })
-        .limit(80),
-    ]);
-    const todosResult = todosResultWithRecurrence.error
-      ? await looseSupabase
+    try {
+      const looseSupabase = asLooseSupabase(supabase);
+      const [todosResultWithRecurrence, remindersResult] = await Promise.all([
+        looseSupabase
           .from("todos")
-          .select(todoColumnsBase)
+          .select(todoColumnsWithRecurrence)
           .eq("user_id", activeUserId)
           .eq("workspace_id", activeWorkspaceId)
           .order("created_at", { ascending: false })
-          .limit(80)
-      : todosResultWithRecurrence;
+          .limit(80),
+        looseSupabase
+          .from("reminders")
+          .select("id,user_id,workspace_id,title,body,remind_at,recurrence_rule,snoozed_until,completed_at,created_by,created_at")
+          .eq("user_id", activeUserId)
+          .eq("workspace_id", activeWorkspaceId)
+          .order("remind_at", { ascending: true })
+          .limit(80),
+      ]);
+      const todosResult = todosResultWithRecurrence.error
+        ? await looseSupabase
+            .from("todos")
+            .select(todoColumnsBase)
+            .eq("user_id", activeUserId)
+            .eq("workspace_id", activeWorkspaceId)
+            .order("created_at", { ascending: false })
+            .limit(80)
+        : todosResultWithRecurrence;
 
-    await Promise.all([
-      window.bukowskiNotifications?.applyRemoteRows({
-        table: "todos",
-        rows: (todosResult.data ?? []) as Record<string, unknown>[],
-      }),
-      window.bukowskiNotifications?.applyRemoteRows({
-        table: "reminders",
-        rows: (remindersResult.data ?? []) as Record<string, unknown>[],
-      }),
-    ]);
+      await Promise.all([
+        window.bukowskiNotifications?.applyRemoteRows({
+          table: "todos",
+          rows: (todosResult.data ?? []) as Record<string, unknown>[],
+        }),
+        window.bukowskiNotifications?.applyRemoteRows({
+          table: "reminders",
+          rows: (remindersResult.data ?? []) as Record<string, unknown>[],
+        }),
+        window.bukowskiNotifications?.reconcileRemoteRows?.({
+          table: "todos",
+          userId: activeUserId,
+          workspaceId: activeWorkspaceId,
+          remoteIds: ((todosResult.data ?? []) as Array<{ id: string }>).map((row) => row.id),
+        }),
+        window.bukowskiNotifications?.reconcileRemoteRows?.({
+          table: "reminders",
+          userId: activeUserId,
+          workspaceId: activeWorkspaceId,
+          remoteIds: ((remindersResult.data ?? []) as Array<{ id: string }>).map((row) => row.id),
+        }),
+      ]);
 
-    const [nextTodos, nextReminders] = await Promise.all([
-      window.bukowskiNotifications?.listTodos({ userId: activeUserId, workspaceId: activeWorkspaceId, limit: 80 }),
-      window.bukowskiNotifications?.listReminders({ userId: activeUserId, workspaceId: activeWorkspaceId, limit: 80 }),
-    ]);
-    setTodos(nextTodos ?? ((todosResult.data ?? []) as Parameters<typeof toTodoRow>[0][]).map(toTodoRow));
-    setReminders(nextReminders ?? ((remindersResult.data ?? []) as Parameters<typeof toReminderRow>[0][]).map(toReminderRow));
-  }, [activeUserId, activeWorkspaceId, canUseLocal, canUseRemote, supabase]);
+      const [nextTodos, nextReminders] = await Promise.all([
+        window.bukowskiNotifications?.listTodos({ userId: activeUserId, workspaceId: activeWorkspaceId, limit: 80 }),
+        window.bukowskiNotifications?.listReminders({ userId: activeUserId, workspaceId: activeWorkspaceId, limit: 80 }),
+      ]);
+      setTodos(nextTodos ?? ((todosResult.data ?? []) as Parameters<typeof toTodoRow>[0][]).map(toTodoRow));
+      setReminders(nextReminders ?? ((remindersResult.data ?? []) as Parameters<typeof toReminderRow>[0][]).map(toReminderRow));
+    } catch {
+      pauseRemoteAfterFailure();
+    }
+  }, [activeUserId, activeWorkspaceId, canAttemptRemoteRefresh, canUseLocal, pauseRemoteAfterFailure, supabase]);
 
   useEffect(() => {
     if (!canUseLocal || !activeUserId || !activeWorkspaceId) {
@@ -490,7 +543,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
         setIsLoading(false);
       });
 
-    if (!canUseRemote || !supabase) {
+    if (!canUseRemote || !supabase || !isOnline) {
       return () => {
         isMounted = false;
       };
@@ -550,7 +603,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       isMounted = false;
       void Promise.resolve(supabase.removeChannel(channel));
     };
-  }, [activeUserId, activeWorkspaceId, canUseLocal, canUseRemote, refreshNotifications, refreshPersonalWork, showNewNotification, supabase]);
+  }, [activeUserId, activeWorkspaceId, canUseLocal, canUseRemote, isOnline, refreshNotifications, refreshPersonalWork, showNewNotification, supabase]);
 
   useEffect(() => {
     if (!canUseLocal) {
@@ -579,6 +632,15 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, [canUseLocal, refreshNotifications, refreshPersonalWork]);
+
+  useEffect(() => {
+    if (!isOnline || !canUseLocal) {
+      return;
+    }
+
+    void refreshNotifications().catch(() => undefined);
+    void refreshPersonalWork().catch(() => undefined);
+  }, [canUseLocal, isOnline, refreshNotifications, refreshPersonalWork]);
 
   const markRead = useCallback(
     async (notificationId: string) => {
@@ -918,7 +980,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   );
 
   useEffect(() => {
-    if (!canUseLocal || !activeUserId || !activeWorkspaceId) {
+    if (!canUseLocal || !activeUserId || !activeWorkspaceId || !isOnline) {
       return;
     }
 
@@ -949,8 +1011,8 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
         backoffAfterFailure();
         return;
       }
-      const release = (await response.json()) as { tag_name?: string; html_url?: string; name?: string };
-      const latest = release.tag_name?.trim();
+      const [release] = (await response.json()) as Array<{ tag_name?: string; html_url?: string; name?: string }>;
+      const latest = release?.tag_name?.trim();
       if (!latest || !isVersionGreater(latest, currentVersion)) {
         return;
       }
@@ -968,7 +1030,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
         notifyNow: true,
       });
     })().catch(() => backoffAfterFailure());
-  }, [activeUserId, activeWorkspaceId, canUseLocal, createNotification, t]);
+  }, [activeUserId, activeWorkspaceId, canUseLocal, createNotification, isOnline, t]);
 
   useEffect(() => {
     if (!canUseLocal || !activeUserId || !activeWorkspaceId) {

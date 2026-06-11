@@ -351,6 +351,8 @@ const bukowskiNotifications = {
     ipcRenderer.invoke(ipcChannels.notifications.deleteReminder, input) as Promise<void>,
   applyRemoteRows: (input: { table: "notifications" | "todos" | "reminders"; rows: Record<string, unknown>[] }) =>
     ipcRenderer.invoke(ipcChannels.notifications.applyRemoteRows, input) as Promise<void>,
+  reconcileRemoteRows: (input: { table: "todos" | "reminders"; userId: string; workspaceId: string; remoteIds: string[] }) =>
+    ipcRenderer.invoke(ipcChannels.notifications.reconcileRemoteRows, input) as Promise<number>,
   showNative: (input: ShowNativeNotificationCommand) =>
     ipcRenderer.invoke(ipcChannels.notifications.showNative, input) as Promise<void>,
   setDockBadge: (count: number) => ipcRenderer.invoke(ipcChannels.notifications.setDockBadge, count) as Promise<void>,

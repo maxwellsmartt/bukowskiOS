@@ -33,10 +33,11 @@ describe("security config", () => {
     expect(isTrustedRendererUrl("https://evil.example")).toBe(false);
   });
 
-  it("builds a CSP that keeps OpenAI and the local dev server reachable", () => {
+  it("builds a CSP that keeps trusted remote APIs and the local dev server reachable", () => {
     const policy = buildContentSecurityPolicy("http://localhost:5173", ["https://jmxkejpdklrrzhvzjlqm.supabase.co"]);
 
     expect(policy).toContain("https://api.openai.com");
+    expect(policy).toContain("https://api.github.com");
     expect(policy).toContain("https://jmxkejpdklrrzhvzjlqm.supabase.co");
     expect(policy).toContain("wss://jmxkejpdklrrzhvzjlqm.supabase.co");
     expect(policy).toContain("https://lh3.googleusercontent.com");

@@ -8,7 +8,6 @@ import {
   hydrateUserSettings,
   resetUserSettings,
   subscribeToUserSettings,
-  SUPPORTED_LANGUAGES,
   userSettingKeys,
   type SupportedLanguage,
   type UserSettingsMap,
@@ -16,23 +15,10 @@ import {
 
 import { useSession } from "./SessionProvider";
 
-const DEFAULT_LANGUAGE: SupportedLanguage = "en";
-
-const detectBrowserLanguage = (): SupportedLanguage => {
-  if (typeof navigator === "undefined") return DEFAULT_LANGUAGE;
-  const candidates = [navigator.language, ...(navigator.languages ?? [])];
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    const short = candidate.slice(0, 2).toLowerCase();
-    if ((SUPPORTED_LANGUAGES as readonly string[]).includes(short)) {
-      return short as SupportedLanguage;
-    }
-  }
-  return DEFAULT_LANGUAGE;
-};
+const DEFAULT_LANGUAGE: SupportedLanguage = "es";
 
 const applyI18nLanguage = (language: SupportedLanguage | undefined) => {
-  const resolved = language ?? detectBrowserLanguage();
+  const resolved = language ?? DEFAULT_LANGUAGE;
   if (i18n.language !== resolved) {
     void i18n.changeLanguage(resolved);
   }

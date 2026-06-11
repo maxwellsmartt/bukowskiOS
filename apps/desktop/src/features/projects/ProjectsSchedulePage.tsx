@@ -7,6 +7,7 @@ import { useOverviewTimeline } from "@features/overview/useOverviewSnapshot";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
+import { useProjectTimelinePreferences } from "./useProjectTimelinePreferences";
 
 const timelinePageSize = 24;
 
@@ -27,6 +28,7 @@ const isTimelineScale = (value: string | null): value is ScheduleTimelineScale =
 export const ProjectsSchedulePage = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId, projectDataVersion } = useShellContext();
+  const { hiddenProjectIds, order, setProjectOrder } = useProjectTimelinePreferences(activeWorkspaceId);
   const [timelineRange, setTimelineRange] = useState<ScheduleTimelineRange>(() => {
     const storedValue = readStringPreference(uiPreferenceKeys.overviewTimelineRange, "90d");
     return isTimelineRange(storedValue) ? storedValue : "90d";
@@ -76,10 +78,13 @@ export const ProjectsSchedulePage = () => {
         isLoading={timelineLoading}
         onAnchorDateChange={setTimelineAnchorDate}
         onLoadMoreProjects={() => setTimelineProjectLimit((current) => current + timelinePageSize)}
+        onProjectOrderChange={(nextOrder) => void setProjectOrder(nextOrder)}
         onRangeChange={setTimelineRange}
         onScaleChange={setTimelineScale}
+        projectOrder={order}
         range={timelineRange}
         scale={timelineScale}
+        hiddenProjectIds={hiddenProjectIds}
         snapshot={timelineSnapshot}
       />
     </div>

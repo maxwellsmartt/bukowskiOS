@@ -21,7 +21,7 @@
         "budget": "Presupuesto"
       },
       "projects": {
-        "schedule": "Timeline",
+        "schedule": "Cronograma",
         "projects": "Proyectos"
       },
       "assets": {
@@ -86,12 +86,18 @@
       "assets_one": "{{count}} equipo",
       "assets_other": "{{count}} equipos",
       "editProject": "Editar detalles",
+      "hiddenFromTimeline": "Oculto del timeline",
+      "hideFromTimeline": "Ocultar del timeline",
+      "hideFromTimelineAria": "Ocultar {{name}} del timeline",
       "hideArchived": "Ocultar proyectos archivados",
       "incidents_one": "{{count}} incidente",
       "incidents_other": "{{count}} incidentes",
       "newProject": "Crear proyecto",
       "restoreProject": "Restaurar proyecto",
-      "showArchived": "Mostrar proyectos archivados"
+      "showArchived": "Mostrar proyectos archivados",
+      "showInTimeline": "Mostrar en timeline",
+      "showInTimelineAria": "Mostrar {{name}} en el timeline",
+      "timelineVisibilityFailed": "No se pudo actualizar la visibilidad del proyecto en el timeline."
     },
     "notifications": {
       "title": "Notificaciones",
@@ -2448,6 +2454,7 @@
       "nextWindow": "Ver ventana siguiente",
       "previousWindow": "Ver ventana anterior",
       "projectsUnits": "Proyectos / unidades",
+      "reorderProject": "Reordenar {{name}} en el timeline",
       "showMore": "Mostrar más proyectos",
       "summary": {
         "activeSignals": "Señales",
@@ -2461,7 +2468,7 @@
         "unscheduled": "Sin fechas",
         "window": "Ventana"
       },
-      "title": "Timeline",
+      "title": "Cronograma",
       "today": "Hoy",
       "unitsCount": "{{count}} unidades",
       "scale": {
@@ -2586,21 +2593,23 @@
     "actions": {
       "markAllRead": "Marcar todo leído",
       "done": "Listo",
-      "snooze": "Posponer"
+      "snooze": "Posponer",
+      "snooze1h": "Posponer 1 h",
+      "snoozeTomorrow": "Mañana 9:00"
     },
     "summary": {
       "unread": "Sin leer",
       "needsAttention": "Requiere atención",
       "allCaughtUp": "Todo al día",
-      "openTodos": "Todos abiertos",
+      "openTodos": "Tareas abiertas",
       "totalVisible": "{{count}} visibles en total",
-      "nextReminder": "Próximo reminder",
+      "nextReminder": "Próximo recordatorio",
       "scheduled": "{{count}} programados"
     },
     "tabs": {
       "notifications": "Notificaciones",
-      "todos": "Todos",
-      "reminders": "Reminders",
+      "todos": "Tareas",
+      "reminders": "Recordatorios",
       "unread": "{{count}} sin leer",
       "open": "{{count}} abiertos",
       "scheduled": "{{count}} programados"
@@ -2611,31 +2620,32 @@
       "emptyBody": "Cuando un agente termine trabajo, se dispare un reminder o un evento del workspace necesite atención, aparecerá aquí."
     },
     "todos": {
-      "titleAria": "Título del todo",
-      "dueDateAria": "Fecha límite del todo",
-      "frequencyAria": "Frecuencia del todo",
+      "titleAria": "Título de la tarea",
+      "dueDateAria": "Fecha límite de la tarea",
+      "frequencyAria": "Frecuencia de la tarea",
       "placeholder": "¿Qué hay que hacer?",
-      "add": "Agregar todo",
+      "add": "Agregar tarea",
       "due": "Vence {{date}}",
       "noDueDate": "Sin fecha",
-      "emptyTitle": "Aún no hay todos",
+      "completed": "Completada",
+      "emptyTitle": "Aún no hay tareas",
       "emptyBody": "Agrega uno arriba o pide a un agente que cree un follow-up."
     },
     "reminders": {
-      "titleAria": "Título del reminder",
-      "timeAria": "Hora del reminder",
-      "frequencyAria": "Frecuencia del reminder",
-      "notesAria": "Notas del reminder",
-      "bodyAria": "Cuerpo del reminder",
+      "titleAria": "Título del recordatorio",
+      "timeAria": "Hora del recordatorio",
+      "frequencyAria": "Frecuencia del recordatorio",
+      "notesAria": "Notas del recordatorio",
+      "bodyAria": "Cuerpo del recordatorio",
       "placeholder": "Recuérdame...",
       "notesPlaceholder": "Notas opcionales",
-      "add": "Agregar reminder",
+      "add": "Agregar recordatorio",
       "delivered": "Entregado",
       "snoozedUntil": "Pospuesto hasta {{date}}",
       "reminds": "Recuerda {{date}}",
       "licenses": "Licencias",
-      "emptyTitle": "Aún no hay reminders",
-      "emptyBody": "Los reminders programados dispararán notificaciones nativas en macOS."
+      "emptyTitle": "Aún no hay recordatorios",
+      "emptyBody": "Los recordatorios programados dispararán notificaciones nativas en macOS."
     },
     "recurrence": {
       "oneTime": "Una vez",
@@ -2646,8 +2656,8 @@
       "repeats": "Recurrente"
     },
     "errors": {
-      "todoTitle": "Agrega primero un título para el todo.",
-      "reminderTitleTime": "Agrega primero título y hora para el reminder."
+      "todoTitle": "Agrega primero un título para la tarea.",
+      "reminderTitleTime": "Agrega primero título y hora para el recordatorio."
     }
   },
   "assistantChat": {
@@ -3924,7 +3934,7 @@
     },
     "schedule": {
       "body": "Vista global para revisar fechas, unidades, señales operativas y proyectos que todavía necesitan calendario.",
-      "title": "Timeline"
+      "title": "Cronograma"
     },
     "registry": {
       "title": "Proyectos",

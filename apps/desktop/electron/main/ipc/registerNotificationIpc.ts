@@ -42,6 +42,12 @@ type NotificationLocalService = {
   updateReminder: (input: import("@contracts").ReminderUpdateCommand) => void;
   deleteReminder: (input: { userId: string; workspaceId: string; id: string }) => void;
   applyRemoteRows: (input: { table: "notifications" | "todos" | "reminders"; rows: Record<string, unknown>[] }) => void;
+  reconcileRemoteRows: (input: {
+    table: "todos" | "reminders";
+    userId: string;
+    workspaceId: string;
+    remoteIds: string[];
+  }) => number;
 };
 
 const jsonSchema: z.ZodType<unknown> = z.lazy(() =>
@@ -156,6 +162,13 @@ const applyRemoteRowsSchema = z.object({
   rows: z.array(z.record(z.string(), jsonSchema)).max(200),
 });
 
+const reconcileRemoteRowsSchema = z.object({
+  table: z.enum(["todos", "reminders"]),
+  userId: idSchema,
+  workspaceId: idSchema,
+  remoteIds: z.array(idSchema).max(200),
+});
+
 export const registerNotificationIpc = (service: NotificationLocalService) => {
   safeHandleReadWithSchema(
     ipcChannels.notifications.list,
@@ -265,6 +278,17 @@ export const registerNotificationIpc = (service: NotificationLocalService) => {
       });
     },
     "The app could not apply remote notifications.",
+  );
+
+  safeHandle(
+    ipcChannels.notifications.reconcileRemoteRows,
+    reconcileRemoteRowsSchema,
+    async (_event, input) =>
+      service.reconcileRemoteRows({
+        ...input,
+        userId: await resolveTrustedUserId(input.userId),
+      }),
+    "The app could not reconcile remote notifications.",
   );
 
   safeHandle(

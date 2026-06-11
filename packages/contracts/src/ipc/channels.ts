@@ -72,6 +72,7 @@ export const ipcChannels = {
     updateReminder: "bukowskiNotifications:updateReminder",
     deleteReminder: "bukowskiNotifications:deleteReminder",
     applyRemoteRows: "bukowskiNotifications:applyRemoteRows",
+    reconcileRemoteRows: "bukowskiNotifications:reconcileRemoteRows",
     showNative: "bukowskiNotifications:showNative",
     setDockBadge: "bukowskiNotifications:setDockBadge",
     getForegroundState: "bukowskiNotifications:getForegroundState",
