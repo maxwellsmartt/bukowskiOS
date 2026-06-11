@@ -741,6 +741,7 @@ export const CatalogPage = () => {
       data.categories.length,
     [data],
   );
+  const isInitialCatalogLoading = isLoading && totalCatalogRecords === 0;
 
   useEffect(() => {
     if (!exportMenuOpen) {
@@ -1013,7 +1014,7 @@ export const CatalogPage = () => {
       <SectionHeader title={t("catalog.title")} />
 
       {error ? <div className="empty-state">{t("catalog.unavailable", { message: error })}</div> : null}
-      {!error && isLoading ? (
+      {!error && isInitialCatalogLoading ? (
         <SurfaceCard title={t("catalog.title")}>
           <TableSkeleton body={t("catalog.loading")} columns={4} />
         </SurfaceCard>
@@ -1191,6 +1192,7 @@ export const CatalogPage = () => {
                 : t("catalog.empty.table", { entity: activeTabConfig.label.toLowerCase() })
             }
             getRowId={(row) => String(row.id)}
+            key={`catalog-table-${activeTab}`}
             onRowClick={(row) => setActivePreviewIds((current) => ({ ...current, [activeTab]: String(row.id) }))}
             onSelectedRowIdsChange={(rowIds) =>
               setSelectedIds((current) => ({

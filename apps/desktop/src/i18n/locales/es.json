@@ -3953,15 +3953,35 @@
       "projectsSelected_other": "{{count}} proyectos seleccionados",
       "compareSubtitle": "Agrégalos para comparar.",
       "addToCompare": "Agregar a comparar",
+      "closeAlreadyWrapped": "Los proyectos seleccionados ya están cerrados.",
+      "closeProject": "Cerrar proyecto",
+      "closeProjectDialog": {
+        "body_one": "Esto marcará el proyecto seleccionado como Cerrado. Podrás volver a cambiar su estado desde Detalles si lo necesitas.",
+        "body_other": "Esto marcará {{count}} proyectos seleccionados como Cerrados. Podrás volver a cambiar su estado desde Detalles si lo necesitas.",
+        "confirm": "Cerrar proyecto",
+        "title_one": "¿Cerrar proyecto?",
+        "title_other": "¿Cerrar proyectos?"
+      },
+      "closeProjectToast": {
+        "body_one": "El proyecto quedó marcado como Cerrado.",
+        "body_other": "{{count}} proyectos quedaron marcados como Cerrados.",
+        "failed": "No se pudo cerrar el proyecto.",
+        "title": "Proyecto cerrado"
+      },
       "clearSelection": "Limpiar selección",
+      "editProject": "Editar proyecto",
+      "reportIncident": "Reportar incidente",
       "searchPlaceholder": "Buscar proyectos, clientes o departamentos",
       "loading": "Cargando proyectos…",
       "showArchived": "Mostrar proyectos archivados",
       "hideArchived": "Ocultar proyectos archivados",
       "rowActions": {
         "addToCompare": "Agregar a comparar",
+        "closeProject": "Cerrar proyecto",
+        "editProject": "Editar proyecto",
         "openDetail": "Abrir detalle",
-        "openProject": "Abrir proyecto"
+        "openProject": "Abrir proyecto",
+        "reportIncident": "Reportar incidente"
       },
       "sort": {
         "name": "Nombre del proyecto",

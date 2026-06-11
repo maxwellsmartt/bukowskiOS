@@ -3949,15 +3949,35 @@
       "projectsSelected_other": "{{count}} projects selected",
       "compareSubtitle": "Add them to compare.",
       "addToCompare": "Add to compare",
+      "closeAlreadyWrapped": "The selected projects are already wrapped.",
+      "closeProject": "Close project",
+      "closeProjectDialog": {
+        "body_one": "This will mark the selected project as Wrapped. You can change its status again from Details if needed.",
+        "body_other": "This will mark {{count}} selected projects as Wrapped. You can change their status again from Details if needed.",
+        "confirm": "Close project",
+        "title_one": "Close project?",
+        "title_other": "Close projects?"
+      },
+      "closeProjectToast": {
+        "body_one": "The project was marked as Wrapped.",
+        "body_other": "{{count}} projects were marked as Wrapped.",
+        "failed": "Could not close the project.",
+        "title": "Project closed"
+      },
       "clearSelection": "Clear selection",
+      "editProject": "Edit project",
+      "reportIncident": "Report incident",
       "searchPlaceholder": "Search projects, clients or departments",
       "loading": "Loading projects…",
       "showArchived": "Show archived projects",
       "hideArchived": "Hide archived projects",
       "rowActions": {
         "addToCompare": "Add to compare",
+        "closeProject": "Close project",
+        "editProject": "Edit project",
         "openDetail": "Open detail",
-        "openProject": "Open project"
+        "openProject": "Open project",
+        "reportIncident": "Report incident"
       },
       "sort": {
         "name": "Project name",

@@ -1,13 +1,18 @@
-import { Archive, ExternalLink, GitCompareArrows, PanelRightOpen, X } from "lucide-react";
+import { AlertTriangle, Archive, CheckCircle2, ExternalLink, GitCompareArrows, Pencil, PanelRightOpen, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ProjectCardRow, ProjectListQuery, ProjectSortField } from "@contracts";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
+import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
+import { reportIncident } from "@features/incidents/useIncidentsData";
+import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListToolbar } from "@shared/components/ListToolbar";
+import { ModalShell } from "@shared/components/ModalShell";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -19,9 +24,10 @@ import { uiPreferenceKeys } from "@shared/lib/preferences";
 import { hasFinanceAccess } from "@shared/lib/financeAccess";
 import { projectStatusTone, resolveProjectColor } from "@shared/lib/projectColors";
 import { isPlaceholderValue } from "@shared/lib/displayValue";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { ProjectDetailPanel } from "./ProjectDetailPanel";
-import { useProjectDetail, useProjectsRegistry } from "./useProjectsData";
+import { useCatalogData, useProjectDetail, useProjectsRegistry } from "./useProjectsData";
 
 const projectSortOptions: Array<ListSortOption<ProjectSortField> & { labelKey: string }> = [
   { value: "name", label: "Project name", labelKey: "projects.registry.sort.name", columnKey: "project" },
@@ -41,6 +47,7 @@ const projectSortOptions: Array<ListSortOption<ProjectSortField> & { labelKey: s
 export const ProjectsPage = () => {
   const { t } = useTranslation();
   const { activeMembership, activeWorkspaceId } = useWorkspace();
+  const toast = useToast();
   const canAccessFinance = hasFinanceAccess(activeMembership);
   const availableProjectSortOptions = useMemo(
     () => (canAccessFinance ? projectSortOptions : projectSortOptions.filter((option) => option.value !== "exposure")),
@@ -74,12 +81,22 @@ export const ProjectsPage = () => {
     }),
   });
   const { data, error, isLoading } = useProjectsRegistry(projectControls.query);
-  const { activeProjectId, openProject, setActiveProjectId, setShowArchivedProjects } = useShellContext();
+  const { activeProjectId, openProject, refreshProjects, setActiveProjectId, setShowArchivedProjects, updateProject } = useShellContext();
   const { addItems } = useCompareTray();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [reportProject, setReportProject] = useState<ProjectCardRow | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [closeProjectTargets, setCloseProjectTargets] = useState<ProjectCardRow[]>([]);
+  const [isClosingProjects, setIsClosingProjects] = useState(false);
   const selectedProjects = useMemo(() => data.filter((project) => selectedRowIds.includes(project.id)), [data, selectedRowIds]);
   const detailProjectId = selectedRowIds.length === 1 ? selectedRowIds[0] ?? null : selectedRowIds.length > 1 ? null : activeProjectId;
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = useProjectDetail(detailProjectId);
+  const { data: catalog, error: catalogError } = useCatalogData();
+  const selectedProject = selectedProjects.length === 1 ? selectedProjects[0] ?? null : null;
+  const reportAssetOptions = reportProject && detail.project?.id === reportProject.id
+    ? detail.assets.map((asset) => ({ id: asset.id, code: asset.code, name: asset.name }))
+    : [];
 
   const addProjectsToCompare = (projects: ProjectCardRow[]) =>
     addItems(
@@ -96,12 +113,65 @@ export const ProjectsPage = () => {
 
   const addSelectedProjectsToCompare = () => addProjectsToCompare(selectedProjects);
 
-  const openProjectFromRegistry = (project: ProjectCardRow) => {
+  const openProjectFromRegistry = (project: ProjectCardRow, section?: "overview" | "assets" | "packing" | "incidents" | "budget" | "info") => {
     if (project.isArchived) {
       setShowArchivedProjects(true);
     }
 
-    openProject(project.id);
+    openProject(project.id, section);
+  };
+
+  const buildProjectUpdateInput = (project: ProjectCardRow, status = project.status) => ({
+    projectId: project.id,
+    code: project.code,
+    name: project.name,
+    clientId: project.clientId ?? undefined,
+    clientName: project.clientId || isPlaceholderValue(project.client) ? undefined : project.client,
+    productionCompanyId: project.productionCompanyId ?? undefined,
+    productionCompanyName: project.productionCompanyId || isPlaceholderValue(project.productionCompany) ? undefined : project.productionCompany,
+    status,
+    description: isPlaceholderValue(project.description) ? undefined : project.description,
+    startDate: project.startDate ?? undefined,
+    endDate: project.endDate ?? undefined,
+    hasPreproduction: project.hasPreproduction,
+    preproductionStartDate: project.preproductionStartDate ?? undefined,
+    preproductionEndDate: project.preproductionEndDate ?? undefined,
+    colorKey: project.colorKey ?? undefined,
+  });
+
+  const openProjectIncidentReport = (project: ProjectCardRow) => {
+    setActiveProjectId(project.id);
+    setReportProject(project);
+    setReportError(null);
+  };
+
+  const openCloseProjectConfirm = (projects: ProjectCardRow[]) => {
+    const closableProjects = projects.filter((project) => project.status !== "Wrapped");
+    if (!closableProjects.length) {
+      toast.info(t("projects.registry.closeAlreadyWrapped"));
+      return;
+    }
+
+    setCloseProjectTargets(closableProjects);
+  };
+
+  const closeSelectedProjectTargets = async () => {
+    try {
+      setIsClosingProjects(true);
+      for (const project of closeProjectTargets) {
+        await updateProject(buildProjectUpdateInput(project, "Wrapped"));
+      }
+      setSelectedRowIds((current) => current.filter((projectId) => !closeProjectTargets.some((project) => project.id === projectId)));
+      setCloseProjectTargets([]);
+      toast.success(
+        t("projects.registry.closeProjectToast.title"),
+        t("projects.registry.closeProjectToast.body", { count: closeProjectTargets.length }),
+      );
+    } catch (nextError) {
+      toast.error(t("projects.registry.closeProjectToast.failed"), getUserFacingErrorMessage(nextError, t("projects.registry.closeProjectToast.failed")));
+    } finally {
+      setIsClosingProjects(false);
+    }
   };
 
   const handleSelectedRowIdsChange = (nextRowIds: string[]) => {
@@ -130,6 +200,33 @@ export const ProjectsPage = () => {
             <span className="selection-action-subtitle">{t("projects.registry.compareSubtitle")}</span>
           </div>
           <div className="selection-action-buttons">
+            <button
+              className="ghost-control"
+              disabled={!selectedProject}
+              onClick={() => selectedProject ? openProjectFromRegistry(selectedProject, "info") : undefined}
+              type="button"
+            >
+              <Pencil size={14} />
+              {t("projects.registry.editProject")}
+            </button>
+            <button
+              className="ghost-control"
+              disabled={!selectedProject}
+              onClick={() => selectedProject ? openProjectIncidentReport(selectedProject) : undefined}
+              type="button"
+            >
+              <AlertTriangle size={14} />
+              {t("projects.registry.reportIncident")}
+            </button>
+            <button
+              className="ghost-control"
+              disabled={!selectedProjects.some((project) => project.status !== "Wrapped")}
+              onClick={() => openCloseProjectConfirm(selectedProjects)}
+              type="button"
+            >
+              <CheckCircle2 size={14} />
+              {t("projects.registry.closeProject")}
+            </button>
             <button
               className="ghost-control"
               onClick={addSelectedProjectsToCompare}
@@ -295,6 +392,25 @@ export const ProjectsPage = () => {
             }}
             rowActions={(row) => [
               {
+                key: "edit-project",
+                label: t("projects.registry.rowActions.editProject"),
+                icon: <Pencil size={14} />,
+                onSelect: () => openProjectFromRegistry(row, "info"),
+              },
+              {
+                key: "report-incident",
+                label: t("projects.registry.rowActions.reportIncident"),
+                icon: <AlertTriangle size={14} />,
+                onSelect: () => openProjectIncidentReport(row),
+              },
+              {
+                key: "close-project",
+                label: t("projects.registry.rowActions.closeProject"),
+                icon: <CheckCircle2 size={14} />,
+                disabled: row.status === "Wrapped",
+                onSelect: () => openCloseProjectConfirm([row]),
+              },
+              {
                 key: "open-detail",
                 label: t("projects.registry.rowActions.openDetail"),
                 icon: <PanelRightOpen size={14} />,
@@ -399,6 +515,78 @@ export const ProjectsPage = () => {
           <ProjectDetailPanel data={detail} error={detailError} isLoading={detailLoading} onIncidentCreated={reloadDetail} />
         )}
       </ResizableSideRailLayout>
+
+      {reportProject ? (
+        <ModalShell
+          onClose={() => {
+            setReportProject(null);
+            setReportError(null);
+          }}
+        >
+          <IncidentReportPanel
+            assetOptions={reportAssetOptions}
+            departments={catalog.departments}
+            error={reportError ?? (catalogError ? t("incidents.catalogUnavailable", { message: catalogError }) : null)}
+            initialValue={{
+              projectId: reportProject.id,
+              severity: "Medium",
+            }}
+            isSubmitting={isSubmittingReport}
+            onClose={() => {
+              setReportProject(null);
+              setReportError(null);
+            }}
+            onSubmit={async (value) => {
+              try {
+                setIsSubmittingReport(true);
+                const result = await reportIncident({
+                  commandId: crypto.randomUUID(),
+                  workspaceId: activeWorkspaceId,
+                  assetId: value.assetId,
+                  projectId: value.projectId ?? reportProject.id,
+                  projectUnitId: value.projectUnitId,
+                  departmentId: value.departmentId,
+                  responsibleUserId: value.responsibleUserId,
+                  incidentType: value.incidentType,
+                  severity: value.severity,
+                  title: value.title,
+                  description: value.description,
+                  costEstimate: value.costEstimate,
+                  notes: value.notes,
+                  actorType: "user",
+                  sourceChannel: "desktop",
+                });
+
+                await Promise.all([reloadDetail(), refreshProjects()]);
+                setReportProject(null);
+                setReportError(null);
+                toast.success(t("incidents.toasts.reported"), result.summary);
+              } catch (nextError) {
+                setReportError(getUserFacingErrorMessage(nextError, t("incidents.toasts.createFailed")));
+              } finally {
+                setIsSubmittingReport(false);
+              }
+            }}
+            projectLocked
+            projects={data}
+            users={catalog.users}
+          />
+        </ModalShell>
+      ) : null}
+
+      <ConfirmDialog
+        body={t("projects.registry.closeProjectDialog.body", { count: closeProjectTargets.length })}
+        confirmLabel={t("projects.registry.closeProjectDialog.confirm")}
+        isOpen={closeProjectTargets.length > 0}
+        isSubmitting={isClosingProjects}
+        onCancel={() => {
+          if (!isClosingProjects) {
+            setCloseProjectTargets([]);
+          }
+        }}
+        onConfirm={closeSelectedProjectTargets}
+        title={t("projects.registry.closeProjectDialog.title", { count: closeProjectTargets.length })}
+      />
     </div>
   );
 };

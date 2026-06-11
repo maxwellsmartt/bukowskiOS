@@ -9218,6 +9218,7 @@ body.is-resizing-side-rail {
 
 .projects-schedule-page-stack {
   flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   padding-bottom: 0;
@@ -9230,6 +9231,11 @@ body.is-resizing-side-rail {
 
 .projects-schedule-page-stack > .section-header {
   flex: 0 0 auto;
+}
+
+.projects-schedule-page-stack > .timeline-surface {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .timeline-surface > .surface-card-header,
@@ -9401,7 +9407,7 @@ body.is-resizing-side-rail {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   overflow: auto;
@@ -9446,8 +9452,10 @@ body.is-resizing-side-rail {
   position: relative;
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: 4px;
   min-width: 0;
+  min-height: 0;
 }
 
 .timeline-header-row {
