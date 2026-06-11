@@ -3495,6 +3495,7 @@
       "preproductionDatesRequired": "Pre-production requires both start and end dates.",
       "preproductionEndAfterStart": "Pre-production end date must be on or after the start date.",
       "projectEndAfterStart": "Project end date must be on or after the start date.",
+      "projectCodeAlreadyExists": "A project with code {{code}} already exists.",
       "selectedAssetsFallback": "the selected assets",
       "projectNameRequired": "Project name is required.",
       "startDateRequired": "Project start date is required.",
@@ -4080,6 +4081,18 @@
       "title": "Project Overview",
       "unavailable": "Project detail unavailable: {{message}}",
       "loading": "Loading the latest project details.",
+      "closeProject": "Close project",
+      "closeProjectDialog": {
+        "body": "This will mark the project as Wrapped. It does not archive or delete data; you can change the status from Details if you need to reopen it.",
+        "cancel": "Keep open",
+        "confirm": "Close project",
+        "title": "Close “{{name}}”?"
+      },
+      "closeProjectToast": {
+        "body": "The project was marked as Wrapped.",
+        "failed": "Could not close the project.",
+        "title": "Project closed"
+      },
       "editProject": "Edit project",
       "reportIncident": "Report incident",
       "empty": {
@@ -4095,6 +4108,26 @@
         "client": "Client",
         "exposure": "Exposure",
         "timeline": "Timeline"
+      },
+      "signals": {
+        "assets": "Inventory",
+        "assetsValue": "{{count}} assets",
+        "incidents": "Incidents",
+        "incidentsValue": "{{count}} open",
+        "schedule": "Window",
+        "title": "Operational signals",
+        "units": "Units",
+        "unitsValue": "{{active}} active · {{planned}} planned"
+      },
+      "quickActions": {
+        "assets": "Assets",
+        "assetsBody": "{{count}} assigned",
+        "budget": "Budget",
+        "budgetBody": "Exposure {{exposure}}",
+        "incidents": "Incidents",
+        "incidentsBody": "{{count}} open",
+        "packing": "Packing",
+        "packingBody": "Prepare check-outs and returns"
       },
       "metrics": {
         "assignedAssets": "Assigned assets",

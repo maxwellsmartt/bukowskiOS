@@ -7832,6 +7832,11 @@ body.is-resizing-side-rail {
   .project-detail-header-actions {
     justify-content: flex-start;
   }
+
+  .project-operational-signals,
+  .project-quick-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .project-overview-card::before {
@@ -7873,6 +7878,82 @@ body.is-resizing-side-rail {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.project-operational-signals,
+.project-quick-action-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.project-operational-signal,
+.project-quick-action {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  background: rgba(7, 10, 12, 0.22);
+}
+
+.project-operational-signal {
+  display: grid;
+  gap: 5px;
+  padding: 10px 11px;
+}
+
+.project-operational-signal span,
+.project-quick-action span {
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 10px);
+}
+
+.project-operational-signal span {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.project-operational-signal strong,
+.project-quick-action strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-size: var(--font-xs, 11px);
+}
+
+.project-operational-signal.is-success {
+  border-color: rgba(114, 196, 146, 0.18);
+  background: rgba(114, 196, 146, 0.06);
+}
+
+.project-operational-signal.is-warning {
+  border-color: rgba(212, 170, 83, 0.2);
+  background: rgba(212, 170, 83, 0.07);
+}
+
+.project-operational-signal.is-critical {
+  border-color: rgba(227, 113, 113, 0.2);
+  background: rgba(227, 113, 113, 0.07);
+}
+
+.project-quick-action-grid {
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+
+.project-quick-action {
+  display: grid;
+  gap: 4px;
+  padding: 11px;
+  text-align: left;
+  color: inherit;
+}
+
+.project-quick-action:hover {
+  border-color: rgba(126, 183, 178, 0.24);
+  background: rgba(126, 183, 178, 0.08);
 }
 
 .project-overview-summary .summary-row {

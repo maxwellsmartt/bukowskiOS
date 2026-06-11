@@ -8,6 +8,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
 import { reportIncident } from "@features/incidents/useIncidentsData";
 import { useCatalogData } from "@features/projects/useProjectsData";
+import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ModalShell } from "@shared/components/ModalShell";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -16,7 +17,7 @@ import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { formatProjectAssignmentInline } from "@shared/lib/assetQuantityPresentation";
 import { projectStatusTone, resolveProjectColor } from "@shared/lib/projectColors";
-import { cleanDisplay } from "@shared/lib/displayValue";
+import { cleanDisplay, isPlaceholderValue } from "@shared/lib/displayValue";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { hasFinanceAccess } from "@shared/lib/financeAccess";
 
@@ -32,10 +33,13 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
   const navigate = useNavigate();
   const { activeMembership, activeWorkspaceId } = useWorkspace();
   const canAccessFinance = hasFinanceAccess(activeMembership);
-  const { projects, refreshProjects } = useShellContext();
+  const { projects, refreshProjects, updateProject } = useShellContext();
   const { data: catalog, error: catalogError } = useCatalogData();
   const [reportOpen, setReportOpen] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [closeProjectOpen, setCloseProjectOpen] = useState(false);
+  const [closeProjectError, setCloseProjectError] = useState<string | null>(null);
+  const [isClosingProject, setIsClosingProject] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const toast = useToast();
 
@@ -64,6 +68,91 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
   }
 
   const project = data.project;
+  const canCloseProject = project.status !== "Wrapped";
+  const operationalSignals = [
+    {
+      label: t("projects.detail.signals.schedule"),
+      value: data.schedule?.windowLabel ?? t("projects.fallbacks.unscheduled"),
+      tone: data.schedule ? "info" : "warning",
+    },
+    {
+      label: t("projects.detail.signals.units"),
+      value: t("projects.detail.signals.unitsValue", {
+        active: data.timelineSummary?.activeUnits ?? 0,
+        planned: data.timelineSummary?.plannedUnits ?? 0,
+      }),
+      tone: data.units.length ? "info" : "warning",
+    },
+    {
+      label: t("projects.detail.signals.assets"),
+      value: t("projects.detail.signals.assetsValue", { count: project.assetCount }),
+      tone: project.assetCount ? "success" : "warning",
+    },
+    {
+      label: t("projects.detail.signals.incidents"),
+      value: t("projects.detail.signals.incidentsValue", { count: project.incidentCount }),
+      tone: project.incidentCount ? "critical" : "success",
+    },
+  ] as const;
+  const quickActions = [
+    {
+      label: t("projects.detail.quickActions.assets"),
+      body: t("projects.detail.quickActions.assetsBody", { count: project.assetCount }),
+      path: `/projects/${project.id}/assets`,
+    },
+    {
+      label: t("projects.detail.quickActions.packing"),
+      body: t("projects.detail.quickActions.packingBody"),
+      path: `/projects/${project.id}/packing`,
+    },
+    {
+      label: t("projects.detail.quickActions.incidents"),
+      body: t("projects.detail.quickActions.incidentsBody", { count: project.incidentCount }),
+      path: `/projects/${project.id}/incidents`,
+    },
+    ...(canAccessFinance
+      ? [
+          {
+            label: t("projects.detail.quickActions.budget"),
+            body: t("projects.detail.quickActions.budgetBody", { exposure: project.exposure }),
+            path: `/projects/${project.id}/budget`,
+          },
+        ]
+      : []),
+  ];
+
+  const handleCloseProject = async () => {
+    setIsClosingProject(true);
+    setCloseProjectError(null);
+
+    try {
+      await updateProject({
+        projectId: project.id,
+        code: project.code,
+        name: project.name,
+        clientId: project.clientId ?? undefined,
+        clientName: project.clientId || isPlaceholderValue(project.client) ? undefined : project.client,
+        productionCompanyId: project.productionCompanyId ?? undefined,
+        productionCompanyName:
+          project.productionCompanyId || isPlaceholderValue(project.productionCompany) ? undefined : project.productionCompany,
+        status: "Wrapped",
+        description: isPlaceholderValue(project.description) ? undefined : project.description,
+        startDate: project.startDate ?? undefined,
+        endDate: project.endDate ?? undefined,
+        hasPreproduction: project.hasPreproduction,
+        preproductionStartDate: project.preproductionStartDate ?? undefined,
+        preproductionEndDate: project.preproductionEndDate ?? undefined,
+        colorKey: project.colorKey ?? undefined,
+      });
+      await onIncidentCreated();
+      setCloseProjectOpen(false);
+      toast.success(t("projects.detail.closeProjectToast.title"), t("projects.detail.closeProjectToast.body"));
+    } catch (nextError) {
+      setCloseProjectError(getUserFacingErrorMessage(nextError, t("projects.detail.closeProjectToast.failed")));
+    } finally {
+      setIsClosingProject(false);
+    }
+  };
 
   return (
     <div className="project-detail-stack">
@@ -89,6 +178,18 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
             >
               {t("projects.detail.editProject")}
             </button>
+            {canCloseProject ? (
+              <button
+                className="ghost-control action-row-button"
+                onClick={() => {
+                  setCloseProjectOpen(true);
+                  setCloseProjectError(null);
+                }}
+                type="button"
+              >
+                {t("projects.detail.closeProject")}
+              </button>
+            ) : null}
             <button
               className="action-primary-button action-row-button"
               onClick={() => {
@@ -103,6 +204,15 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
         }
         className="project-overview-card"
       >
+        <div className="project-operational-signals" aria-label={t("projects.detail.signals.title")}>
+          {operationalSignals.map((signal) => (
+            <div key={signal.label} className={`project-operational-signal is-${signal.tone}`}>
+              <span>{signal.label}</span>
+              <strong>{signal.value}</strong>
+            </div>
+          ))}
+        </div>
+
         <div className="compact-summary-grid project-overview-summary">
           <div className="summary-row">
             <span className="summary-label">{t("projects.detail.summary.assignedAssets")}</span>
@@ -127,9 +237,35 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
             <span className="summary-value">{data.schedule?.windowLabel ?? t("projects.fallbacks.unscheduled")}</span>
           </div>
         </div>
+
+        <div className="project-quick-action-grid">
+          {quickActions.map((action) => (
+            <button key={action.path} className="project-quick-action" onClick={() => navigate(action.path)} type="button">
+              <strong>{action.label}</strong>
+              <span>{action.body}</span>
+            </button>
+          ))}
+        </div>
       </SurfaceCard>
 
       {catalogError ? <div className="empty-state">{t("incidents.catalogUnavailable", { message: catalogError })}</div> : null}
+      {closeProjectError ? <div className="action-feedback action-feedback-error">{closeProjectError}</div> : null}
+
+      {closeProjectOpen ? (
+        <ConfirmDialog
+          isOpen
+          title={t("projects.detail.closeProjectDialog.title", { name: project.name })}
+          body={t("projects.detail.closeProjectDialog.body")}
+          confirmLabel={t("projects.detail.closeProjectDialog.confirm")}
+          cancelLabel={t("projects.detail.closeProjectDialog.cancel")}
+          isSubmitting={isClosingProject}
+          onConfirm={handleCloseProject}
+          onCancel={() => {
+            setCloseProjectOpen(false);
+            setCloseProjectError(null);
+          }}
+        />
+      ) : null}
 
       {reportOpen ? (
         <ModalShell

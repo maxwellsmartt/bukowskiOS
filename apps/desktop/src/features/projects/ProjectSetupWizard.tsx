@@ -16,6 +16,7 @@ import type {
   ProjectBlueprintUnitDepartmentDraftInput,
   ProjectBlueprintUnitDraftInput,
   ProjectBlueprintUnitWindowInput,
+  ProjectCardRow,
   StagingPackingSlipRow,
 } from "@contracts";
 import { projectColorPalette } from "@contracts";
@@ -361,12 +362,17 @@ const unitConflictCount = (
 
 const isValidDateWindow = (startDate: string, endDate: string) => !startDate || !endDate || startDate <= endDate;
 
-const buildValidationErrors = (draft: ProjectSetupDraft, t: TFunction) => {
+const buildValidationErrors = (draft: ProjectSetupDraft, t: TFunction, existingProjects: ProjectCardRow[]) => {
   const errors: string[] = [];
   const projectDepartmentIds = deriveProjectDepartmentIds(draft);
+  const normalizedCode = draft.generalInfo.code.trim().toUpperCase();
 
   if (!draft.generalInfo.name.trim()) {
     errors.push(t("projectSetup.validation.projectNameRequired"));
+  }
+
+  if (normalizedCode && existingProjects.some((project) => project.code.trim().toUpperCase() === normalizedCode)) {
+    errors.push(t("projectSetup.validation.projectCodeAlreadyExists", { code: normalizedCode }));
   }
 
   if (!draft.generalInfo.startDate) {
@@ -473,7 +479,7 @@ export const ProjectSetupWizard = ({
   const { activeWorkspaceId } = useWorkspace();
   const toast = useToast();
   const { createNotification } = useNotifications();
-  const { createProjectBlueprint, openProject } = useShellContext();
+  const { createProjectBlueprint, openProject, projects } = useShellContext();
   const [stagingSlips, setStagingSlips] = useState<StagingPackingSlipRow[]>([]);
   const [stagingError, setStagingError] = useState<string | null>(null);
   const [isLoadingStaging, setIsLoadingStaging] = useState(false);
@@ -505,7 +511,7 @@ export const ProjectSetupWizard = ({
   const [crewSelectedDirection, setCrewSelectedDirection] = useState<ListSortDirection>("asc");
   const dirty = isProjectSetupDraftDirty(draft);
 
-  const validationErrors = useMemo(() => buildValidationErrors(draft, t), [draft, t]);
+  const validationErrors = useMemo(() => buildValidationErrors(draft, t, projects), [draft, projects, t]);
 
   useEffect(() => {
     if (!open) {
@@ -2225,7 +2231,12 @@ export const ProjectSetupWizard = ({
                         ),
                     })}
                   </p>
-                  <span>{t("projectSetup.summary.unitDepartmentCounts", { units: draft.additionalUnits.length, departments: draft.generalInfo.departmentIds.length })}</span>
+                  <span>
+                    {t("projectSetup.summary.unitDepartmentCounts", {
+                      units: draft.additionalUnits.length,
+                      departments: deriveProjectDepartmentIds(draft).length,
+                    })}
+                  </span>
                 </div>
 
                 <div className="project-setup-summary-card">

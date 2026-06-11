@@ -3499,6 +3499,7 @@
       "preproductionDatesRequired": "La preproducción requiere fecha inicial y final.",
       "preproductionEndAfterStart": "La fecha final de preproducción debe ser igual o posterior a la fecha inicial.",
       "projectEndAfterStart": "La fecha final del proyecto debe ser igual o posterior a la fecha inicial.",
+      "projectCodeAlreadyExists": "Ya existe un proyecto con el código {{code}}.",
       "selectedAssetsFallback": "los equipos seleccionados",
       "projectNameRequired": "El nombre del proyecto es obligatorio.",
       "startDateRequired": "La fecha inicial del proyecto es obligatoria.",
@@ -4084,6 +4085,18 @@
       "title": "Resumen del proyecto",
       "unavailable": "Detalle del proyecto no disponible: {{message}}",
       "loading": "Cargando los detalles más recientes del proyecto.",
+      "closeProject": "Cerrar proyecto",
+      "closeProjectDialog": {
+        "body": "Esto marcará el proyecto como Cerrado. No archiva ni elimina datos; podrás cambiar el estado desde Detalles si necesitas reabrirlo.",
+        "cancel": "Mantener abierto",
+        "confirm": "Cerrar proyecto",
+        "title": "¿Cerrar “{{name}}”?"
+      },
+      "closeProjectToast": {
+        "body": "El proyecto quedó marcado como Cerrado.",
+        "failed": "No se pudo cerrar el proyecto.",
+        "title": "Proyecto cerrado"
+      },
       "editProject": "Editar proyecto",
       "reportIncident": "Reportar incidente",
       "empty": {
@@ -4099,6 +4112,26 @@
         "client": "Cliente",
         "exposure": "Exposición",
         "timeline": "Cronograma"
+      },
+      "signals": {
+        "assets": "Inventario",
+        "assetsValue": "{{count}} equipos",
+        "incidents": "Incidentes",
+        "incidentsValue": "{{count}} abiertos",
+        "schedule": "Ventana",
+        "title": "Señales operativas",
+        "units": "Unidades",
+        "unitsValue": "{{active}} activas · {{planned}} planificadas"
+      },
+      "quickActions": {
+        "assets": "Equipos",
+        "assetsBody": "{{count}} asignados",
+        "budget": "Presupuesto",
+        "budgetBody": "Exposición {{exposure}}",
+        "incidents": "Incidentes",
+        "incidentsBody": "{{count}} abiertos",
+        "packing": "Packing",
+        "packingBody": "Preparar salidas y retornos"
       },
       "metrics": {
         "assignedAssets": "Equipos asignados",
