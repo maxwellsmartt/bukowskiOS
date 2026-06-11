@@ -81,6 +81,13 @@
       "settings": "Ajustes"
     },
     "projectsPanel": {
+      "archiveDialog": {
+        "body": "El proyecto saldrá de las vistas activas y quedará disponible desde proyectos archivados.",
+        "cancel": "Conservar activo",
+        "confirm": "Archivar proyecto",
+        "title": "¿Archivar “{{name}}”?",
+        "warning": "Podrás restaurarlo más adelante sin perder sus datos operativos."
+      },
       "archiveProject": "Archivar proyecto",
       "archiveProjectAria": "Archivar {{name}}",
       "archived": "Archivado",

@@ -50,6 +50,8 @@ export const ShellProjectsPanel = () => {
   const [wizardTab, setWizardTab] = useState<WizardTab>("general");
   const [wizardDraft, setWizardDraft] = useState<ProjectSetupDraft>(createEmptyProjectSetupDraft());
   const [actionError, setActionError] = useState<string | null>(null);
+  const [archivePreview, setArchivePreview] = useState<ProjectCardRow | null>(null);
+  const [isArchiveSubmitting, setIsArchiveSubmitting] = useState(false);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [deletePreview, setDeletePreview] = useState<{ project: ProjectCardRow; preview: ProjectDeletePreview } | null>(null);
   const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
@@ -62,20 +64,38 @@ export const ShellProjectsPanel = () => {
   const handleToggleArchive = async (project: ProjectCardRow) => {
     setActionError(null);
 
-    try {
-      if (project.isArchived) {
-        await unarchiveProject({ projectId: project.id });
-      } else {
-        await archiveProject({ projectId: project.id });
-      }
-    } catch (error) {
-      setActionError(
-        getUserFacingErrorMessage(
-          error,
-          project.isArchived ? t("shell.projectsPanel.errors.restoreFailed") : t("shell.projectsPanel.errors.archiveFailed"),
-        ),
-      );
+    if (!project.isArchived) {
+      setArchivePreview(project);
+      return;
     }
+
+    try {
+      await unarchiveProject({ projectId: project.id });
+    } catch (error) {
+      setActionError(getUserFacingErrorMessage(error, t("shell.projectsPanel.errors.restoreFailed")));
+    }
+  };
+
+  const handleConfirmArchive = async () => {
+    if (!archivePreview) {
+      return;
+    }
+
+    setIsArchiveSubmitting(true);
+    setActionError(null);
+
+    try {
+      await archiveProject({ projectId: archivePreview.id });
+      setArchivePreview(null);
+    } catch (error) {
+      setActionError(getUserFacingErrorMessage(error, t("shell.projectsPanel.errors.archiveFailed")));
+    } finally {
+      setIsArchiveSubmitting(false);
+    }
+  };
+
+  const handleCancelArchive = () => {
+    setArchivePreview(null);
   };
 
   const handleToggleTimelineVisibility = async (project: ProjectCardRow) => {
@@ -245,19 +265,21 @@ export const ShellProjectsPanel = () => {
                 >
                   {isTimelineHidden ? <Eye size={13} /> : <EyeOff size={13} />}
                 </button>
-                <button
-                  aria-label={t("shell.projectsPanel.deleteProjectAria", { name: project.name })}
-                  className="shell-project-action is-danger"
-                  disabled={deletingProjectId === project.id}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void handleRequestDelete(project);
-                  }}
-                  title={t("shell.projectsPanel.deleteProject")}
-                  type="button"
-                >
-                  <Trash2 size={13} />
-                </button>
+                {project.isArchived ? (
+                  <button
+                    aria-label={t("shell.projectsPanel.deleteProjectAria", { name: project.name })}
+                    className="shell-project-action is-danger shell-project-delete-action"
+                    disabled={deletingProjectId === project.id}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void handleRequestDelete(project);
+                    }}
+                    title={t("shell.projectsPanel.deleteProject")}
+                    type="button"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                ) : null}
               </div>
             </div>
           );
@@ -276,6 +298,24 @@ export const ShellProjectsPanel = () => {
         }}
         open={wizardOpen}
       />
+
+      {archivePreview ? (
+        <ConfirmDialog
+          isOpen
+          confirmLabel={t("shell.projectsPanel.archiveDialog.confirm")}
+          cancelLabel={t("shell.projectsPanel.archiveDialog.cancel")}
+          isSubmitting={isArchiveSubmitting}
+          title={t("shell.projectsPanel.archiveDialog.title", { name: archivePreview.name })}
+          body={
+            <>
+              <p>{t("shell.projectsPanel.archiveDialog.body")}</p>
+              <p className="confirm-dialog-warning">{t("shell.projectsPanel.archiveDialog.warning")}</p>
+            </>
+          }
+          onConfirm={handleConfirmArchive}
+          onCancel={handleCancelArchive}
+        />
+      ) : null}
 
       {deletePreview ? (
         <ConfirmDialog

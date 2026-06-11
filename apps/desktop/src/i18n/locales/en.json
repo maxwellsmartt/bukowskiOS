@@ -81,6 +81,13 @@
       "settings": "Settings"
     },
     "projectsPanel": {
+      "archiveDialog": {
+        "body": "The project will leave active views and remain available from archived projects.",
+        "cancel": "Keep active",
+        "confirm": "Archive project",
+        "title": "Archive “{{name}}”?",
+        "warning": "You can restore it later without losing operational data."
+      },
       "archiveProject": "Archive project",
       "archiveProjectAria": "Archive {{name}}",
       "archived": "Archived",
