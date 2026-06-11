@@ -3320,9 +3320,12 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   padding-bottom: clamp(14px, 1.2vw, 28px);
 }
 
+.shell-content-projects,
 .shell-content-licenses {
-  overflow-x: hidden;
-  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
 }
 
 .page-stack {
@@ -5518,13 +5521,19 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .rma-page-stack--fill {
   flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   padding-bottom: 0;
 }
 
+.rma-page-stack--fill > .surface-card:not(.rail-table-card) {
+  flex: 0 0 auto;
+}
+
 .rma-page-stack--fill > .split-layout {
   flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
 }
@@ -5539,8 +5548,10 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .rma-page-stack--fill .rail-table-card {
+  flex: 1 1 auto;
   min-height: 0;
   max-height: none;
+  height: 100%;
 }
 
 .rma-page-stack--fill .rail-table-card > .surface-card-body {
@@ -7663,12 +7674,19 @@ body.is-resizing-side-rail {
   display: grid;
   grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.35fr);
   gap: var(--space-md);
-  align-items: start;
+  align-items: stretch;
+  flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .projects-page-stack {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
+  padding-bottom: 0;
 }
 
 .projects-page-stack > .section-header,
@@ -7678,8 +7696,10 @@ body.is-resizing-side-rail {
 }
 
 .projects-page-stack > .projects-layout {
-  flex: 1;
+  flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .resizable-side-layout.projects-layout.has-side-rail {
@@ -7696,8 +7716,10 @@ body.is-resizing-side-rail {
 }
 
 .projects-registry-card {
+  height: 100%;
   min-height: 0;
   max-height: none;
+  overflow: hidden;
 }
 
 .projects-registry-card,
@@ -7727,6 +7749,7 @@ body.is-resizing-side-rail {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+  height: 100%;
   min-width: 0;
   min-height: 0;
   max-height: 100%;
@@ -9211,6 +9234,7 @@ body.is-resizing-side-rail {
 .timeline-surface {
   flex: 1 1 auto;
   gap: 16px;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   padding: 18px;
@@ -9224,7 +9248,10 @@ body.is-resizing-side-rail {
   padding-bottom: 0;
 }
 
+.shell-content:has(> .projects-page-stack),
 .shell-content:has(> .projects-schedule-page-stack) {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
   padding-bottom: 0;
 }
@@ -9235,6 +9262,7 @@ body.is-resizing-side-rail {
 
 .projects-schedule-page-stack > .timeline-surface {
   flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
 }
 
@@ -9408,6 +9436,7 @@ body.is-resizing-side-rail {
   flex-direction: column;
   gap: 12px;
   flex: 1 1 auto;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: auto;
@@ -9453,6 +9482,7 @@ body.is-resizing-side-rail {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
+  height: 100%;
   gap: 4px;
   min-width: 0;
   min-height: 0;
@@ -11684,8 +11714,18 @@ button.timeline-signal-chip:focus-visible {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.asset-licenses-page-stack {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
 .license-register-card {
-  overflow: visible;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .license-form-grid {
@@ -11715,9 +11755,14 @@ button.timeline-signal-chip:focus-visible {
 
 .license-list {
   display: grid;
+  align-content: start;
+  flex: 1 1 auto;
   gap: 10px;
   min-height: 0;
+  overflow: auto;
   padding-right: 4px;
+  padding-bottom: 8px;
+  scrollbar-gutter: stable;
 }
 
 .license-row {

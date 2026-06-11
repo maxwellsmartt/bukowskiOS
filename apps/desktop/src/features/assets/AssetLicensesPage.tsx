@@ -557,7 +557,7 @@ export const AssetLicensesPage = () => {
   };
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack--fill asset-licenses-page-stack">
       <SectionHeader title={t("assets.licenses.title")} />
 
       {editorOpen ? (
@@ -718,7 +718,7 @@ export const AssetLicensesPage = () => {
       />
 
       <SurfaceCard
-        className="license-register-card"
+        className="surface-card--fill license-register-card"
         title={t("assets.licenses.register.title")}
         aside={
           <div className="surface-card-actions">

@@ -356,7 +356,7 @@ export const AppShell = () => {
           <Breadcrumb />
           {subnavItems.length ? <SubnavTabs items={subnavItems} /> : null}
           <RouteTransitionMain
-            className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}${activeRoute.domain === "assets" ? " shell-content-assets" : ""}${isLicensesRoute ? " shell-content-licenses" : ""}${isCatalogRoute ? " shell-content-catalog" : ""}${isPackingRoute ? " shell-content-packing" : ""}${isIncidentsRoute ? " shell-content-incidents" : ""}${isRmaRoute ? " shell-content-rma" : ""}`}
+            className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}${activeRoute.domain === "projects" ? " shell-content-projects" : ""}${activeRoute.domain === "assets" ? " shell-content-assets" : ""}${isLicensesRoute ? " shell-content-licenses" : ""}${isCatalogRoute ? " shell-content-catalog" : ""}${isPackingRoute ? " shell-content-packing" : ""}${isIncidentsRoute ? " shell-content-incidents" : ""}${isRmaRoute ? " shell-content-rma" : ""}`}
             transitionKey={location.pathname}
           >
             {!isScopeReady ? (
