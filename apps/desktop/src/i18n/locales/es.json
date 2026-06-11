@@ -82,10 +82,45 @@
     },
     "projectsPanel": {
       "archiveProject": "Archivar proyecto",
+      "archiveProjectAria": "Archivar {{name}}",
       "archived": "Archivado",
       "assets_one": "{{count}} equipo",
       "assets_other": "{{count}} equipos",
+      "deleteProject": "Eliminar proyecto",
+      "deleteProjectAria": "Eliminar {{name}}",
+      "deleteDialog": {
+        "bodyBackup": "Antes de eliminarlo se creará una copia de seguridad local.",
+        "bodyNoBackup": "No hay copia de seguridad programada para esta eliminación.",
+        "cancel": "Conservar proyecto",
+        "confirm": "Eliminar proyecto",
+        "detailsLabel": "Datos vinculados que también se eliminarán",
+        "noLinkedData": "No encontramos datos operativos vinculados.",
+        "title": "¿Eliminar “{{name}}”?",
+        "warning": "Esta acción no se puede deshacer.",
+        "linked": {
+          "assignments_one": "asignación",
+          "assignments_other": "asignaciones",
+          "collaboratorFees_one": "honorario de crew",
+          "collaboratorFees_other": "honorarios de crew",
+          "currentAssets_one": "equipo activo",
+          "currentAssets_other": "equipos activos",
+          "financeRecords_one": "registro financiero",
+          "financeRecords_other": "registros financieros",
+          "incidents_one": "incidente",
+          "incidents_other": "incidentes",
+          "packingSlips_one": "packing slip",
+          "packingSlips_other": "packing slips"
+        }
+      },
       "editProject": "Editar detalles",
+      "editProjectAria": "Editar detalles de {{name}}",
+      "errors": {
+        "archiveFailed": "No se pudo archivar este proyecto.",
+        "deleteBlocked": "Este proyecto aún no se puede eliminar.",
+        "deleteFailed": "No se pudo eliminar este proyecto.",
+        "deletePreviewFailed": "No se pudo preparar esta eliminación.",
+        "restoreFailed": "No se pudo restaurar este proyecto."
+      },
       "hiddenFromTimeline": "Oculto del timeline",
       "hideFromTimeline": "Ocultar del timeline",
       "hideFromTimelineAria": "Ocultar {{name}} del timeline",
@@ -94,6 +129,7 @@
       "incidents_other": "{{count}} incidentes",
       "newProject": "Crear proyecto",
       "restoreProject": "Restaurar proyecto",
+      "restoreProjectAria": "Restaurar {{name}}",
       "showArchived": "Mostrar proyectos archivados",
       "showInTimeline": "Mostrar en timeline",
       "showInTimelineAria": "Mostrar {{name}} en el timeline",
@@ -3489,16 +3525,17 @@
       "noResponsible": "Sin responsable",
       "noSelectedAssets": "Aún no hay equipos asignados a esta unidad.",
       "packingModes": {
-        "draft": "Crear draft de staging",
-        "existing": "Usar packing slip de staging",
-        "none": "Sin packing source"
+        "draft": "Preparar un borrador de packing",
+        "existing": "Usar packing existente",
+        "none": "Sin packing inicial"
       },
-      "packingSeed": "Packing seed",
-      "packingSource": "Packing source",
+      "packingPlan": "Packing inicial",
+      "packingSeed": "Packing inicial",
+      "packingSource": "Origen del packing",
       "packingSummary": {
-        "draft": "Draft de packing",
-        "existing": "Usando staging slip",
-        "none": "Sin packing seed"
+        "draft": "Borrador de packing",
+        "existing": "Usando packing existente",
+        "none": "Sin packing inicial"
       },
       "partOfKit": "Parte del kit activo {{kits}}",
       "removeAssetAria": "Quitar {{asset}} de {{unit}}",
@@ -4141,6 +4178,16 @@
         "savedTitle": "Proyecto guardado",
         "savedBody": "Detalles del proyecto actualizados.",
         "updateFailed": "No se pudieron actualizar los detalles del proyecto."
+      },
+      "validation": {
+        "fixBeforeSaving": "Corrige estos puntos antes de guardar.",
+        "nameRequired": "El nombre del proyecto es obligatorio.",
+        "preproductionBeforeMain": "La preproducción debe terminar en o antes de la fecha inicial del proyecto.",
+        "preproductionDatesRequired": "La preproducción requiere fecha inicial y fecha de cierre.",
+        "preproductionEndAfterStart": "La fecha de cierre de preproducción debe ser igual o posterior a la fecha inicial.",
+        "projectEndAfterStart": "La fecha de cierre del proyecto debe ser igual o posterior a la fecha de inicio.",
+        "statusRequired": "El estado del proyecto es obligatorio.",
+        "title": "Revisa estos datos"
       }
     },
     "budget": {

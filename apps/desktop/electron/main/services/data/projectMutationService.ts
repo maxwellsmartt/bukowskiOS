@@ -1810,6 +1810,8 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
       db.exec("ROLLBACK");
       throw error;
     }
+
+    return { projectId };
   },
 
   updateProject(input: UpdateProjectInput) {

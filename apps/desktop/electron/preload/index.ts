@@ -91,6 +91,7 @@ import type {
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
   CreateProjectBlueprintInput,
+  CreateProjectBlueprintResult,
   CreateRmaCaseCommand,
   DeleteAssistantThreadCommand,
   CreateProjectInput,
@@ -507,7 +508,7 @@ const bukowskiProjects = {
     ipcRenderer.invoke(ipcChannels.projects.getCreationConflicts, input) as Promise<ProjectCreationConflictsSnapshot>,
   create: (input: CreateProjectInput) => ipcRenderer.invoke(ipcChannels.projects.create, input) as Promise<ProjectCardRow[]>,
   createBlueprint: (input: CreateProjectBlueprintInput) =>
-    ipcRenderer.invoke(ipcChannels.projects.createBlueprint, input) as Promise<ProjectCardRow[]>,
+    ipcRenderer.invoke(ipcChannels.projects.createBlueprint, input) as Promise<CreateProjectBlueprintResult>,
   exportBlueprintPdf: (input: CreateProjectBlueprintInput) =>
     ipcRenderer.invoke(ipcChannels.projects.exportBlueprintPdf, input) as Promise<AppExportResult>,
   update: (input: UpdateProjectInput) => ipcRenderer.invoke(ipcChannels.projects.update, input) as Promise<ProjectCardRow[]>,

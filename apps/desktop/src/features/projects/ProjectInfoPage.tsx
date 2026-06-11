@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
@@ -22,6 +22,8 @@ const normalizeOptional = (value: string) => {
   const trimmedValue = value.trim();
   return trimmedValue ? trimmedValue : undefined;
 };
+
+const isValidDateWindow = (start: string, end: string) => !start || !end || start <= end;
 
 export const ProjectInfoPage = () => {
   const { t } = useTranslation();
@@ -68,6 +70,38 @@ export const ProjectInfoPage = () => {
     setColorKey(data.project.colorKey ?? "");
   }, [data.project]);
 
+  const validationErrors = useMemo(() => {
+    const errors: string[] = [];
+
+    if (!name.trim()) {
+      errors.push(t("projects.info.validation.nameRequired"));
+    }
+
+    if (!status.trim()) {
+      errors.push(t("projects.info.validation.statusRequired"));
+    }
+
+    if (!isValidDateWindow(startDate, endDate)) {
+      errors.push(t("projects.info.validation.projectEndAfterStart"));
+    }
+
+    if (hasPreproduction) {
+      if (!preproductionStartDate || !preproductionEndDate) {
+        errors.push(t("projects.info.validation.preproductionDatesRequired"));
+      }
+
+      if (!isValidDateWindow(preproductionStartDate, preproductionEndDate)) {
+        errors.push(t("projects.info.validation.preproductionEndAfterStart"));
+      }
+
+      if (startDate && preproductionEndDate && preproductionEndDate > startDate) {
+        errors.push(t("projects.info.validation.preproductionBeforeMain"));
+      }
+    }
+
+    return errors;
+  }, [endDate, hasPreproduction, name, preproductionEndDate, preproductionStartDate, startDate, status, t]);
+
   if (error) {
     return <div className="empty-state">{t("projects.info.unavailable", { message: error })}</div>;
   }
@@ -83,6 +117,11 @@ export const ProjectInfoPage = () => {
   const currentProject = data.project;
 
   const handleSave = async () => {
+    if (validationErrors.length) {
+      setSaveError(t("projects.info.validation.fixBeforeSaving"));
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       await updateProject({
@@ -128,6 +167,16 @@ export const ProjectInfoPage = () => {
 
       <div className="project-workspace-scroll">
         {saveError ? <div className="action-feedback action-feedback-error">{saveError}</div> : null}
+        {validationErrors.length ? (
+          <div className="action-feedback action-feedback-warning">
+            <strong>{t("projects.info.validation.title")}</strong>
+            <ul className="action-feedback-list">
+              {validationErrors.map((validationError) => (
+                <li key={validationError}>{validationError}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="project-detail-support-grid">
           <SurfaceCard
@@ -253,7 +302,7 @@ export const ProjectInfoPage = () => {
             </div>
 
             <div className="action-panel-actions">
-              <button className="action-primary-button" disabled={isSubmitting} onClick={() => void handleSave()} type="button">
+              <button className="action-primary-button" disabled={isSubmitting || validationErrors.length > 0} onClick={() => void handleSave()} type="button">
                 {isSubmitting ? t("common.saving") : t("projects.info.saveChanges")}
               </button>
             </div>

@@ -82,10 +82,45 @@
     },
     "projectsPanel": {
       "archiveProject": "Archive project",
+      "archiveProjectAria": "Archive {{name}}",
       "archived": "Archived",
       "assets_one": "{{count}} asset",
       "assets_other": "{{count}} assets",
+      "deleteProject": "Delete project",
+      "deleteProjectAria": "Delete {{name}}",
+      "deleteDialog": {
+        "bodyBackup": "A local backup will be created before deletion.",
+        "bodyNoBackup": "No backup is scheduled for this deletion.",
+        "cancel": "Keep project",
+        "confirm": "Delete project",
+        "detailsLabel": "Linked data that will also be removed",
+        "noLinkedData": "No linked operational data was found.",
+        "title": "Delete “{{name}}”?",
+        "warning": "This action cannot be undone.",
+        "linked": {
+          "assignments_one": "assignment",
+          "assignments_other": "assignments",
+          "collaboratorFees_one": "crew fee",
+          "collaboratorFees_other": "crew fees",
+          "currentAssets_one": "active asset",
+          "currentAssets_other": "active assets",
+          "financeRecords_one": "finance record",
+          "financeRecords_other": "finance records",
+          "incidents_one": "incident",
+          "incidents_other": "incidents",
+          "packingSlips_one": "packing slip",
+          "packingSlips_other": "packing slips"
+        }
+      },
       "editProject": "Edit details",
+      "editProjectAria": "Edit {{name}} details",
+      "errors": {
+        "archiveFailed": "Could not archive this project.",
+        "deleteBlocked": "This project cannot be deleted yet.",
+        "deleteFailed": "Could not delete this project.",
+        "deletePreviewFailed": "Could not prepare this deletion.",
+        "restoreFailed": "Could not restore this project."
+      },
       "hiddenFromTimeline": "Hidden from timeline",
       "hideFromTimeline": "Hide from timeline",
       "hideFromTimelineAria": "Hide {{name}} from the timeline",
@@ -94,6 +129,7 @@
       "incidents_other": "{{count}} incidents",
       "newProject": "Create project",
       "restoreProject": "Restore project",
+      "restoreProjectAria": "Restore {{name}}",
       "showArchived": "Show archived projects",
       "showInTimeline": "Show in timeline",
       "showInTimelineAria": "Show {{name}} in the timeline",
@@ -3489,6 +3525,7 @@
         "existing": "Use staging slip",
         "none": "No packing source"
       },
+      "packingPlan": "Initial packing",
       "packingSeed": "Packing seed",
       "packingSource": "Packing source",
       "packingSummary": {
@@ -4137,6 +4174,16 @@
         "savedTitle": "Project saved",
         "savedBody": "Project details updated.",
         "updateFailed": "Unable to update project details."
+      },
+      "validation": {
+        "fixBeforeSaving": "Fix these items before saving.",
+        "nameRequired": "Project name is required.",
+        "preproductionBeforeMain": "Pre-production must end on or before the project start date.",
+        "preproductionDatesRequired": "Pre-production requires both start and end dates.",
+        "preproductionEndAfterStart": "Pre-production end date must be on or after the start date.",
+        "projectEndAfterStart": "Project end date must be on or after the start date.",
+        "statusRequired": "Project status is required.",
+        "title": "Review these details"
       }
     },
     "budget": {

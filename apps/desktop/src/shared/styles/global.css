@@ -5611,6 +5611,22 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   font-size: 12px;
 }
 
+.action-feedback-list {
+  align-self: stretch;
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.action-feedback:has(.action-feedback-list) {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.action-feedback-list li + li {
+  margin-top: 2px;
+}
+
 .action-feedback-success {
   border-color: rgba(96, 168, 117, 0.18);
   background: rgba(96, 168, 117, 0.12);

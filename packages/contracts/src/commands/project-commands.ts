@@ -1,3 +1,5 @@
+import type { ProjectCardRow } from "../queries/operations-queries";
+
 export type CreateProjectInput = {
   workspaceId: string;
   code: string;
@@ -166,4 +168,9 @@ export type CreateProjectBlueprintInput = {
   generalInfo: ProjectBlueprintGeneralInfoInput;
   mainUnit: ProjectBlueprintUnitDraftInput;
   additionalUnits: ProjectBlueprintUnitDraftInput[];
+};
+
+export type CreateProjectBlueprintResult = {
+  createdProjectId: string;
+  projects: ProjectCardRow[];
 };

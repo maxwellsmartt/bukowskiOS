@@ -278,7 +278,7 @@ type RegisterFoundationIpcOptions = {
   };
   projectMutations: {
     createProject: (input: CreateProjectInput) => void;
-    createProjectBlueprint: (input: CreateProjectBlueprintInput) => void;
+    createProjectBlueprint: (input: CreateProjectBlueprintInput) => { projectId: string };
     updateProject: (input: UpdateProjectInput) => void;
     archiveProject: (input: ArchiveProjectInput) => void;
     unarchiveProject: (input: UnarchiveProjectInput) => void;
@@ -1616,8 +1616,11 @@ export const registerFoundationIpc = ({
       accessLevel: "write",
       requiredPermission: "projects.manage",
     });
-    projectMutations.createProjectBlueprint(input);
-    return getProjectListForWorkspace({ workspaceId: input.workspaceId, search: "", sortBy: "name", sortDirection: "asc" });
+    const result = projectMutations.createProjectBlueprint(input);
+    return {
+      createdProjectId: result.projectId,
+      projects: getProjectListForWorkspace({ workspaceId: input.workspaceId, search: "", sortBy: "name", sortDirection: "asc" }),
+    };
   });
   safeHandleReadWithSchema(
     ipcChannels.projects.exportBlueprintPdf,

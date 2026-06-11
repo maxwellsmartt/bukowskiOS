@@ -1464,7 +1464,7 @@ export const ProjectSetupWizard = ({
                   <SelectField onChange={(event) => setGeneralInfo("status", event.target.value)} value={draft.generalInfo.status}>
                     {projectStatusOptions.map((option) => (
                       <option key={option} value={option}>
-                        {option}
+                        {t(`projects.statuses.${option}`, { defaultValue: option })}
                       </option>
                     ))}
                   </SelectField>
@@ -2229,7 +2229,7 @@ export const ProjectSetupWizard = ({
                 </div>
 
                 <div className="project-setup-summary-card">
-                  <h3>{t("projectSetup.assets.packingSeed")}</h3>
+                  <h3>{t("projectSetup.assets.packingPlan")}</h3>
                   <p>
                     {t("projectSetup.summary.configuredBuckets", {
                       count: [

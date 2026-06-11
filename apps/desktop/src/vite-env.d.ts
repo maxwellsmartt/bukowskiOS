@@ -74,6 +74,7 @@ import type {
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
   CreateProjectBlueprintInput,
+  CreateProjectBlueprintResult,
   CreateProjectInput,
   CreateProjectUnitInput,
   CreateRmaCaseCommand,
@@ -357,7 +358,7 @@ declare global {
       getStagingPackingSlips: () => Promise<StagingPackingSlipRow[]>;
       getCreationConflicts: (input: CreateProjectBlueprintInput) => Promise<ProjectCreationConflictsSnapshot>;
       create: (input: CreateProjectInput) => Promise<ProjectCardRow[]>;
-      createBlueprint: (input: CreateProjectBlueprintInput) => Promise<ProjectCardRow[]>;
+      createBlueprint: (input: CreateProjectBlueprintInput) => Promise<CreateProjectBlueprintResult>;
       exportBlueprintPdf: (input: CreateProjectBlueprintInput) => Promise<AppExportResult>;
       update: (input: UpdateProjectInput) => Promise<ProjectCardRow[]>;
       archive: (input: ArchiveProjectInput) => Promise<ProjectCardRow[]>;

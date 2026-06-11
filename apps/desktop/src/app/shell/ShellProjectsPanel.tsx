@@ -14,17 +14,17 @@ import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import type { ProjectCardRow, ProjectDeletePreview } from "@contracts";
 
-type LinkedItem = { label: string; count: number };
+type LinkedItem = { labelKey: string; count: number };
 
 const buildLinkedItems = (preview: ProjectDeletePreview): LinkedItem[] => {
   const relationSummary = preview.operationalRelationSummary;
   return [
-    { label: "current assets", count: relationSummary.currentAssetCount },
-    { label: "assignments", count: relationSummary.assignmentCount },
-    { label: "incidents", count: relationSummary.incidentCount },
-    { label: "packing slips", count: relationSummary.packingCount },
-    { label: "finance records", count: relationSummary.financeCount },
-    { label: "collaborator fees", count: relationSummary.collaboratorFeeCount },
+    { labelKey: "shell.projectsPanel.deleteDialog.linked.currentAssets", count: relationSummary.currentAssetCount },
+    { labelKey: "shell.projectsPanel.deleteDialog.linked.assignments", count: relationSummary.assignmentCount },
+    { labelKey: "shell.projectsPanel.deleteDialog.linked.incidents", count: relationSummary.incidentCount },
+    { labelKey: "shell.projectsPanel.deleteDialog.linked.packingSlips", count: relationSummary.packingCount },
+    { labelKey: "shell.projectsPanel.deleteDialog.linked.financeRecords", count: relationSummary.financeCount },
+    { labelKey: "shell.projectsPanel.deleteDialog.linked.collaboratorFees", count: relationSummary.collaboratorFeeCount },
   ].filter((item) => item.count > 0);
 };
 
@@ -72,7 +72,7 @@ export const ShellProjectsPanel = () => {
       setActionError(
         getUserFacingErrorMessage(
           error,
-          project.isArchived ? "Could not restore this project." : "Could not archive this project.",
+          project.isArchived ? t("shell.projectsPanel.errors.restoreFailed") : t("shell.projectsPanel.errors.archiveFailed"),
         ),
       );
     }
@@ -103,7 +103,7 @@ export const ShellProjectsPanel = () => {
         setActionError(
           preview.hardDeleteBlockedReasons.length
             ? preview.hardDeleteBlockedReasons.join(" ")
-            : "This project cannot be deleted yet.",
+            : t("shell.projectsPanel.errors.deleteBlocked"),
         );
         setDeletingProjectId(null);
         return;
@@ -111,7 +111,7 @@ export const ShellProjectsPanel = () => {
 
       setDeletePreview({ project, preview });
     } catch (error) {
-      setActionError(getUserFacingErrorMessage(error, "Could not prepare this deletion."));
+      setActionError(getUserFacingErrorMessage(error, t("shell.projectsPanel.errors.deletePreviewFailed")));
       setDeletingProjectId(null);
     }
   };
@@ -127,7 +127,7 @@ export const ShellProjectsPanel = () => {
       await deleteProject(deletePreview.project.id);
       setDeletePreview(null);
     } catch (error) {
-      setActionError(getUserFacingErrorMessage(error, "Could not delete this project."));
+      setActionError(getUserFacingErrorMessage(error, t("shell.projectsPanel.errors.deleteFailed")));
     } finally {
       setIsDeleteSubmitting(false);
       setDeletingProjectId(null);
@@ -199,7 +199,7 @@ export const ShellProjectsPanel = () => {
               </div>
               <div className="shell-project-item-actions" aria-label={`${project.name} actions`}>
                 <button
-                  aria-label={`Edit ${project.name}`}
+                  aria-label={t("shell.projectsPanel.editProjectAria", { name: project.name })}
                   className="shell-project-action"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -211,7 +211,11 @@ export const ShellProjectsPanel = () => {
                   <Pencil size={13} />
                 </button>
                 <button
-                  aria-label={project.isArchived ? `Restore ${project.name}` : `Archive ${project.name}`}
+                  aria-label={
+                    project.isArchived
+                      ? t("shell.projectsPanel.restoreProjectAria", { name: project.name })
+                      : t("shell.projectsPanel.archiveProjectAria", { name: project.name })
+                  }
                   className="shell-project-action"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -242,14 +246,14 @@ export const ShellProjectsPanel = () => {
                   {isTimelineHidden ? <Eye size={13} /> : <EyeOff size={13} />}
                 </button>
                 <button
-                  aria-label={`Delete ${project.name}`}
+                  aria-label={t("shell.projectsPanel.deleteProjectAria", { name: project.name })}
                   className="shell-project-action is-danger"
                   disabled={deletingProjectId === project.id}
                   onClick={(event) => {
                     event.stopPropagation();
                     void handleRequestDelete(project);
                   }}
-                  title="Delete permanently (with backup)"
+                  title={t("shell.projectsPanel.deleteProject")}
                   type="button"
                 >
                   <Trash2 size={13} />
@@ -277,32 +281,32 @@ export const ShellProjectsPanel = () => {
         <ConfirmDialog
           isOpen
           tone="danger"
-          confirmLabel="Delete project"
-          cancelLabel="Keep project"
+          confirmLabel={t("shell.projectsPanel.deleteDialog.confirm")}
+          cancelLabel={t("shell.projectsPanel.deleteDialog.cancel")}
           isSubmitting={isDeleteSubmitting}
-          title={`Delete "${deletePreview.preview.name}"?`}
+          title={t("shell.projectsPanel.deleteDialog.title", { name: deletePreview.preview.name })}
           body={
             <>
               <p>
                 {deletePreview.preview.backupWillRun
-                  ? "A backup will be created before deletion."
-                  : "No backup is scheduled for this deletion."}
+                  ? t("shell.projectsPanel.deleteDialog.bodyBackup")
+                  : t("shell.projectsPanel.deleteDialog.bodyNoBackup")}
               </p>
-              <p className="confirm-dialog-warning">This action cannot be undone.</p>
+              <p className="confirm-dialog-warning">{t("shell.projectsPanel.deleteDialog.warning")}</p>
             </>
           }
           details={(() => {
             const linkedItems = buildLinkedItems(deletePreview.preview);
             if (!linkedItems.length) {
-              return <p className="confirm-dialog-empty">No linked operational data was found.</p>;
+              return <p className="confirm-dialog-empty">{t("shell.projectsPanel.deleteDialog.noLinkedData")}</p>;
             }
             return (
               <>
-                <span className="confirm-dialog-details-label">Linked data that will be removed</span>
+                <span className="confirm-dialog-details-label">{t("shell.projectsPanel.deleteDialog.detailsLabel")}</span>
                 <ul className="confirm-dialog-list">
                   {linkedItems.map((item) => (
-                    <li key={item.label}>
-                      <strong>{item.count}</strong> {item.label}
+                    <li key={item.labelKey}>
+                      <strong>{item.count}</strong> {t(item.labelKey, { count: item.count })}
                     </li>
                   ))}
                 </ul>

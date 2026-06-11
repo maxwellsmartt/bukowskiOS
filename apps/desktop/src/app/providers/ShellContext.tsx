@@ -253,19 +253,14 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     }
 
     const nextInput = { ...input, workspaceId: activeWorkspaceId };
-    const nextProjects = await window.bukowskiProjects.createBlueprint(nextInput);
+    const result = await window.bukowskiProjects.createBlueprint(nextInput);
+    const nextProjects = result.projects;
     setProjects(nextProjects);
     setProjectsError(null);
 
-    const requestedCode = nextInput.generalInfo.code?.trim().toUpperCase();
-    const requestedName = nextInput.generalInfo.name.trim();
-    const createdProject =
-      nextProjects.find(
-        (project) =>
-          project.name === requestedName && (!requestedCode || project.code === requestedCode),
-      ) ?? null;
+    const createdProject = nextProjects.find((project) => project.id === result.createdProjectId) ?? null;
 
-    setRememberedProjectId(createdProject?.id ?? nextProjects[0]?.id ?? null);
+    setRememberedProjectId(result.createdProjectId ?? nextProjects[0]?.id ?? null);
     await refreshProjects();
     setProjectDataVersion((current) => current + 1);
     return createdProject;

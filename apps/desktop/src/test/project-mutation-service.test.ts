@@ -122,7 +122,7 @@ describe("project mutation service", () => {
     const catalog = reads.getCatalogSnapshot();
     const client = catalog.clients.find((row) => row.name === "Internal");
 
-    mutations.createProjectBlueprint({
+    const result = mutations.createProjectBlueprint({
       workspaceId: DEFAULT_WORKSPACE_ID,
       generalInfo: {
         code: "BLUE",
@@ -157,6 +157,7 @@ describe("project mutation service", () => {
     });
 
     const project = reads.getProjects().find((row) => row.code === "BLUE");
+    expect(result.projectId).toBe(project?.id);
     expect(project?.productionCompanyId).toBeTruthy();
     expect(project?.productionCompany).toBe("Altitude Pictures");
     expect(project?.hasPreproduction).toBe(true);
