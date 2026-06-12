@@ -8452,14 +8452,58 @@ body.is-resizing-side-rail {
   gap: var(--space-md);
 }
 
+.project-info-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.72fr) minmax(620px, 1.28fr);
+  gap: var(--space-md);
+  align-items: start;
+  min-height: 0;
+}
+
+.project-info-layout-column {
+  min-width: 0;
+}
+
+.project-info-layout-column-details {
+  align-self: start;
+}
+
+.project-info-layout-column-units {
+  display: flex;
+  min-height: 0;
+}
+
+.project-info-layout-column-units > .surface-card {
+  width: 100%;
+}
+
 .project-info-card .surface-card-body {
   display: grid;
-  gap: 14px;
+  gap: 12px;
+}
+
+.project-info-card .action-form-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.project-info-card .action-field-pair {
+  grid-column: auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.project-info-card .action-textarea {
+  min-height: 104px;
+}
+
+.project-info-card .action-panel-actions {
+  margin-top: 0;
 }
 
 .project-info-summary {
   display: grid;
-  grid-template-columns: minmax(260px, 0.75fr) minmax(240px, 0.9fr) minmax(320px, 1.35fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
   padding: 10px;
@@ -8544,7 +8588,7 @@ body.is-resizing-side-rail {
 
 .project-info-summary-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -8562,6 +8606,10 @@ body.is-resizing-side-rail {
 }
 
 @media (max-width: 1180px) {
+  .project-info-layout {
+    grid-template-columns: 1fr;
+  }
+
   .project-info-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -8569,9 +8617,23 @@ body.is-resizing-side-rail {
   .project-info-summary-stats {
     grid-column: 1 / -1;
   }
+
+  .project-info-card .action-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-info-card .action-field-pair,
+  .project-info-card .action-field-wide {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 760px) {
+  .project-info-card .action-form-grid,
+  .project-info-card .action-field-pair {
+    grid-template-columns: 1fr;
+  }
+
   .project-info-summary {
     grid-template-columns: 1fr;
   }
@@ -18889,6 +18951,7 @@ select.field-input {
   .project-grid,
   .projects-layout,
   .project-detail-support-grid,
+  .project-info-layout,
   .project-budget-grid,
   .project-budget-command-card,
   .project-budget-overview-grid,

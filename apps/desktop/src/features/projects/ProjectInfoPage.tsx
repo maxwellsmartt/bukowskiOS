@@ -194,184 +194,186 @@ export const ProjectInfoPage = () => {
           </div>
         ) : null}
 
-        <div className="project-detail-support-grid">
-          <SurfaceCard
-            className="project-scroll-card project-info-card"
-            title={t("projects.info.cardTitle")}
-            aside={<StatusBadge>{t(`projects.statuses.${currentProject.status}`, { defaultValue: currentProject.status })}</StatusBadge>}
-          >
-            <div className="project-info-summary" aria-label={t("projects.info.schedule.title")}>
-              <div className="project-info-summary-window">
-                <span>{t("projects.info.schedule.window")}</span>
-                <strong>{scheduleWindow}</strong>
-                <small>
-                  {scheduleStart} - {scheduleEnd}
-                </small>
-              </div>
-
-              <div className="project-info-summary-progress">
-                <div className="project-info-summary-progress-copy">
-                  <span>{t("projects.info.schedule.completion")}</span>
-                  <strong>
-                    {totalScheduledUnits
-                      ? t("projects.info.schedule.completionValue", { wrapped: wrappedUnits, total: totalScheduledUnits })
-                      : t("projects.info.schedule.noUnits")}
-                  </strong>
+        <div className="project-info-layout">
+          <div className="project-info-layout-column project-info-layout-column-details">
+            <SurfaceCard
+              className="project-scroll-card project-info-card"
+              title={t("projects.info.cardTitle")}
+              aside={<StatusBadge>{t(`projects.statuses.${currentProject.status}`, { defaultValue: currentProject.status })}</StatusBadge>}
+            >
+              <div className="project-info-summary" aria-label={t("projects.info.schedule.title")}>
+                <div className="project-info-summary-window">
+                  <span>{t("projects.info.schedule.window")}</span>
+                  <strong>{scheduleWindow}</strong>
+                  <small>
+                    {scheduleStart} - {scheduleEnd}
+                  </small>
                 </div>
-                <div className="project-info-summary-progress-track" aria-hidden="true">
-                  <span style={{ width: `${wrappedRatio}%` }} />
-                </div>
-              </div>
 
-              <div className="project-info-summary-stats">
-                {scheduleStats.map((stat) => (
-                  <div key={stat.label}>
-                    <span>{stat.label}</span>
-                    <strong>{stat.value}</strong>
+                <div className="project-info-summary-progress">
+                  <div className="project-info-summary-progress-copy">
+                    <span>{t("projects.info.schedule.completion")}</span>
+                    <strong>
+                      {totalScheduledUnits
+                        ? t("projects.info.schedule.completionValue", { wrapped: wrappedUnits, total: totalScheduledUnits })
+                        : t("projects.info.schedule.noUnits")}
+                    </strong>
                   </div>
-                ))}
+                  <div className="project-info-summary-progress-track" aria-hidden="true">
+                    <span style={{ width: `${wrappedRatio}%` }} />
+                  </div>
+                </div>
+
+                <div className="project-info-summary-stats">
+                  {scheduleStats.map((stat) => (
+                    <div key={stat.label}>
+                      <span>{stat.label}</span>
+                      <strong>{stat.value}</strong>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div className="action-form-grid">
-              <label className="action-field">
-                <span className="action-field-label">{t("projects.info.fields.code")}</span>
-                <input className="action-field-control" onChange={(event) => setCode(event.target.value.toUpperCase())} value={code} />
-              </label>
-
-              <label className="action-field">
-                <span className="action-field-label">{t("projects.info.fields.name")}</span>
-                <input className="action-field-control" onChange={(event) => setName(event.target.value)} value={name} />
-              </label>
-
-              <label className="action-field">
-                <span className="action-field-label">{t("projects.info.fields.status")}</span>
-                <SelectField onChange={(event) => setStatus(event.target.value)} value={status}>
-                  {projectStatusOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {t(`projects.statuses.${option}`, { defaultValue: option })}
-                    </option>
-                  ))}
-                </SelectField>
-              </label>
-
-              <label className="action-field">
-                <span className="action-field-label">{t("projects.info.fields.client")}</span>
-                <SelectField onChange={(event) => setClientId(event.target.value)} value={clientId}>
-                  <option value="">{t("projects.info.fields.noClient")}</option>
-                  {catalog.clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name}
-                    </option>
-                  ))}
-                </SelectField>
-              </label>
-
-              <label className="action-field">
-                <span className="action-field-label">{t("projects.info.fields.productionCompany")}</span>
-                <SelectField onChange={(event) => setProductionCompanyId(event.target.value)} value={productionCompanyId}>
-                  <option value="">{t("projects.info.fields.noProductionCompany")}</option>
-                  {catalog.productionCompanies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </SelectField>
-              </label>
-
-              <div className="action-field-pair">
+              <div className="action-form-grid">
                 <label className="action-field">
-                  <span className="action-field-label">{t("projects.info.fields.startDate")}</span>
-                  <input
-                    className="action-field-control"
-                    onChange={(event) => setStartDate(event.target.value)}
-                    type="date"
-                    value={startDate}
-                  />
+                  <span className="action-field-label">{t("projects.info.fields.code")}</span>
+                  <input className="action-field-control" onChange={(event) => setCode(event.target.value.toUpperCase())} value={code} />
                 </label>
 
                 <label className="action-field">
-                  <span className="action-field-label">{t("projects.info.fields.endDate")}</span>
-                  <input
-                    className="action-field-control"
-                    min={startDate || undefined}
-                    onChange={(event) => setEndDate(event.target.value)}
-                    type="date"
-                    value={endDate}
-                  />
+                  <span className="action-field-label">{t("projects.info.fields.name")}</span>
+                  <input className="action-field-control" onChange={(event) => setName(event.target.value)} value={name} />
                 </label>
-              </div>
 
-              <label className="project-setup-toggle">
-                <input checked={hasPreproduction} onChange={(event) => setHasPreproduction(event.target.checked)} type="checkbox" />
-                <span>{t("projects.info.fields.hasPreproduction")}</span>
-              </label>
+                <label className="action-field">
+                  <span className="action-field-label">{t("projects.info.fields.status")}</span>
+                  <SelectField onChange={(event) => setStatus(event.target.value)} value={status}>
+                    {projectStatusOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {t(`projects.statuses.${option}`, { defaultValue: option })}
+                      </option>
+                    ))}
+                  </SelectField>
+                </label>
 
-              <div />
+                <label className="action-field">
+                  <span className="action-field-label">{t("projects.info.fields.client")}</span>
+                  <SelectField onChange={(event) => setClientId(event.target.value)} value={clientId}>
+                    <option value="">{t("projects.info.fields.noClient")}</option>
+                    {catalog.clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                      </option>
+                    ))}
+                  </SelectField>
+                </label>
 
-              {hasPreproduction ? (
+                <label className="action-field">
+                  <span className="action-field-label">{t("projects.info.fields.productionCompany")}</span>
+                  <SelectField onChange={(event) => setProductionCompanyId(event.target.value)} value={productionCompanyId}>
+                    <option value="">{t("projects.info.fields.noProductionCompany")}</option>
+                    {catalog.productionCompanies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </SelectField>
+                </label>
+
                 <div className="action-field-pair">
                   <label className="action-field">
-                    <span className="action-field-label">{t("projects.info.fields.preproductionStart")}</span>
+                    <span className="action-field-label">{t("projects.info.fields.startDate")}</span>
                     <input
                       className="action-field-control"
-                      onChange={(event) => setPreproductionStartDate(event.target.value)}
+                      onChange={(event) => setStartDate(event.target.value)}
                       type="date"
-                      value={preproductionStartDate}
+                      value={startDate}
                     />
                   </label>
 
                   <label className="action-field">
-                    <span className="action-field-label">{t("projects.info.fields.preproductionEnd")}</span>
+                    <span className="action-field-label">{t("projects.info.fields.endDate")}</span>
                     <input
                       className="action-field-control"
-                      min={preproductionStartDate || undefined}
-                      onChange={(event) => setPreproductionEndDate(event.target.value)}
+                      min={startDate || undefined}
+                      onChange={(event) => setEndDate(event.target.value)}
                       type="date"
-                      value={preproductionEndDate}
+                      value={endDate}
                     />
                   </label>
                 </div>
-              ) : null}
 
-              <label className="action-field">
-                <span className="action-field-label">{t("projects.info.fields.timelineColor")}</span>
-                <ProjectColorSelect
-                  onChange={(nextColorKey) => setColorKey(nextColorKey)}
-                  placeholder={t("projects.info.fields.defaultSystemTone")}
-                  value={colorKey as ProjectColorKey | ""}
-                />
-              </label>
+                <label className="project-setup-toggle">
+                  <input checked={hasPreproduction} onChange={(event) => setHasPreproduction(event.target.checked)} type="checkbox" />
+                  <span>{t("projects.info.fields.hasPreproduction")}</span>
+                </label>
 
-              <label className="action-field action-field-wide">
-                <span className="action-field-label">{t("projects.info.fields.description")}</span>
-                <textarea
-                  className="action-field-control action-textarea"
-                  onChange={(event) => setDescription(event.target.value)}
-                  rows={4}
-                  value={description}
-                />
-              </label>
-            </div>
+                {hasPreproduction ? (
+                  <div className="action-field-pair">
+                    <label className="action-field">
+                      <span className="action-field-label">{t("projects.info.fields.preproductionStart")}</span>
+                      <input
+                        className="action-field-control"
+                        onChange={(event) => setPreproductionStartDate(event.target.value)}
+                        type="date"
+                        value={preproductionStartDate}
+                      />
+                    </label>
 
-            <div className="action-panel-actions">
-              <button className="action-primary-button" disabled={isSubmitting || validationErrors.length > 0} onClick={() => void handleSave()} type="button">
-                {isSubmitting ? t("common.saving") : t("projects.info.saveChanges")}
-              </button>
-            </div>
-          </SurfaceCard>
+                    <label className="action-field">
+                      <span className="action-field-label">{t("projects.info.fields.preproductionEnd")}</span>
+                      <input
+                        className="action-field-control"
+                        min={preproductionStartDate || undefined}
+                        onChange={(event) => setPreproductionEndDate(event.target.value)}
+                        type="date"
+                        value={preproductionEndDate}
+                      />
+                    </label>
+                  </div>
+                ) : null}
+
+                <label className="action-field">
+                  <span className="action-field-label">{t("projects.info.fields.timelineColor")}</span>
+                  <ProjectColorSelect
+                    onChange={(nextColorKey) => setColorKey(nextColorKey)}
+                    placeholder={t("projects.info.fields.defaultSystemTone")}
+                    value={colorKey as ProjectColorKey | ""}
+                  />
+                </label>
+
+                <label className="action-field action-field-wide">
+                  <span className="action-field-label">{t("projects.info.fields.description")}</span>
+                  <textarea
+                    className="action-field-control action-textarea"
+                    onChange={(event) => setDescription(event.target.value)}
+                    rows={4}
+                    value={description}
+                  />
+                </label>
+              </div>
+
+              <div className="action-panel-actions">
+                <button className="action-primary-button" disabled={isSubmitting || validationErrors.length > 0} onClick={() => void handleSave()} type="button">
+                  {isSubmitting ? t("common.saving") : t("projects.info.saveChanges")}
+                </button>
+              </div>
+            </SurfaceCard>
+          </div>
+
+          <div className="project-info-layout-column project-info-layout-column-units">
+            <ProjectUnitsManager
+              crewMembers={catalog.crewMembers}
+              departments={catalog.departments}
+              focusedUnitId={focusedUnitId}
+              onChanged={async () => {
+                await Promise.all([reload(), refreshProjects()]);
+              }}
+              projectId={currentProject.id}
+              units={data.units}
+            />
+          </div>
         </div>
-
-        <ProjectUnitsManager
-          crewMembers={catalog.crewMembers}
-          departments={catalog.departments}
-          focusedUnitId={focusedUnitId}
-          onChanged={async () => {
-            await Promise.all([reload(), refreshProjects()]);
-          }}
-          projectId={currentProject.id}
-          units={data.units}
-        />
       </div>
     </div>
   );

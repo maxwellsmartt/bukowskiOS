@@ -453,6 +453,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
   return (
     <>
     <SurfaceCard
+      className="project-units-card"
       title={t("projects.units.title")}
       aside={
         <div className="surface-card-action-row">
