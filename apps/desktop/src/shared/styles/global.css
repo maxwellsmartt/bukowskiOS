@@ -3302,7 +3302,34 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .shell-content-project {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
+  padding-bottom: 0;
+}
+
+.shell-content-project > .assets-page-stack,
+.shell-content-project > .packing-page-stack,
+.shell-content-project > .incidents-page-stack {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.shell-content-project .packing-page-stack > .split-layout,
+.shell-content-project .incidents-page-stack > .split-layout,
+.shell-content-project .assets-page-stack > .asset-list-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.shell-content-project .packing-page-stack .rail-table-card,
+.shell-content-project .incidents-page-stack .rail-table-card,
+.shell-content-project .assets-page-stack .asset-registry-card {
+  height: 100%;
+  min-height: 0;
+  max-height: none;
 }
 
 .shell-content-assets {

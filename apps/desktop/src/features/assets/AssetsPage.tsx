@@ -2415,6 +2415,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             onSortRequest={assetControls.handleColumnSortRequest}
             persistKey={isProjectMode ? "project-assets-registry-v2" : "assets-registry-v2"}
             pruneSelectionOnRowsChange={false}
+            fillParent
             rows={assets}
             shellClassName="table-shell-wide-scroll table-shell-fill"
             selectable

@@ -478,6 +478,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           activeRowId={activeIncidentId}
           autoScrollToActiveRow
           defaultVisibleColumnKeys={isProjectMode ? projectIncidentDefaultColumnKeys : incidentDefaultColumnKeys}
+          fillParent
           shellClassName="table-shell-fill"
           emptyContent={
             <div className="table-empty-state">

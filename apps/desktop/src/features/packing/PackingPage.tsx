@@ -596,6 +596,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             activeRowId={activePackingSlipId}
             autoScrollToActiveRow
             defaultVisibleColumnKeys={isProjectMode ? projectPackingColumnKeys : defaultPackingColumnKeys}
+            fillParent
             emptyContent={
               <div className="packing-empty-state">
                 <span className="packing-empty-kicker">{t(hasActiveFilters ? "packing.empty.filteredKicker" : "packing.empty.kicker")}</span>
