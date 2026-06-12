@@ -7,8 +7,9 @@ import { HelpMenu } from "@features/onboarding/HelpMenu";
 import { useConnectivity } from "@shared/hooks/useConnectivity";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
+import { requestImmediatePull } from "@shared/hooks/useWorkspaceDataRefresh";
 import { resolveProjectColor } from "@shared/lib/projectColors";
-import type { AppDiagnosticsSnapshot } from "@contracts";
+import type { AppDiagnosticsSnapshot, AppSyncPullCursorRow } from "@contracts";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { NotificationsButton } from "./NotificationsTray";
 
@@ -22,6 +23,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const { t } = useTranslation();
   const isOnline = useConnectivity();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot | null>(null);
+  const [pullCursors, setPullCursors] = useState<AppSyncPullCursorRow[]>([]);
   const [syncPopoverOpen, setSyncPopoverOpen] = useState(false);
   const [isRunningSync, setIsRunningSync] = useState(false);
   const [syncActionError, setSyncActionError] = useState<string | null>(null);
@@ -77,9 +79,13 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       }
 
       try {
-        const nextDiagnostics = await window.bukowskiApp.getDiagnostics();
+        const [nextDiagnostics, nextPullCursors] = await Promise.all([
+          window.bukowskiApp.getDiagnostics(),
+          window.bukowskiApp.getSyncPullCursors().catch(() => pullCursors),
+        ]);
         if (isMountedRef.current) {
           setDiagnostics(nextDiagnostics);
+          setPullCursors(nextPullCursors);
         }
       } catch {
         if (isMountedRef.current) {
@@ -89,6 +95,9 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     },
     { intervalMs: 15_000 },
   );
+
+  const inboundFailedCount = pullCursors.filter((cursor) => cursor.lastError).length;
+  const latestInboundCheck = pullCursors[0]?.updatedAt ?? null;
 
   const syncState = useMemo(() => {
     if (!diagnostics) {
@@ -100,24 +109,16 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       };
     }
 
-    if (!diagnostics.lastSyncRunAt) {
-      return {
-        label: t("shell.topBar.syncPopover.noSync", { defaultValue: "Sin sync confirmado" }),
-        className: "sync-control-missing",
-        icon: CloudOff,
-        badge: null as number | null,
-      };
-    }
-
-    if (diagnostics.syncOutboxFailedCount > 0 || diagnostics.lastSyncStatus === "failed") {
+    if (diagnostics.syncOutboxFailedCount > 0 || diagnostics.lastSyncStatus === "failed" || inboundFailedCount > 0) {
+      const failedCount = diagnostics.syncOutboxFailedCount + inboundFailedCount;
       return {
         label:
-          diagnostics.syncOutboxFailedCount > 0
-            ? t("shell.topBar.syncFailedWithCount", { count: diagnostics.syncOutboxFailedCount })
+          failedCount > 0
+            ? t("shell.topBar.syncFailedWithCount", { count: failedCount })
             : t("shell.topBar.syncFailed"),
         className: "sync-control-review",
         icon: AlertTriangle,
-        badge: diagnostics.syncOutboxFailedCount,
+        badge: failedCount,
       };
     }
 
@@ -132,13 +133,22 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       };
     }
 
+    if (!diagnostics.lastSyncRunAt && !pullCursors.length) {
+      return {
+        label: t("shell.topBar.syncPopover.noSync", { defaultValue: "Sin sync confirmado" }),
+        className: "sync-control-missing",
+        icon: CloudOff,
+        badge: null as number | null,
+      };
+    }
+
     return {
       label: t("shell.topBar.upToDate"),
       className: "sync-control-healthy",
       icon: CheckCircle2,
       badge: null as number | null,
     };
-  }, [diagnostics, t]);
+  }, [diagnostics, inboundFailedCount, pullCursors.length, t]);
   const SyncStatusIcon = syncState.icon;
 
   const refreshDiagnostics = async () => {
@@ -147,9 +157,13 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     }
 
     try {
-      const nextDiagnostics = await window.bukowskiApp.getDiagnostics();
+      const [nextDiagnostics, nextPullCursors] = await Promise.all([
+        window.bukowskiApp.getDiagnostics(),
+        window.bukowskiApp.getSyncPullCursors().catch(() => pullCursors),
+      ]);
       if (isMountedRef.current) {
         setDiagnostics(nextDiagnostics);
+        setPullCursors(nextPullCursors);
       }
     } catch {
       if (isMountedRef.current) {
@@ -176,9 +190,11 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
 
     try {
       const result = await window.bukowskiApp.runLocalSync();
+      requestImmediatePull();
       if (isMountedRef.current) {
         setDiagnostics(result.diagnostics);
       }
+      window.setTimeout(() => void refreshDiagnostics(), 1200);
     } catch {
       if (isMountedRef.current) {
         setSyncActionError(t("shell.topBar.syncPopover.syncFailed", { defaultValue: "No se pudo sincronizar ahora." }));
@@ -246,7 +262,6 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
             <div className="sync-popover" role="dialog" aria-label={t("shell.topBar.syncPopover.title", { defaultValue: "Sincronización" })}>
               <div className="sync-popover-header">
                 <div>
-                  <span className="sync-popover-kicker">{t("shell.topBar.syncPopover.title", { defaultValue: "Sincronización" })}</span>
                   <strong>{syncState.label}</strong>
                 </div>
                 <span className={`sync-popover-status ${syncState.className}`}>
@@ -261,8 +276,10 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
                 <strong>{diagnostics?.syncOutboxProcessingCount ?? 0}</strong>
                 <span>{t("shell.topBar.syncPopover.failed", { defaultValue: "Fallidas" })}</span>
                 <strong>{diagnostics?.syncOutboxFailedCount ?? 0}</strong>
+                <span>{t("shell.topBar.syncPopover.inbound", { defaultValue: "Entrantes" })}</span>
+                <strong>{inboundFailedCount ? t("shell.topBar.syncPopover.inboundErrors", { defaultValue: "{{count}} con error", count: inboundFailedCount }) : pullCursors.length}</strong>
                 <span>{t("shell.topBar.syncPopover.lastRun", { defaultValue: "Última pasada" })}</span>
-                <strong>{formatSyncDate(diagnostics?.lastSyncRunAt)}</strong>
+                <strong>{formatSyncDate(diagnostics?.lastSyncRunAt ?? latestInboundCheck)}</strong>
               </div>
 
               {diagnostics?.lastSyncSummary ? <p className="sync-popover-summary">{diagnostics.lastSyncSummary}</p> : null}
