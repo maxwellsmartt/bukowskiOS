@@ -586,6 +586,7 @@ body.has-floating-tooltips .icon-danger-control[aria-label]::after {
 }
 
 .project-setup-department-picker {
+  gap: 8px;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
@@ -759,7 +760,9 @@ body.has-floating-tooltips .icon-danger-control[aria-label]::after {
 }
 
 .project-setup-department-option {
-  min-height: 64px;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 12px;
 }
 
 .project-setup-checklist-toggle {
