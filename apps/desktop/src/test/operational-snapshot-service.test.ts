@@ -164,6 +164,298 @@ describe("operational snapshot service", () => {
     }
   });
 
+  it("reconciles removed project children from remote snapshots", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-reconcile");
+
+    try {
+      const service = createOperationalSnapshotService(database);
+      const projectId = "project-remote-reconcile";
+      const unitId = "unit-remote-reconcile-main";
+      const windowId = "window-remote-reconcile-main";
+      const assignmentId = "assignment-remote-reconcile-paola";
+
+      const baseProject = {
+        id: projectId,
+        workspace_id: "workspace-metadata",
+        code: "RRC",
+        name: "Remote Reconcile",
+        client_name: null,
+        status: "Prep",
+        start_date: "2026-06-01",
+        end_date: "2026-06-10",
+        description: null,
+        created_at: "2026-05-06T12:20:00.000Z",
+        updated_at: "2026-05-06T12:20:00.000Z",
+        client_id: null,
+        color_key: null,
+        production_company_id: null,
+        production_company_name: null,
+        has_preproduction: 0,
+        preproduction_start_date: null,
+        preproduction_end_date: null,
+        archived_at: null,
+      };
+      const baseUnit = {
+        id: unitId,
+        workspace_id: "workspace-metadata",
+        project_id: projectId,
+        code: "MAIN",
+        name: "Main Unit",
+        sort_order: 0,
+        status: "planned",
+        status_source: "derived",
+        color_key: null,
+        start_date: "2026-06-01",
+        end_date: "2026-06-10",
+        notes: null,
+        created_at: "2026-05-06T12:20:00.000Z",
+        updated_at: "2026-05-06T12:20:00.000Z",
+      };
+
+      const first = service.applyRemoteSnapshots("workspace-metadata", "project", [
+        {
+          workspace_id: "workspace-metadata",
+          entity_type: "project",
+          entity_id: projectId,
+          updated_at: "2026-05-06T12:20:00.000Z",
+          deleted_at: null,
+          snapshot_json: {
+            project: baseProject,
+            units: [baseUnit],
+            unitWindows: [
+              {
+                id: windowId,
+                project_unit_id: unitId,
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                sort_order: 0,
+                label: null,
+                created_at: "2026-05-06T12:20:00.000Z",
+                updated_at: "2026-05-06T12:20:00.000Z",
+              },
+            ],
+            projectDepartments: [{ project_id: projectId, department_id: "dept-video", created_at: "2026-05-06T12:20:00.000Z" }],
+            unitDepartments: [{ project_unit_id: unitId, department_id: "dept-video", created_at: "2026-05-06T12:20:00.000Z" }],
+            crewAssignments: [
+              {
+                id: assignmentId,
+                workspace_id: "workspace-metadata",
+                project_unit_id: unitId,
+                department_id: "dept-video",
+                crew_member_id: "crew-user-paola",
+                role_label: "VTR Operator",
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                notes: null,
+                created_at: "2026-05-06T12:20:00.000Z",
+                updated_at: "2026-05-06T12:20:00.000Z",
+              },
+            ],
+          },
+        },
+      ]);
+
+      expect(first.errors).toEqual([]);
+      expect(first.appliedCount).toBe(1);
+
+      const second = service.applyRemoteSnapshots("workspace-metadata", "project", [
+        {
+          workspace_id: "workspace-metadata",
+          entity_type: "project",
+          entity_id: projectId,
+          updated_at: "2026-05-06T12:21:00.000Z",
+          deleted_at: null,
+          snapshot_json: {
+            project: { ...baseProject, updated_at: "2026-05-06T12:21:00.000Z" },
+            units: [{ ...baseUnit, updated_at: "2026-05-06T12:21:00.000Z" }],
+            unitWindows: [],
+            projectDepartments: [],
+            unitDepartments: [],
+            crewAssignments: [],
+          },
+        },
+      ]);
+
+      expect(second.errors).toEqual([]);
+      expect(second.appliedCount).toBe(1);
+
+      const counts = database
+        .prepare(
+          `
+            SELECT
+              (SELECT COUNT(*) FROM project_unit_windows WHERE project_unit_id = ?) AS windows,
+              (SELECT COUNT(*) FROM project_departments WHERE project_id = ?) AS project_departments,
+              (SELECT COUNT(*) FROM project_unit_departments WHERE project_unit_id = ?) AS unit_departments,
+              (SELECT COUNT(*) FROM project_unit_crew_assignments WHERE project_unit_id = ?) AS crew
+          `,
+        )
+        .get(unitId, projectId, unitId, unitId) as {
+        windows: number;
+        project_departments: number;
+        unit_departments: number;
+        crew: number;
+      };
+
+      expect(counts).toEqual({ windows: 0, project_departments: 0, unit_departments: 0, crew: 0 });
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("rejects project snapshots that do not match the synced entity", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-scope");
+
+    try {
+      const service = createOperationalSnapshotService(database);
+      const result = service.applyRemoteSnapshots("workspace-metadata", "project", [
+        {
+          workspace_id: "workspace-metadata",
+          entity_type: "project",
+          entity_id: "project-remote-expected",
+          updated_at: "2026-05-06T12:25:00.000Z",
+          deleted_at: null,
+          snapshot_json: {
+            project: {
+              id: "project-remote-poison",
+              workspace_id: "workspace-metadata",
+              code: "BAD",
+              name: "Poisoned Project",
+              client_name: null,
+              status: "Prep",
+              start_date: "2026-06-01",
+              end_date: "2026-06-10",
+              description: null,
+              created_at: "2026-05-06T12:25:00.000Z",
+              updated_at: "2026-05-06T12:25:00.000Z",
+              client_id: null,
+              color_key: null,
+              production_company_id: null,
+              production_company_name: null,
+              has_preproduction: 0,
+              preproduction_start_date: null,
+              preproduction_end_date: null,
+              archived_at: null,
+            },
+            units: [],
+            unitWindows: [],
+            projectDepartments: [],
+            unitDepartments: [],
+            crewAssignments: [],
+          },
+        },
+      ]);
+
+      expect(result.appliedCount).toBe(0);
+      expect(result.errors[0]).toContain("does not match the synced entity");
+      expect(database.prepare("SELECT COUNT(*) AS count FROM projects WHERE id = ?").get("project-remote-poison")).toEqual({ count: 0 });
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("ignores project snapshot children outside the synced project scope", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-child-scope");
+
+    try {
+      const service = createOperationalSnapshotService(database);
+      const projectId = "project-remote-safe";
+      const validUnitId = "unit-remote-safe-main";
+      const poisonedUnitId = "unit-remote-poison";
+      const result = service.applyRemoteSnapshots("workspace-metadata", "project", [
+        {
+          workspace_id: "workspace-metadata",
+          entity_type: "project",
+          entity_id: projectId,
+          updated_at: "2026-05-06T12:30:00.000Z",
+          deleted_at: null,
+          snapshot_json: {
+            project: {
+              id: projectId,
+              workspace_id: "workspace-metadata",
+              code: "SAFE",
+              name: "Safe Project",
+              client_name: null,
+              status: "Prep",
+              start_date: "2026-06-01",
+              end_date: "2026-06-10",
+              description: null,
+              created_at: "2026-05-06T12:30:00.000Z",
+              updated_at: "2026-05-06T12:30:00.000Z",
+              client_id: null,
+              color_key: null,
+              production_company_id: null,
+              production_company_name: null,
+              has_preproduction: 0,
+              preproduction_start_date: null,
+              preproduction_end_date: null,
+              archived_at: null,
+            },
+            units: [
+              {
+                id: validUnitId,
+                workspace_id: "workspace-metadata",
+                project_id: projectId,
+                code: "MAIN",
+                name: "Main Unit",
+                sort_order: 0,
+                status: "planned",
+                status_source: "derived",
+                color_key: null,
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                notes: null,
+                created_at: "2026-05-06T12:30:00.000Z",
+                updated_at: "2026-05-06T12:30:00.000Z",
+              },
+              {
+                id: poisonedUnitId,
+                workspace_id: "workspace-metadata",
+                project_id: "project-aurora",
+                code: "BAD",
+                name: "Bad Unit",
+                sort_order: 0,
+                status: "planned",
+                status_source: "derived",
+                color_key: null,
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                notes: null,
+                created_at: "2026-05-06T12:30:00.000Z",
+                updated_at: "2026-05-06T12:30:00.000Z",
+              },
+            ],
+            unitWindows: [],
+            projectDepartments: [],
+            unitDepartments: [{ project_unit_id: poisonedUnitId, department_id: "dept-video", created_at: "2026-05-06T12:30:00.000Z" }],
+            crewAssignments: [
+              {
+                id: "assignment-remote-poison",
+                workspace_id: "workspace-metadata",
+                project_unit_id: poisonedUnitId,
+                department_id: "dept-video",
+                crew_member_id: "crew-user-paola",
+                role_label: "Bad Link",
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                notes: null,
+                created_at: "2026-05-06T12:30:00.000Z",
+                updated_at: "2026-05-06T12:30:00.000Z",
+              },
+            ],
+          },
+        },
+      ]);
+
+      expect(result.errors).toEqual([]);
+      expect(result.appliedCount).toBe(1);
+      expect(database.prepare("SELECT COUNT(*) AS count FROM project_units WHERE id = ?").get(validUnitId)).toEqual({ count: 1 });
+      expect(database.prepare("SELECT COUNT(*) AS count FROM project_units WHERE id = ?").get(poisonedUnitId)).toEqual({ count: 0 });
+      expect(database.prepare("SELECT COUNT(*) AS count FROM project_unit_crew_assignments WHERE id = ?").get("assignment-remote-poison")).toEqual({ count: 0 });
+    } finally {
+      cleanup();
+    }
+  });
+
   it("resolves a tombstone snapshot when an outbound operational entity no longer exists locally", () => {
     const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-tombstone");
 
@@ -184,6 +476,77 @@ describe("operational snapshot service", () => {
         updated_at: "2026-05-06T12:06:00.000Z",
         deleted_at: "2026-05-06T12:06:00.000Z",
       });
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("applies remote project tombstones to remove local project snapshots", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-tombstone-apply");
+
+    try {
+      const service = createOperationalSnapshotService(database);
+      database
+        .prepare(
+          `
+            INSERT INTO projects (
+              id, workspace_id, code, name, client_id, client_name, production_company_id,
+              production_company_name, status, start_date, end_date, has_preproduction,
+              preproduction_start_date, preproduction_end_date, color_key, description,
+              archived_at, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, NULL, NULL, NULL, NULL, 'Prep', ?, ?, 0, NULL, NULL, NULL, NULL, NULL, ?, ?)
+          `,
+        )
+        .run(
+          "project-remote-tombstone",
+          "workspace-metadata",
+          "RDT",
+          "Remote Delete Target",
+          "2026-06-01",
+          "2026-06-10",
+          "2026-05-06T12:35:00.000Z",
+          "2026-05-06T12:35:00.000Z",
+        );
+      database
+        .prepare(
+          `
+            INSERT INTO project_units (
+              id, workspace_id, project_id, code, name, sort_order, status, status_source,
+              color_key, start_date, end_date, notes, created_at, updated_at
+            )
+            VALUES (?, ?, ?, 'MAIN', 'Main Unit', 0, 'planned', 'derived', NULL, ?, ?, NULL, ?, ?)
+          `,
+        )
+        .run(
+          "unit-remote-tombstone-main",
+          "workspace-metadata",
+          "project-remote-tombstone",
+          "2026-06-01",
+          "2026-06-10",
+          "2026-05-06T12:35:00.000Z",
+          "2026-05-06T12:35:00.000Z",
+        );
+      database
+        .prepare("INSERT INTO project_unit_departments (project_unit_id, department_id, created_at) VALUES (?, ?, ?)")
+        .run("unit-remote-tombstone-main", "dept-video", "2026-05-06T12:35:00.000Z");
+
+      const result = service.applyRemoteSnapshots("workspace-metadata", "project", [
+        {
+          workspace_id: "workspace-metadata",
+          entity_type: "project",
+          entity_id: "project-remote-tombstone",
+          updated_at: "2026-05-06T12:36:00.000Z",
+          deleted_at: "2026-05-06T12:36:00.000Z",
+          snapshot_json: {},
+        },
+      ]);
+
+      expect(result.errors).toEqual([]);
+      expect(result.appliedCount).toBe(1);
+      expect(database.prepare("SELECT COUNT(*) AS count FROM projects WHERE id = ?").get("project-remote-tombstone")).toEqual({ count: 0 });
+      expect(database.prepare("SELECT COUNT(*) AS count FROM project_units WHERE project_id = ?").get("project-remote-tombstone")).toEqual({ count: 0 });
+      expect(database.prepare("SELECT COUNT(*) AS count FROM project_unit_departments WHERE project_unit_id = ?").get("unit-remote-tombstone-main")).toEqual({ count: 0 });
     } finally {
       cleanup();
     }

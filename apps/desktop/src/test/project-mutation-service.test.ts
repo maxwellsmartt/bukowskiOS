@@ -53,6 +53,11 @@ describe("project mutation service", () => {
     expect(backupSpy).toHaveBeenCalledTimes(1);
 
     expect(reads.getProjects().some((project) => project.code === "TEST")).toBe(false);
+    const deleteOutbox = database
+      .prepare("SELECT operation_type, payload_json FROM sync_outbox WHERE entity_type = 'project' AND entity_id = ? AND operation_type = 'delete'")
+      .get(createdProject!.id) as { operation_type: string; payload_json: string } | undefined;
+    expect(deleteOutbox?.operation_type).toBe("delete");
+    expect(JSON.parse(deleteOutbox?.payload_json ?? "{}")).toMatchObject({ projectId: createdProject!.id, operation: "delete" });
 
     cleanup();
   });

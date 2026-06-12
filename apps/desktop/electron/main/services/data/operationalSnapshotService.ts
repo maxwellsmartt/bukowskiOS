@@ -195,6 +195,96 @@ const upsertRowWithConflict = (db: DatabaseSync, table: string, row: Record<stri
     .run(...entries.map(([, value]) => toSqlInputValue(value)));
 };
 
+const toRecordArray = (value: unknown) =>
+  Array.isArray(value) ? value.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row)) : [];
+
+const toStringId = (value: unknown) => (typeof value === "string" && value.trim() ? value : null);
+
+const deleteRowsMissingFromSnapshot = (
+  db: DatabaseSync,
+  table: string,
+  keyColumn: string,
+  scopeWhere: string,
+  scopeParams: SQLInputValue[],
+  desiredIds: Set<string>,
+) => {
+  const localRows = selectMany<{ id: string }>(
+    db,
+    `SELECT ${keyColumn} AS id FROM ${table} WHERE ${scopeWhere}`,
+    ...scopeParams,
+  );
+
+  for (const row of localRows) {
+    if (desiredIds.has(row.id)) continue;
+    db.prepare(`DELETE FROM ${table} WHERE ${keyColumn} = ?`).run(row.id);
+  }
+};
+
+const deleteUnitDepartmentsMissingFromSnapshot = (
+  db: DatabaseSync,
+  localUnitIds: string[],
+  desiredPairs: Set<string>,
+) => {
+  if (!localUnitIds.length) return;
+  const placeholders = localUnitIds.map(() => "?").join(", ");
+  const localRows = selectMany<{ project_unit_id: string; department_id: string }>(
+    db,
+    `
+      SELECT project_unit_id, department_id
+      FROM project_unit_departments
+      WHERE project_unit_id IN (${placeholders})
+    `,
+    ...localUnitIds,
+  );
+
+  for (const row of localRows) {
+    const pairKey = `${row.project_unit_id}::${row.department_id}`;
+    if (desiredPairs.has(pairKey)) continue;
+    db
+      .prepare("DELETE FROM project_unit_departments WHERE project_unit_id = ? AND department_id = ?")
+      .run(row.project_unit_id, row.department_id);
+  }
+};
+
+const deleteProjectSnapshotLocally = (db: DatabaseSync, projectId: string) => {
+  const unitIds = selectMany<{ id: string }>(db, "SELECT id FROM project_units WHERE project_id = ?", projectId).map((row) => row.id);
+  if (unitIds.length) {
+    const placeholders = unitIds.map(() => "?").join(", ");
+    db.prepare(`DELETE FROM project_unit_crew_assignments WHERE project_unit_id IN (${placeholders})`).run(...unitIds);
+    db.prepare(`DELETE FROM project_unit_departments WHERE project_unit_id IN (${placeholders})`).run(...unitIds);
+    db.prepare(`DELETE FROM project_unit_windows WHERE project_unit_id IN (${placeholders})`).run(...unitIds);
+  }
+
+  db.prepare("DELETE FROM project_departments WHERE project_id = ?").run(projectId);
+  db.prepare("DELETE FROM project_units WHERE project_id = ?").run(projectId);
+  db.prepare("DELETE FROM projects WHERE id = ?").run(projectId);
+};
+
+const deleteOperationalSnapshotLocally = (
+  db: DatabaseSync,
+  entityType: OperationalSnapshotEntityType,
+  entityId: string,
+) => {
+  if (entityType === "project") {
+    deleteProjectSnapshotLocally(db, entityId);
+    return;
+  }
+  if (entityType === "packing_slip") {
+    db.prepare("DELETE FROM packing_slip_items WHERE packing_slip_id = ?").run(entityId);
+    db.prepare("DELETE FROM packing_slips WHERE id = ?").run(entityId);
+    return;
+  }
+  if (entityType === "incident") {
+    db.prepare("DELETE FROM incident_files WHERE incident_id = ?").run(entityId);
+    db.prepare("DELETE FROM incidents WHERE id = ?").run(entityId);
+    return;
+  }
+  if (entityType === "rma_case") {
+    db.prepare("DELETE FROM rma_case_assets WHERE rma_case_id = ?").run(entityId);
+    db.prepare("DELETE FROM rma_cases WHERE id = ?").run(entityId);
+  }
+};
+
 const hasPendingOutbox = (db: DatabaseSync, workspaceId: string, entityType: OperationalSnapshotEntityType, entityId: string) => {
   const row = db
     .prepare(
@@ -427,9 +517,19 @@ export const resolveOperationalSnapshot = (
   };
 };
 
-const applyProjectSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown>) => {
+const applyProjectSnapshot = (
+  db: DatabaseSync,
+  snapshot: Record<string, unknown>,
+  context: { workspaceId: string; projectId: string },
+) => {
   const project = snapshot.project as Record<string, unknown> | undefined;
   if (!project) throw new Error("Project snapshot is missing project.");
+  if (project.id !== context.projectId) {
+    throw new Error("Project snapshot id does not match the synced entity.");
+  }
+  if (project.workspace_id !== context.workspaceId) {
+    throw new Error("Project snapshot workspace does not match the synced workspace.");
+  }
 
   const safeProject = { ...project };
   if (safeProject.client_id && !rowExists(db, "clients", safeProject.client_id)) {
@@ -444,10 +544,126 @@ const applyProjectSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown
     safeProject.production_company_id = null;
   }
 
+  const units = toRecordArray(snapshot.units).filter((row) => {
+    const belongsToProject = row.project_id === context.projectId;
+    const belongsToWorkspace = row.workspace_id === context.workspaceId;
+    if (!belongsToProject || !belongsToWorkspace) {
+      logger.warn("Skipped remote project unit outside the synced project scope.", { projectId: row.project_id, unitId: row.id });
+    }
+    return belongsToProject && belongsToWorkspace;
+  });
+  const snapshotUnitIds = new Set(units.map((row) => toStringId(row.id)).filter((id): id is string => Boolean(id)));
+  const localUnitIds = selectMany<{ id: string }>(db, "SELECT id FROM project_units WHERE project_id = ?", context.projectId).map(
+    (row) => row.id,
+  );
+  const scopedUnitIds = new Set([...snapshotUnitIds, ...localUnitIds]);
+
+  const unitWindows = toRecordArray(snapshot.unitWindows).filter((row) => {
+    const belongsToProject = snapshotUnitIds.has(String(row.project_unit_id ?? ""));
+    if (!belongsToProject) {
+      logger.warn("Skipped remote project unit window outside the synced project scope.", {
+        projectUnitId: row.project_unit_id,
+        windowId: row.id,
+      });
+    }
+    return belongsToProject;
+  });
+  const projectDepartments = toRecordArray(snapshot.projectDepartments).filter((row) => {
+    const belongsToProject = row.project_id === context.projectId;
+    if (!belongsToProject) {
+      logger.warn("Skipped remote project department outside the synced project scope.", {
+        projectId: row.project_id,
+        departmentId: row.department_id,
+      });
+    }
+    return belongsToProject;
+  });
+  const unitDepartments = toRecordArray(snapshot.unitDepartments).filter((row) => {
+    const belongsToProject = snapshotUnitIds.has(String(row.project_unit_id ?? ""));
+    if (!belongsToProject) {
+      logger.warn("Skipped remote project unit department outside the synced project scope.", {
+        projectUnitId: row.project_unit_id,
+        departmentId: row.department_id,
+      });
+    }
+    return belongsToProject;
+  });
+  const crewAssignments = toRecordArray(snapshot.crewAssignments).filter((row) => {
+    const belongsToProject = snapshotUnitIds.has(String(row.project_unit_id ?? ""));
+    const belongsToWorkspace = row.workspace_id === context.workspaceId;
+    if (!belongsToProject || !belongsToWorkspace) {
+      logger.warn("Skipped remote project crew assignment outside the synced project scope.", {
+        projectUnitId: row.project_unit_id,
+        assignmentId: row.id,
+      });
+    }
+    return belongsToProject && belongsToWorkspace;
+  });
+
+  if (Array.isArray(snapshot.crewAssignments) && scopedUnitIds.size) {
+    deleteRowsMissingFromSnapshot(
+      db,
+      "project_unit_crew_assignments",
+      "id",
+      `project_unit_id IN (${Array.from(scopedUnitIds).map(() => "?").join(", ")})`,
+      Array.from(scopedUnitIds),
+      new Set(crewAssignments.map((row) => toStringId(row.id)).filter((id): id is string => Boolean(id))),
+    );
+  }
+  if (Array.isArray(snapshot.unitDepartments)) {
+    deleteUnitDepartmentsMissingFromSnapshot(
+      db,
+      localUnitIds,
+      new Set(
+        unitDepartments
+          .map((row) => {
+            const unitId = toStringId(row.project_unit_id);
+            const departmentId = toStringId(row.department_id);
+            return unitId && departmentId ? `${unitId}::${departmentId}` : null;
+          })
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+  }
+  if (Array.isArray(snapshot.unitWindows) && scopedUnitIds.size) {
+    deleteRowsMissingFromSnapshot(
+      db,
+      "project_unit_windows",
+      "id",
+      `project_unit_id IN (${Array.from(scopedUnitIds).map(() => "?").join(", ")})`,
+      Array.from(scopedUnitIds),
+      new Set(unitWindows.map((row) => toStringId(row.id)).filter((id): id is string => Boolean(id))),
+    );
+  }
+  if (Array.isArray(snapshot.projectDepartments)) {
+    const desiredProjectDepartments = new Set(
+      projectDepartments.map((row) => toStringId(row.department_id)).filter((id): id is string => Boolean(id)),
+    );
+    const localProjectDepartments = selectMany<{ department_id: string }>(
+      db,
+      "SELECT department_id FROM project_departments WHERE project_id = ?",
+      context.projectId,
+    );
+    for (const row of localProjectDepartments) {
+      if (desiredProjectDepartments.has(row.department_id)) continue;
+      db.prepare("DELETE FROM project_departments WHERE project_id = ? AND department_id = ?").run(context.projectId, row.department_id);
+    }
+  }
+  if (Array.isArray(snapshot.units)) {
+    deleteRowsMissingFromSnapshot(
+      db,
+      "project_units",
+      "id",
+      "project_id = ?",
+      [context.projectId],
+      snapshotUnitIds,
+    );
+  }
+
   upsertRow(db, "projects", safeProject);
-  for (const row of (snapshot.units as Record<string, unknown>[] | undefined) ?? []) upsertRow(db, "project_units", row);
-  for (const row of (snapshot.unitWindows as Record<string, unknown>[] | undefined) ?? []) upsertRow(db, "project_unit_windows", row);
-  for (const row of (snapshot.projectDepartments as Record<string, unknown>[] | undefined) ?? []) {
+  for (const row of units) upsertRow(db, "project_units", row);
+  for (const row of unitWindows) upsertRow(db, "project_unit_windows", row);
+  for (const row of projectDepartments) {
     if (!rowExists(db, "departments", row.department_id)) {
       logger.warn("Skipped remote project department because related department is unavailable.", {
         projectId: row.project_id,
@@ -464,7 +680,7 @@ const applyProjectSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown
       )
       .run(toSqlInputValue(row.project_id), toSqlInputValue(row.department_id), toSqlInputValue(row.created_at));
   }
-  for (const row of (snapshot.unitDepartments as Record<string, unknown>[] | undefined) ?? []) {
+  for (const row of unitDepartments) {
     if (!rowExists(db, "departments", row.department_id)) {
       logger.warn("Skipped remote project unit department because related department is unavailable.", {
         projectUnitId: row.project_unit_id,
@@ -481,7 +697,7 @@ const applyProjectSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown
       )
       .run(toSqlInputValue(row.project_unit_id), toSqlInputValue(row.department_id), toSqlInputValue(row.created_at));
   }
-  for (const row of (snapshot.crewAssignments as Record<string, unknown>[] | undefined) ?? []) {
+  for (const row of crewAssignments) {
     try {
       upsertRow(db, "project_unit_crew_assignments", row);
     } catch {
@@ -639,11 +855,16 @@ export const createOperationalSnapshotService = (db: DatabaseSync) => ({
 
         try {
           if (row.deleted_at) {
+            deleteOperationalSnapshotLocally(db, entityType, row.entity_id);
+            result.appliedCount += 1;
             result.cursorAfter = row.updated_at;
             continue;
           }
 
-          if (entityType === "project") applyProjectSnapshot(db, row.snapshot_json);
+          if (entityType === "project") applyProjectSnapshot(db, row.snapshot_json, {
+            workspaceId: row.workspace_id,
+            projectId: row.entity_id,
+          });
           if (entityType === "packing_slip") applyPackingSnapshot(db, row.snapshot_json);
           if (entityType === "incident") applyIncidentSnapshot(db, row.snapshot_json);
           if (entityType === "rma_case") applyRmaSnapshot(db, row.snapshot_json);

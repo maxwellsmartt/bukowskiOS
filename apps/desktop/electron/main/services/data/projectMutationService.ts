@@ -1976,6 +1976,8 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
       throw new Error("This project has linked operational history and can only be archived.");
     }
 
+    const now = new Date().toISOString();
+
     try {
       options.createBackupBeforeDelete?.();
     } catch (error) {
@@ -2003,6 +2005,15 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
       if (!result.changes) {
         throw new Error("Project not found.");
       }
+
+      enqueueOperationalSnapshotOutbox(db, {
+        workspaceId: project.workspace_id,
+        entityType: "project",
+        entityId: input.projectId,
+        operationType: "delete",
+        updatedAt: now,
+        payload: { projectId: input.projectId, operation: "delete" },
+      });
 
       db.exec("COMMIT");
     } catch (error) {
