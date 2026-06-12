@@ -78,6 +78,12 @@ export type DeleteProjectUnitInput = {
   unitId: string;
 };
 
+export type AddDepartmentToProjectUnitInput = {
+  projectId: string;
+  unitId: string;
+  departmentId: string;
+};
+
 export type AssignCrewToProjectUnitInput = {
   projectId: string;
   unitId: string;

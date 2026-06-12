@@ -15,6 +15,7 @@ import type {
   ConnectorMutationResult,
   AgentRosterRow,
   AgentRunRow,
+  AddDepartmentToProjectUnitInput,
   AssignAgentModelCommand,
   ArchiveAssetCommand,
   ArchiveProjectInput,
@@ -522,6 +523,8 @@ const bukowskiProjects = {
     ipcRenderer.invoke(ipcChannels.projects.updateUnit, input) as Promise<ProjectDetailSnapshot>,
   removeUnit: (input: DeleteProjectUnitInput) =>
     ipcRenderer.invoke(ipcChannels.projects.deleteUnit, input) as Promise<ProjectDetailSnapshot>,
+  addDepartmentToUnit: (input: AddDepartmentToProjectUnitInput) =>
+    ipcRenderer.invoke(ipcChannels.projects.addDepartmentToUnit, input) as Promise<ProjectDetailSnapshot>,
   assignCrewToUnit: (input: AssignCrewToProjectUnitInput) =>
     ipcRenderer.invoke(ipcChannels.projects.assignCrewToUnit, input) as Promise<ProjectDetailSnapshot>,
   unassignCrewFromUnit: (input: UnassignCrewFromProjectUnitInput) =>

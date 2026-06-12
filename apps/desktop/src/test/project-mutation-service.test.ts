@@ -119,6 +119,57 @@ describe("project mutation service", () => {
     cleanup();
   });
 
+  it("adds unit departments idempotently before assigning crew", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-unit-department-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createProjectMutationService(database);
+
+    mutations.createProjectUnit({
+      projectId: "project-studio",
+      code: "VTR",
+      name: "VTR Unit",
+      startDate: "2026-04-10",
+      endDate: "2026-04-12",
+    });
+
+    const createdUnit = reads.getProjectDetail("project-studio").units.find((unit) => unit.code === "VTR");
+    expect(createdUnit).toBeTruthy();
+    expect(createdUnit?.unitDepartments).toHaveLength(0);
+
+    mutations.addDepartmentToProjectUnit({
+      projectId: "project-studio",
+      unitId: createdUnit!.id,
+      departmentId: "dept-video",
+    });
+    mutations.addDepartmentToProjectUnit({
+      projectId: "project-studio",
+      unitId: createdUnit!.id,
+      departmentId: "dept-video",
+    });
+
+    let detail = reads.getProjectDetail("project-studio");
+    let refreshedUnit = detail.units.find((unit) => unit.id === createdUnit!.id);
+    expect(refreshedUnit?.unitDepartments).toHaveLength(1);
+    expect(refreshedUnit?.unitDepartments[0]?.departmentId).toBe("dept-video");
+
+    mutations.assignCrewToProjectUnit({
+      projectId: "project-studio",
+      unitId: createdUnit!.id,
+      departmentId: "dept-video",
+      crewMemberId: "crew-user-paola",
+      roleLabel: "VTR Operator",
+      startDate: "2026-04-10",
+      endDate: "2026-04-12",
+    });
+
+    detail = reads.getProjectDetail("project-studio");
+    refreshedUnit = detail.units.find((unit) => unit.id === createdUnit!.id);
+    expect(refreshedUnit?.unitDepartments[0]?.crewAssignments).toHaveLength(1);
+    expect(refreshedUnit?.unitDepartments[0]?.crewAssignments[0]?.roleLabel).toBe("VTR Operator");
+
+    cleanup();
+  });
+
   it("requires crew assignments to use a department linked to the selected unit", () => {
     const { cleanup, database } = createTestDatabase("bukowski-project-unit-department-guard-test");
     const mutations = createProjectMutationService(database);

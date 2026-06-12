@@ -4431,6 +4431,7 @@
     "units": {
       "title": "Unidades",
       "newUnit": "Nueva unidad",
+      "addDepartment": "Añadir departamento",
       "primaryBadge": "Unidad base",
       "order": "Orden {{order}}",
       "crewLinked_one": "{{count}} crew vinculado",
@@ -4450,6 +4451,20 @@
       "moreDetails": "Más detalles",
       "linkCrew": "Asignar crew",
       "empty": "Aún no hay unidades definidas. Crea la primera unidad operativa de este proyecto.",
+      "departmentDialog": {
+        "title": "Añadir departamento",
+        "body": "Elige en qué unidad operará este departamento.",
+        "noDepartments": "No quedan departamentos disponibles para esta unidad",
+        "confirm": "Añadir departamento"
+      },
+      "crewDialog": {
+        "title": "Asignar crew a {{department}}",
+        "body": "{{unit}} · agrega una o varias personas con su rol operativo.",
+        "rowLabel": "Persona {{number}}",
+        "addRow": "Añadir otra persona",
+        "removeRow": "Quitar fila",
+        "confirm": "Asignar crew"
+      },
       "actions": {
         "edit": "Editar unidad",
         "editAria": "Editar {{name}}",
@@ -4471,6 +4486,8 @@
         "start": "Inicio",
         "end": "Cierre",
         "notes": "Notas",
+        "unit": "Unidad",
+        "department": "Departamento",
         "code": "Código",
         "name": "Nombre",
         "startDate": "Fecha de inicio",
@@ -4503,6 +4520,9 @@
         "deletedBody": "La unidad y sus asignaciones fueron eliminadas.",
         "updatedLiveBody": "Los cambios ya están activos para el crew del proyecto.",
         "updateFailed": "No se pudo actualizar la unidad.",
+        "departmentAddedTitle": "Departamento añadido",
+        "departmentAddedBody": "La unidad ya puede recibir crew en ese departamento.",
+        "departmentAddFailed": "No pudimos añadir el departamento.",
         "crewLinkedTitle": "Crew vinculado",
         "crewLinkedBody": "La persona ya está asignada a esta unidad.",
         "assignCrewFailed": "No se pudo asignar el crew a la unidad.",

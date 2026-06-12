@@ -669,6 +669,14 @@ export const deleteProjectUnitSchema = z
   })
   .strict();
 
+export const addDepartmentToProjectUnitSchema = z
+  .object({
+    projectId: nonEmptyString,
+    unitId: nonEmptyString,
+    departmentId: nonEmptyString,
+  })
+  .strict();
+
 export const assignCrewToProjectUnitSchema = z
   .object({
     projectId: nonEmptyString,

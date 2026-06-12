@@ -4427,6 +4427,7 @@
     "units": {
       "title": "Units",
       "newUnit": "New unit",
+      "addDepartment": "Add department",
       "primaryBadge": "Base unit",
       "order": "Order {{order}}",
       "crewLinked_one": "{{count}} crew linked",
@@ -4446,6 +4447,20 @@
       "moreDetails": "More details",
       "linkCrew": "Assign crew",
       "empty": "No units defined yet. Create the first operational unit for this project.",
+      "departmentDialog": {
+        "title": "Add department",
+        "body": "Choose where this department will operate.",
+        "noDepartments": "No departments remain available for this unit",
+        "confirm": "Add department"
+      },
+      "crewDialog": {
+        "title": "Assign crew to {{department}}",
+        "body": "{{unit}} · add one or more people with their operational role.",
+        "rowLabel": "Person {{number}}",
+        "addRow": "Add another person",
+        "removeRow": "Remove row",
+        "confirm": "Assign crew"
+      },
       "actions": {
         "edit": "Edit unit",
         "editAria": "Edit {{name}}",
@@ -4467,6 +4482,8 @@
         "start": "Start",
         "end": "End",
         "notes": "Notes",
+        "unit": "Unit",
+        "department": "Department",
         "code": "Code",
         "name": "Name",
         "startDate": "Start date",
@@ -4499,6 +4516,9 @@
         "deletedBody": "The unit and its assignments are gone.",
         "updatedLiveBody": "Changes are now live for the project crew.",
         "updateFailed": "Unable to update unit.",
+        "departmentAddedTitle": "Department added",
+        "departmentAddedBody": "This unit can now receive crew in that department.",
+        "departmentAddFailed": "Unable to add department.",
         "crewLinkedTitle": "Crew linked",
         "crewLinkedBody": "Member is now assigned to this unit.",
         "assignCrewFailed": "Unable to assign crew member to unit.",

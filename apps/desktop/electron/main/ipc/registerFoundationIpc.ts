@@ -4,6 +4,7 @@ import path from "node:path";
 import { z } from "zod";
 
 import {
+  addDepartmentToProjectUnitSchema,
   archiveProjectSchema,
   archiveAssetSchema,
   assignAgentModelSchema,
@@ -163,6 +164,7 @@ import {
   DEFAULT_WORKSPACE_ID,
 } from "@contracts";
 import type {
+  AddDepartmentToProjectUnitInput,
   AssistantChatSnapshot,
   AssignAgentModelCommand,
   CreateAssistantThreadCommand,
@@ -277,6 +279,7 @@ type RegisterFoundationIpcOptions = {
     getConnectorsSnapshot: () => unknown;
   };
   projectMutations: {
+    addDepartmentToProjectUnit: (input: AddDepartmentToProjectUnitInput) => void;
     createProject: (input: CreateProjectInput) => void;
     createProjectBlueprint: (input: CreateProjectBlueprintInput) => { projectId: string };
     updateProject: (input: UpdateProjectInput) => void;
@@ -1694,6 +1697,11 @@ export const registerFoundationIpc = ({
   safeHandle(ipcChannels.projects.deleteUnit, deleteProjectUnitSchema, async (_event, input) => {
     const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "delete project units", "write", "projects.manage");
     projectMutations.deleteProjectUnit(input);
+    return getProjectDetailForWorkspace(workspaceId, input.projectId);
+  });
+  safeHandle(ipcChannels.projects.addDepartmentToUnit, addDepartmentToProjectUnitSchema, async (_event, input) => {
+    const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "add project unit departments", "write", "projects.manage");
+    projectMutations.addDepartmentToProjectUnit(input);
     return getProjectDetailForWorkspace(workspaceId, input.projectId);
   });
   safeHandle(ipcChannels.projects.assignCrewToUnit, assignCrewToProjectUnitSchema, async (_event, input) => {

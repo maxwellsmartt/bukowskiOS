@@ -14,6 +14,7 @@ import type {
   ConnectorMutationResult,
   AgentRosterRow,
   AgentRunRow,
+  AddDepartmentToProjectUnitInput,
   ArchiveAssetCommand,
   ArchiveProjectInput,
   AssetListQuery,
@@ -367,6 +368,7 @@ declare global {
       createUnit: (input: CreateProjectUnitInput) => Promise<ProjectDetailSnapshot>;
       updateUnit: (input: UpdateProjectUnitInput) => Promise<ProjectDetailSnapshot>;
       removeUnit: (input: DeleteProjectUnitInput) => Promise<ProjectDetailSnapshot>;
+      addDepartmentToUnit: (input: AddDepartmentToProjectUnitInput) => Promise<ProjectDetailSnapshot>;
       assignCrewToUnit: (input: AssignCrewToProjectUnitInput) => Promise<ProjectDetailSnapshot>;
       unassignCrewFromUnit: (input: UnassignCrewFromProjectUnitInput) => Promise<ProjectDetailSnapshot>;
     };

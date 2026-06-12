@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
+  AddDepartmentToProjectUnitInput,
   ArchiveProjectInput,
   AssignCrewToProjectUnitInput,
   CreateProjectBlueprintInput,
@@ -2232,6 +2233,33 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
       db.exec("ROLLBACK");
       throw error;
     }
+  },
+
+  addDepartmentToProjectUnit(input: AddDepartmentToProjectUnitInput) {
+    const project = ensureProjectExists(db, input.projectId);
+    ensureProjectUnitExists(db, input.projectId, input.unitId);
+    ensureDepartmentExists(db, input.departmentId, "Unit department");
+    const now = new Date().toISOString();
+
+    db.prepare(
+      `
+        INSERT OR IGNORE INTO project_unit_departments (project_unit_id, department_id, created_at)
+        VALUES (?, ?, ?)
+      `,
+    ).run(input.unitId, input.departmentId, now);
+
+    enqueueOperationalSnapshotOutbox(db, {
+      workspaceId: project.workspace_id,
+      entityType: "project",
+      entityId: input.projectId,
+      updatedAt: now,
+      payload: {
+        projectId: input.projectId,
+        unitId: input.unitId,
+        departmentId: input.departmentId,
+        operation: "add_unit_department",
+      },
+    });
   },
 
   assignCrewToProjectUnit(input: AssignCrewToProjectUnitInput) {

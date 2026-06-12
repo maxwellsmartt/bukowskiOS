@@ -384,6 +384,7 @@ export const ProjectInfoPage = () => {
 
         <ProjectUnitsManager
           crewMembers={catalog.crewMembers}
+          departments={catalog.departments}
           focusedUnitId={focusedUnitId}
           onChanged={async () => {
             await Promise.all([reload(), refreshProjects()]);

@@ -1,4 +1,5 @@
 import type {
+  AddDepartmentToProjectUnitInput,
   ArchiveProjectInput,
   AssignCrewToProjectUnitInput,
   CatalogCsvImportPreview,
@@ -267,6 +268,14 @@ export const deleteProjectUnit = async (input: DeleteProjectUnitInput): Promise<
   }
 
   return window.bukowskiProjects.removeUnit(input);
+};
+
+export const addDepartmentToProjectUnit = async (input: AddDepartmentToProjectUnitInput): Promise<ProjectDetailSnapshot> => {
+  if (!window.bukowskiProjects) {
+    throw new Error("Projects bridge unavailable");
+  }
+
+  return window.bukowskiProjects.addDepartmentToUnit(input);
 };
 
 export const assignCrewToProjectUnit = async (input: AssignCrewToProjectUnitInput): Promise<ProjectDetailSnapshot> => {
