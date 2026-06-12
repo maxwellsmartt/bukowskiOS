@@ -1,4 +1,4 @@
-import { Check, Pencil, RotateCcw, Trash2, WrapText, X } from "lucide-react";
+import { Check, Pencil, Plus, RotateCcw, Trash2, UsersRound, WrapText, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -94,6 +94,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
   const [unitDraft, setUnitDraft] = useState<UnitDraft>(emptyUnitDraft);
+  const [activeCrewFormKey, setActiveCrewFormKey] = useState<string | null>(null);
   const [crewDrafts, setCrewDrafts] = useState<Record<string, CrewAssignmentDraft>>({});
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -278,6 +279,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       });
       await Promise.resolve(onChanged());
       setCrewDrafts((current) => ({ ...current, [draftKey]: emptyCrewDraft }));
+      setActiveCrewFormKey(draftKey);
       setError(null);
       toast.success(t("projects.units.toasts.crewLinkedTitle"), t("projects.units.toasts.crewLinkedBody"));
       setWarning(nextSnapshot.units.find((unit) => unit.id === unitId)?.conflictSummary ?? null);
@@ -407,19 +409,35 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                     const crewDraft = crewDrafts[draftKey] ?? emptyCrewDraft;
                     const crewOptions = department.departmentId ? getCrewOptionsForDepartment(department.departmentId) : [];
                     const canAssign = Boolean(department.departmentId && crewDraft.crewMemberId);
+                    const isCrewFormActive = activeCrewFormKey === draftKey;
 
                     return (
-                      <div key={department.departmentId ?? "unclassified"} className={`project-unit-department-card${department.departmentId ? "" : " is-legacy"}`}>
+                      <div
+                        key={department.departmentId ?? "unclassified"}
+                        className={`project-unit-department-card${department.departmentId ? "" : " is-legacy"}${isCrewFormActive ? " is-assigning" : ""}`}
+                      >
                         <div className="project-unit-department-header">
                           <div className="identity-cell">
                             <span className="identity-title">
                               {department.departmentId ? department.departmentName : t("projects.units.unclassifiedDepartment")}
                             </span>
                             <span className="identity-meta">
+                              <UsersRound size={12} />
                               {t("projects.units.departmentCrewCount", { count: department.crewAssignments.length })}
                             </span>
                           </div>
-                          {!department.departmentId ? <StatusBadge tone="warning">{t("projects.units.legacyBadge")}</StatusBadge> : null}
+                          {department.departmentId ? (
+                            <button
+                              className="ghost-control project-unit-add-crew-button"
+                              onClick={() => setActiveCrewFormKey(isCrewFormActive ? null : draftKey)}
+                              type="button"
+                            >
+                              {isCrewFormActive ? <X size={13} /> : <Plus size={13} />}
+                              <span>{isCrewFormActive ? t("common.cancel") : t("projects.units.linkCrew")}</span>
+                            </button>
+                          ) : (
+                            <StatusBadge tone="warning">{t("projects.units.legacyBadge")}</StatusBadge>
+                          )}
                         </div>
 
                         {department.crewAssignments.length ? (
@@ -450,7 +468,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                           </div>
                         )}
 
-                        {department.departmentId ? (
+                        {department.departmentId && isCrewFormActive ? (
                           <div className="project-unit-crew-form">
                             <div className="action-form-grid">
                               <label className="action-field">
