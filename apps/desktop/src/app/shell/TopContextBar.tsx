@@ -1,5 +1,5 @@
 import { CloudCog, Search, Wifi, WifiOff } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -7,6 +7,7 @@ import { HelpMenu } from "@features/onboarding/HelpMenu";
 import { useConnectivity } from "@shared/hooks/useConnectivity";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
+import { resolveProjectColor } from "@shared/lib/projectColors";
 import type { AppDiagnosticsSnapshot } from "@contracts";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { NotificationsButton } from "./NotificationsTray";
@@ -16,12 +17,21 @@ type TopContextBarProps = {
 };
 
 export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
-  const { scopeChipLabel } = useShellContext();
+  const { activeProject, scopeChipLabel } = useShellContext();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const isOnline = useConnectivity();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot | null>(null);
   const isMountedRef = useRef(true);
+  const projectChipStyle = useMemo(
+    () =>
+      activeProject
+        ? ({
+            "--project-chip-color": resolveProjectColor(activeProject.colorKey),
+          } as CSSProperties)
+        : undefined,
+    [activeProject],
+  );
 
   useEffect(
     () => () => {
@@ -95,7 +105,8 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
 
       {scopeChipLabel ? (
         <div className="top-context-group top-context-group-center">
-          <div className="context-chip context-chip-project">
+          <div className="context-chip context-chip-project" style={projectChipStyle}>
+            {activeProject ? <span aria-hidden="true" className="context-chip-project-dot" /> : null}
             <span>{scopeChipLabel}</span>
           </div>
         </div>
