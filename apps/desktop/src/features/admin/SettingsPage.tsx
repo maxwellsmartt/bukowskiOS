@@ -388,6 +388,22 @@ export const SettingsPage = () => {
   const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [isDeleteUserConfirmOpen, setIsDeleteUserConfirmOpen] = useState(false);
   const [syncRows, setSyncRows] = useState<AppSyncOutboxRow[]>([]);
+  const [usersSnapshotUnavailable, setUsersSnapshotUnavailable] = useState(false);
+
+  const loadUsersSnapshot = async () => {
+    if (!window.bukowskiApp) {
+      return emptyUsersSnapshot;
+    }
+
+    try {
+      const nextUsersSnapshot = await window.bukowskiApp.getUsersSnapshot({ workspaceId: activeWorkspaceId });
+      setUsersSnapshotUnavailable(false);
+      return nextUsersSnapshot;
+    } catch {
+      setUsersSnapshotUnavailable(true);
+      return emptyUsersSnapshot;
+    }
+  };
 
   const loadDiagnostics = async () => {
     if (!window.bukowskiApp) {
@@ -399,7 +415,7 @@ export const SettingsPage = () => {
         window.bukowskiApp.getDiagnostics(),
         window.bukowskiApp.getSupportSnapshot(),
         window.bukowskiApp.getSyncOutboxRows(),
-        window.bukowskiApp.getUsersSnapshot({ workspaceId: activeWorkspaceId }),
+        loadUsersSnapshot(),
       ]);
       setDiagnostics(nextDiagnostics);
       setSupportSnapshot(nextSupportSnapshot);
@@ -451,7 +467,7 @@ export const SettingsPage = () => {
           const [nextSyncRows, nextSupportSnapshot, nextUsersSnapshot] = await Promise.all([
             window.bukowskiApp.getSyncOutboxRows(),
             window.bukowskiApp.getSupportSnapshot(),
-            window.bukowskiApp.getUsersSnapshot({ workspaceId: activeWorkspaceId }),
+            loadUsersSnapshot(),
           ]);
           setSyncRows(nextSyncRows);
           setSupportSnapshot(nextSupportSnapshot);
@@ -875,6 +891,17 @@ export const SettingsPage = () => {
 
           <span className="settings-group-label">{t("settings.team.groups.appAccounts")}</span>
 
+          {usersSnapshotUnavailable ? (
+            <SurfaceCard title={t("settings.team.usersUnavailableTitle", { defaultValue: "Usuarios no disponibles" })}>
+              <p className="surface-card-subtitle">
+                {t("settings.team.usersUnavailableBody", {
+                  defaultValue:
+                    "Tu rol actual no permite administrar usuarios del workspace. El resto de Ajustes sigue disponible.",
+                })}
+              </p>
+            </SurfaceCard>
+          ) : (
+            <>
           <SettingsDisclosure
             title={t("settings.team.usersDisclosure.title")}
             summary={t("settings.team.usersDisclosure.summary", {
@@ -1122,6 +1149,8 @@ export const SettingsPage = () => {
               <RolesPermissionMatrix roles={usersSnapshot.roles} />
             </SurfaceCard>
           </SettingsDisclosure>
+            </>
+          )}
         </div>
       ) : null}
 

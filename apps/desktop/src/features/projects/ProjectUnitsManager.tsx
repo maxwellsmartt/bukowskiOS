@@ -643,93 +643,102 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
         {!units.length ? <div className="empty-state">{t("projects.units.empty")}</div> : null}
       </div>
 
-      {editorMode ? (
-        <div className="project-unit-editor">
-          <div className="surface-card-header">
+    </SurfaceCard>
+
+    {editorMode ? (
+      <ModalShell className="project-unit-modal-shell" onClose={resetEditor} width={920}>
+        <div className="project-unit-modal">
+          <div className="project-unit-modal-header">
             <div>
-              <h3 className="surface-card-title">{editorMode === "create" ? t("projects.units.editor.newTitle") : t("projects.units.editor.editTitle")}</h3>
+              <h3>{editorMode === "create" ? t("projects.units.editor.newTitle") : t("projects.units.editor.editTitle")}</h3>
             </div>
+            <button className="icon-ghost-control" onClick={resetEditor} type="button">
+              <X size={16} />
+            </button>
           </div>
 
-          <div className="action-form-grid">
-            <label className="action-field">
-              <span className="action-field-label">{t("projects.units.fields.code")}</span>
-              <input
-                className="action-field-control"
-                onChange={(event) => setUnitDraft((current) => ({ ...current, code: event.target.value.toUpperCase() }))}
-                value={unitDraft.code}
-              />
-            </label>
+          <div className="project-unit-modal-body project-unit-editor-form">
+            {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
+            <div className="action-form-grid">
+              <label className="action-field">
+                <span className="action-field-label">{t("projects.units.fields.code")}</span>
+                <input
+                  className="action-field-control"
+                  onChange={(event) => setUnitDraft((current) => ({ ...current, code: event.target.value.toUpperCase() }))}
+                  value={unitDraft.code}
+                />
+              </label>
 
-            <label className="action-field">
-              <span className="action-field-label">{t("projects.units.fields.name")}</span>
-              <input
-                className="action-field-control"
-                onChange={(event) => setUnitDraft((current) => ({ ...current, name: event.target.value }))}
-                value={unitDraft.name}
-              />
-            </label>
+              <label className="action-field">
+                <span className="action-field-label">{t("projects.units.fields.name")}</span>
+                <input
+                  className="action-field-control"
+                  onChange={(event) => setUnitDraft((current) => ({ ...current, name: event.target.value }))}
+                  value={unitDraft.name}
+                />
+              </label>
 
-            <label className="action-field">
-              <span className="action-field-label">{t("projects.units.fields.startDate")}</span>
-              <input
-                className="action-field-control"
-                onChange={(event) => setUnitDraft((current) => ({ ...current, startDate: event.target.value }))}
-                type="date"
-                value={unitDraft.startDate}
-              />
-            </label>
+              <label className="action-field">
+                <span className="action-field-label">{t("projects.units.fields.startDate")}</span>
+                <input
+                  className="action-field-control"
+                  onChange={(event) => setUnitDraft((current) => ({ ...current, startDate: event.target.value }))}
+                  type="date"
+                  value={unitDraft.startDate}
+                />
+              </label>
 
-            <label className="action-field">
-              <span className="action-field-label">{t("projects.units.fields.endDate")}</span>
-              <input
-                className="action-field-control"
-                min={unitDraft.startDate || undefined}
-                onChange={(event) => setUnitDraft((current) => ({ ...current, endDate: event.target.value }))}
-                type="date"
-                value={unitDraft.endDate}
-              />
-            </label>
-          </div>
+              <label className="action-field">
+                <span className="action-field-label">{t("projects.units.fields.endDate")}</span>
+                <input
+                  className="action-field-control"
+                  min={unitDraft.startDate || undefined}
+                  onChange={(event) => setUnitDraft((current) => ({ ...current, endDate: event.target.value }))}
+                  type="date"
+                  value={unitDraft.endDate}
+                />
+              </label>
+            </div>
 
-          <details className="detail-disclosure">
-            <summary className="detail-disclosure-summary">{t("projects.units.moreDetails")}</summary>
-            <div className="detail-disclosure-content">
-              <div className="action-form-grid">
-                <label className="action-field">
-                  <span className="action-field-label">{t("projects.units.fields.order")}</span>
-                  <input
-                    className="action-field-control"
-                    inputMode="numeric"
-                    onChange={(event) => setUnitDraft((current) => ({ ...current, sortOrder: event.target.value }))}
-                    value={unitDraft.sortOrder}
-                  />
-                </label>
+            <details className="detail-disclosure">
+              <summary className="detail-disclosure-summary">{t("projects.units.moreDetails")}</summary>
+              <div className="detail-disclosure-content">
+                <div className="action-form-grid">
+                  <label className="action-field">
+                    <span className="action-field-label">{t("projects.units.fields.order")}</span>
+                    <input
+                      className="action-field-control"
+                      inputMode="numeric"
+                      onChange={(event) => setUnitDraft((current) => ({ ...current, sortOrder: event.target.value }))}
+                      value={unitDraft.sortOrder}
+                    />
+                  </label>
 
-                <label className="action-field">
-                  <span className="action-field-label">{t("projects.units.fields.color")}</span>
-                  <ProjectColorSelect
-                    onChange={(nextColorKey) => setUnitDraft((current) => ({ ...current, colorKey: nextColorKey }))}
-                    placeholder={t("projects.units.fields.useProjectColor")}
-                    value={unitDraft.colorKey as ProjectColorKey | ""}
-                  />
-                </label>
+                  <label className="action-field">
+                    <span className="action-field-label">{t("projects.units.fields.color")}</span>
+                    <ProjectColorSelect
+                      onChange={(nextColorKey) => setUnitDraft((current) => ({ ...current, colorKey: nextColorKey }))}
+                      placeholder={t("projects.units.fields.useProjectColor")}
+                      value={unitDraft.colorKey as ProjectColorKey | ""}
+                    />
+                  </label>
 
-                <label className="action-field action-field-wide">
-                  <span className="action-field-label">{t("projects.units.fields.notes")}</span>
-                  <textarea
-                    className="action-field-control action-textarea"
-                    onChange={(event) => setUnitDraft((current) => ({ ...current, notes: event.target.value }))}
-                    rows={3}
-                    value={unitDraft.notes}
-                  />
-                </label>
+                  <label className="action-field action-field-wide">
+                    <span className="action-field-label">{t("projects.units.fields.notes")}</span>
+                    <textarea
+                      className="action-field-control action-textarea"
+                      onChange={(event) => setUnitDraft((current) => ({ ...current, notes: event.target.value }))}
+                      rows={3}
+                      value={unitDraft.notes}
+                    />
+                  </label>
+                </div>
               </div>
-            </div>
-          </details>
+            </details>
+          </div>
 
-          <div className="action-panel-actions">
-            <button className="ghost-control cancel-control" onClick={resetEditor} type="button">
+          <div className="project-unit-modal-actions">
+            <button className="ghost-control project-unit-modal-cancel" onClick={resetEditor} type="button">
               {t("common.cancel")}
             </button>
             <button className="action-primary-button" disabled={isSubmitting} onClick={() => void handleSave()} type="button">
@@ -737,8 +746,8 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
             </button>
           </div>
         </div>
-      ) : null}
-    </SurfaceCard>
+      </ModalShell>
+    ) : null}
 
     {departmentDialogOpen ? (
       <ModalShell className="project-unit-modal-shell" onClose={() => setDepartmentDialogOpen(false)} width={680}>
@@ -868,9 +877,6 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
                           {crewOptions.map((crewMember) => (
                             <option key={crewMember.id} value={crewMember.id}>
                               {crewMember.fullName}
-                              {crewMember.primaryDepartmentId === crewDialogTarget.department.departmentId
-                                ? ` · ${crewMember.roleLabel || t("projects.units.fields.defaultRole")}`
-                                : ` · ${crewMember.primaryDepartment ?? t("projects.units.otherDepartment")}`}
                             </option>
                           ))}
                         </SelectField>

@@ -1,5 +1,5 @@
-import { Archive, ArchiveRestore, Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Archive, ArchiveRestore, Eye, EyeOff, ListFilter, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -15,6 +15,7 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import type { ProjectCardRow, ProjectDeletePreview } from "@contracts";
 
 type LinkedItem = { labelKey: string; count: number };
+type ProjectSidebarSort = "name" | "code" | "startDate" | "incidents";
 
 const buildLinkedItems = (preview: ProjectDeletePreview): LinkedItem[] => {
   const relationSummary = preview.operationalRelationSummary;
@@ -55,6 +56,39 @@ export const ShellProjectsPanel = () => {
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [deletePreview, setDeletePreview] = useState<{ project: ProjectCardRow; preview: ProjectDeletePreview } | null>(null);
   const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
+  const [projectSearch, setProjectSearch] = useState("");
+  const [projectSort, setProjectSort] = useState<ProjectSidebarSort>("name");
+
+  const visibleProjects = useMemo(() => {
+    const query = projectSearch.trim().toLocaleLowerCase();
+    const matchesSearch = (project: ProjectCardRow) => {
+      if (!query) {
+        return true;
+      }
+
+      return [project.name, project.code, project.client, project.productionCompany, project.status, project.departments, project.exposure, project.description]
+        .flatMap((value) => (value ? [value] : []))
+        .some((value) => value.toLocaleLowerCase().includes(query));
+    };
+
+    return [...projects]
+      .filter(matchesSearch)
+      .sort((first, second) => {
+        if (projectSort === "code") {
+          return first.code.localeCompare(second.code, undefined, { sensitivity: "base" });
+        }
+
+        if (projectSort === "startDate") {
+          return (first.startDate ?? "9999-12-31").localeCompare(second.startDate ?? "9999-12-31");
+        }
+
+        if (projectSort === "incidents") {
+          return second.incidentCount - first.incidentCount || first.name.localeCompare(second.name, undefined, { sensitivity: "base" });
+        }
+
+        return first.name.localeCompare(second.name, undefined, { sensitivity: "base" });
+      });
+  }, [projectSearch, projectSort, projects]);
 
   const handleEditProject = (projectId: string) => {
     setActionError(null);
@@ -189,8 +223,33 @@ export const ShellProjectsPanel = () => {
 
       {projectsError || actionError ? <div className="shell-project-error">{projectsError ?? actionError}</div> : null}
 
+      <div className="shell-projects-tools">
+        <label className="shell-project-search">
+          <Search size={12} />
+          <input
+            aria-label={t("shell.projectsPanel.searchAria", { defaultValue: "Buscar proyectos" })}
+            onChange={(event) => setProjectSearch(event.target.value)}
+            placeholder={t("shell.projectsPanel.searchPlaceholder", { defaultValue: "Buscar" })}
+            value={projectSearch}
+          />
+        </label>
+        <label className="shell-project-sort-control">
+          <ListFilter size={12} />
+          <select
+            aria-label={t("shell.projectsPanel.sortAria", { defaultValue: "Ordenar proyectos" })}
+            onChange={(event) => setProjectSort(event.target.value as ProjectSidebarSort)}
+            value={projectSort}
+          >
+            <option value="name">{t("shell.projectsPanel.sortName", { defaultValue: "Nombre" })}</option>
+            <option value="code">{t("shell.projectsPanel.sortCode", { defaultValue: "Código" })}</option>
+            <option value="startDate">{t("shell.projectsPanel.sortStartDate", { defaultValue: "Fecha" })}</option>
+            <option value="incidents">{t("shell.projectsPanel.sortIncidents", { defaultValue: "Incidentes" })}</option>
+          </select>
+        </label>
+      </div>
+
       <div className="shell-project-list">
-        {projects.map((project) => {
+        {visibleProjects.map((project) => {
           const isTimelineHidden = hiddenProjectIdSet.has(project.id);
 
           return (
@@ -284,6 +343,13 @@ export const ShellProjectsPanel = () => {
             </div>
           );
         })}
+        {!visibleProjects.length ? (
+          <div className="shell-project-empty">
+            {projectSearch.trim()
+              ? t("shell.projectsPanel.noSearchResults", { defaultValue: "No hay proyectos que coincidan." })
+              : t("shell.projectsPanel.empty", { defaultValue: "No hay proyectos todavía." })}
+          </div>
+        ) : null}
       </div>
 
       <ProjectSetupWizard
