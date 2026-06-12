@@ -503,6 +503,7 @@ export type ProjectUnitRow = {
   id: string;
   code: string;
   name: string;
+  isPrimary: boolean;
   sortOrder: number;
   status: string;
   statusSource: "derived" | "manual_override";

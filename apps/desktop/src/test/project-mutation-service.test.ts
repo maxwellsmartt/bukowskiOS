@@ -151,7 +151,7 @@ describe("project mutation service", () => {
     cleanup();
   });
 
-  it("creates a project blueprint with a hidden main unit and visible additional units", () => {
+  it("creates a project blueprint with a visible main unit and additional units", () => {
     const { cleanup, database } = createTestDatabase("bukowski-project-blueprint-test");
     const reads = createFoundationReadService(database);
     const mutations = createProjectMutationService(database);
@@ -200,17 +200,22 @@ describe("project mutation service", () => {
     expect(project?.activeUnitCount).toBe(0);
 
     const detail = reads.getProjectDetail(project!.id);
-    expect(detail.units).toHaveLength(1);
-    expect(detail.units[0]?.name).toBe("Second Unit");
+    expect(detail.units).toHaveLength(2);
+    expect(detail.units[0]?.name).toBe("Main Unit");
+    expect(detail.units[0]?.isPrimary).toBe(true);
     expect(detail.units[0]?.crewAssignments).toHaveLength(1);
     expect(detail.units[0]?.unitDepartments).toHaveLength(1);
     expect(detail.units[0]?.unitDepartments[0]?.departmentId).toBe("dept-video");
     expect(detail.units[0]?.unitDepartments[0]?.crewAssignments).toHaveLength(1);
+    expect(detail.units[1]?.name).toBe("Second Unit");
+    expect(detail.units[1]?.isPrimary).toBe(false);
+    expect(detail.units[1]?.crewAssignments).toHaveLength(1);
 
     const timeline = reads.getScheduleTimeline("90d", "week");
     const timelineProject = timeline.projects.find((row) => row.id === project!.id);
-    expect(timelineProject?.units).toHaveLength(1);
-    expect(timelineProject?.units[0]?.name).toBe("Second Unit");
+    expect(timelineProject?.units).toHaveLength(2);
+    expect(timelineProject?.units[0]?.name).toBe("Main Unit");
+    expect(timelineProject?.units[1]?.name).toBe("Second Unit");
 
     cleanup();
   });
@@ -263,6 +268,10 @@ describe("project mutation service", () => {
 
     const createdProject = reads.getProjects().find((project) => project.name === "Delete Me Blueprint");
     expect(createdProject).toBeTruthy();
+    const createdDetail = reads.getProjectDetail(createdProject!.id);
+    const mainUnit = createdDetail.units.find((unit) => unit.isPrimary);
+    expect(mainUnit).toBeTruthy();
+    expect(() => mutations.deleteProjectUnit({ projectId: createdProject!.id, unitId: mainUnit!.id })).toThrow("base unit");
 
     mutations.archiveProject({ projectId: createdProject!.id });
     mutations.deleteProject({ projectId: createdProject!.id, confirmedWithBackup: true });
@@ -454,12 +463,14 @@ describe("project mutation service", () => {
 
     const project = reads.getProjects().find((row) => row.name === "Segmented Unit Setup");
     const detail = reads.getProjectDetail(project!.id);
-    expect(detail.units[0]?.windows).toHaveLength(3);
+    const secondUnit = detail.units.find((unit) => unit.name === "Second Unit");
+    expect(secondUnit?.windows).toHaveLength(3);
 
     const timeline = reads.getScheduleTimeline("90d", "week");
     const timelineProject = timeline.projects.find((row) => row.id === project!.id);
+    const timelineSecondUnit = timelineProject?.units.find((unit) => unit.name === "Second Unit");
     expect(timelineProject?.segments.some((segment) => segment.kind === "preproduction")).toBe(true);
-    expect(timelineProject?.units[0]?.segments).toHaveLength(3);
+    expect(timelineSecondUnit?.segments).toHaveLength(3);
 
     cleanup();
   });

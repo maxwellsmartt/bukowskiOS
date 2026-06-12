@@ -4427,6 +4427,7 @@
     "units": {
       "title": "Units",
       "newUnit": "New unit",
+      "primaryBadge": "Base unit",
       "order": "Order {{order}}",
       "crewLinked_one": "{{count}} crew linked",
       "crewLinked_other": "{{count}} crew linked",

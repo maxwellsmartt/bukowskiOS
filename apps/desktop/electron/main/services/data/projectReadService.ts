@@ -339,7 +339,6 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           FROM projects
           LEFT JOIN clients ON clients.id = projects.client_id
           LEFT JOIN project_units ON project_units.project_id = projects.id
-            AND COALESCE(project_units.is_primary, 0) = 0
           WHERE projects.workspace_id = ?
             AND projects.archived_at IS NULL
           ORDER BY projects.name, project_units.sort_order, project_units.start_date, project_units.name
@@ -957,7 +956,6 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
               SELECT COUNT(*)
               FROM project_units
               WHERE project_units.project_id = projects.id
-                AND COALESCE(project_units.is_primary, 0) = 0
                 AND project_units.status = 'active'
             ), 0) AS active_unit_count
           FROM projects
@@ -1379,6 +1377,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             project_units.id,
             project_units.code,
             project_units.name,
+            project_units.is_primary,
             project_units.sort_order,
             project_units.status,
             project_units.status_source,
@@ -1420,7 +1419,6 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           LEFT JOIN departments assignment_departments ON assignment_departments.id = project_unit_crew_assignments.department_id
           LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
           WHERE project_units.project_id = ?
-            AND COALESCE(project_units.is_primary, 0) = 0
           ORDER BY project_units.sort_order, project_units.start_date, project_units.name, crew_members.full_name
         `,
       )
@@ -1428,6 +1426,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       id: string;
       code: string;
       name: string;
+      is_primary: number;
       sort_order: number;
       status: string;
       status_source: "derived" | "manual_override";
@@ -1462,7 +1461,6 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             SELECT id
             FROM project_units
             WHERE project_id = ?
-              AND COALESCE(is_primary, 0) = 0
           )
           ORDER BY project_unit_id, sort_order, start_date, end_date
         `,
@@ -1498,7 +1496,6 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             JOIN departments ON departments.id = project_unit_departments.department_id
             JOIN project_units ON project_units.id = project_unit_departments.project_unit_id
             WHERE project_units.project_id = ?
-              AND COALESCE(project_units.is_primary, 0) = 0
             UNION
             SELECT
               asset_assignments.project_unit_id,
@@ -1509,7 +1506,6 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             JOIN departments ON departments.id = asset_assignments.department_id
             JOIN project_units ON project_units.id = asset_assignments.project_unit_id
             WHERE project_units.project_id = ?
-              AND COALESCE(project_units.is_primary, 0) = 0
           )
           ORDER BY unit_sort_order, department_name
         `,
@@ -1615,6 +1611,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           id: row.id,
           code: row.code,
           name: row.name,
+          isPrimary: Boolean(row.is_primary),
           sortOrder: row.sort_order,
           status: derived.status,
           statusSource: derived.statusSource,

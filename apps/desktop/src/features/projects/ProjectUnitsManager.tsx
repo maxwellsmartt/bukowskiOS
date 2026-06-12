@@ -336,6 +336,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                   <div className="project-unit-title-row">
                     <span className="shell-project-code-badge">{unit.code}</span>
                     <span className="identity-title">{unit.name}</span>
+                    {unit.isPrimary ? <StatusBadge tone="neutral">{t("projects.units.primaryBadge")}</StatusBadge> : null}
                     <StatusBadge tone={statusTone}>{t(`projects.unitStatuses.${unit.status}`, { defaultValue: unit.status })}</StatusBadge>
                   </div>
                   <span className="identity-meta">
@@ -380,15 +381,17 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                   >
                     <RotateCcw size={12} />
                   </button>
-                  <button
-                    aria-label={t("projects.units.actions.deleteAria", { name: unit.name })}
-                    className="shell-project-action is-danger"
-                    data-tooltip={t("projects.units.actions.delete")}
-                    onClick={() => setPendingUnitAction({ unit, action: "delete" })}
-                    type="button"
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                  {!unit.isPrimary ? (
+                    <button
+                      aria-label={t("projects.units.actions.deleteAria", { name: unit.name })}
+                      className="shell-project-action is-danger"
+                      data-tooltip={t("projects.units.actions.delete")}
+                      onClick={() => setPendingUnitAction({ unit, action: "delete" })}
+                      type="button"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  ) : null}
                 </div>
               </div>
 

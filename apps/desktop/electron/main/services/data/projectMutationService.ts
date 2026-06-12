@@ -766,6 +766,7 @@ const getProjectUnitRow = (db: DatabaseSync, unitId: string, projectId: string) 
           project_id,
           code,
           name,
+          is_primary,
           sort_order,
           status,
           status_source,
@@ -785,6 +786,7 @@ const getProjectUnitRow = (db: DatabaseSync, unitId: string, projectId: string) 
         project_id: string;
         code: string;
         name: string;
+        is_primary: number;
         sort_order: number;
         status: string;
         status_source: "derived" | "manual_override";
@@ -2195,9 +2197,13 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
 
   deleteProjectUnit(input: DeleteProjectUnitInput) {
     const project = ensureProjectExists(db, input.projectId);
-    ensureProjectUnitExists(db, input.projectId, input.unitId);
+    const unit = ensureProjectUnitExists(db, input.projectId, input.unitId);
     const relationCount = getProjectUnitRelationCount(db, input.unitId);
     const now = new Date().toISOString();
+
+    if (unit.is_primary) {
+      throw new Error("Main Unit is the base unit for this project and cannot be deleted.");
+    }
 
     if (relationCount > 0) {
       throw new Error("This unit already has linked operational records and cannot be deleted yet.");
