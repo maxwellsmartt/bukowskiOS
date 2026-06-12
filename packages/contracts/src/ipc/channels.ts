@@ -168,6 +168,7 @@ export const ipcChannels = {
     updateUnit: "bukowskiProjects:updateUnit",
     deleteUnit: "bukowskiProjects:deleteUnit",
     addDepartmentToUnit: "bukowskiProjects:addDepartmentToUnit",
+    removeDepartmentFromUnit: "bukowskiProjects:removeDepartmentFromUnit",
     assignCrewToUnit: "bukowskiProjects:assignCrewToUnit",
     unassignCrewFromUnit: "bukowskiProjects:unassignCrewFromUnit",
   },

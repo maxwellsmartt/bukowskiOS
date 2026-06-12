@@ -4476,6 +4476,8 @@
         "cancelAria": "Cancelar {{name}}",
         "delete": "Eliminar unidad",
         "deleteAria": "Eliminar {{name}}",
+        "removeDepartment": "Eliminar departamento",
+        "removeDepartmentAria": "Eliminar {{department}} de {{unit}}",
         "removeCrewAria": "Remover a {{name}} de esta unidad"
       },
       "fields": {
@@ -4508,7 +4510,10 @@
         "deleteBody": "Solo funciona si la unidad no tiene registros operativos vinculados. Esta acción no se puede deshacer.",
         "wrapBody": "La fecha de cierre de la unidad se pondrá en hoy.",
         "deleteConfirm": "Eliminar unidad",
-        "wrapConfirm": "Marcar cerrada"
+        "wrapConfirm": "Marcar cerrada",
+        "removeDepartmentTitle": "¿Eliminar {{department}} de {{unit}}?",
+        "removeDepartmentBody": "Solo se puede eliminar si el departamento no tiene crew ni equipos asignados en esta unidad.",
+        "removeDepartmentConfirm": "Eliminar departamento"
       },
       "toasts": {
         "done": "Listo",
@@ -4523,6 +4528,9 @@
         "departmentAddedTitle": "Departamento añadido",
         "departmentAddedBody": "La unidad ya puede recibir crew en ese departamento.",
         "departmentAddFailed": "No pudimos añadir el departamento.",
+        "departmentRemovedTitle": "Departamento eliminado",
+        "departmentRemovedBody": "El departamento ya no aparece en esta unidad.",
+        "departmentRemoveFailed": "No pudimos eliminar el departamento.",
         "crewLinkedTitle": "Crew vinculado",
         "crewLinkedBody": "La persona ya está asignada a esta unidad.",
         "assignCrewFailed": "No se pudo asignar el crew a la unidad.",

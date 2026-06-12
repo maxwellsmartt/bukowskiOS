@@ -84,6 +84,7 @@ import type {
   PreviewCatalogCsvImportInput,
   DeleteProjectInput,
   DeleteProjectUnitInput,
+  RemoveDepartmentFromProjectUnitInput,
   DraftRunFromChatResult,
   FinanceCostLinkRow,
   FinanceEntryListQuery,
@@ -369,6 +370,7 @@ declare global {
       updateUnit: (input: UpdateProjectUnitInput) => Promise<ProjectDetailSnapshot>;
       removeUnit: (input: DeleteProjectUnitInput) => Promise<ProjectDetailSnapshot>;
       addDepartmentToUnit: (input: AddDepartmentToProjectUnitInput) => Promise<ProjectDetailSnapshot>;
+      removeDepartmentFromUnit: (input: RemoveDepartmentFromProjectUnitInput) => Promise<ProjectDetailSnapshot>;
       assignCrewToUnit: (input: AssignCrewToProjectUnitInput) => Promise<ProjectDetailSnapshot>;
       unassignCrewFromUnit: (input: UnassignCrewFromProjectUnitInput) => Promise<ProjectDetailSnapshot>;
     };

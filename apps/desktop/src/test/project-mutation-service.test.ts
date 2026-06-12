@@ -152,6 +152,21 @@ describe("project mutation service", () => {
     expect(refreshedUnit?.unitDepartments).toHaveLength(1);
     expect(refreshedUnit?.unitDepartments[0]?.departmentId).toBe("dept-video");
 
+    mutations.removeDepartmentFromProjectUnit({
+      projectId: "project-studio",
+      unitId: createdUnit!.id,
+      departmentId: "dept-video",
+    });
+    detail = reads.getProjectDetail("project-studio");
+    refreshedUnit = detail.units.find((unit) => unit.id === createdUnit!.id);
+    expect(refreshedUnit?.unitDepartments).toHaveLength(0);
+
+    mutations.addDepartmentToProjectUnit({
+      projectId: "project-studio",
+      unitId: createdUnit!.id,
+      departmentId: "dept-video",
+    });
+
     mutations.assignCrewToProjectUnit({
       projectId: "project-studio",
       unitId: createdUnit!.id,
@@ -166,6 +181,13 @@ describe("project mutation service", () => {
     refreshedUnit = detail.units.find((unit) => unit.id === createdUnit!.id);
     expect(refreshedUnit?.unitDepartments[0]?.crewAssignments).toHaveLength(1);
     expect(refreshedUnit?.unitDepartments[0]?.crewAssignments[0]?.roleLabel).toBe("VTR Operator");
+    expect(() =>
+      mutations.removeDepartmentFromProjectUnit({
+        projectId: "project-studio",
+        unitId: createdUnit!.id,
+        departmentId: "dept-video",
+      }),
+    ).toThrow("linked crew or equipment");
 
     cleanup();
   });

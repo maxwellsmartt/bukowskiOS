@@ -18,6 +18,7 @@ import {
   assignCrewToProjectUnit,
   createProjectUnit,
   deleteProjectUnit,
+  removeDepartmentFromProjectUnit,
   unassignCrewFromProjectUnit,
   updateProjectUnit,
 } from "./useProjectsData";
@@ -112,6 +113,10 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
   const [pendingUnitAction, setPendingUnitAction] = useState<{
     unit: ProjectDetailSnapshot["units"][number];
     action: "mark_wrapped" | "delete";
+  } | null>(null);
+  const [pendingDepartmentAction, setPendingDepartmentAction] = useState<{
+    unit: ProjectDetailSnapshot["units"][number];
+    department: ProjectDetailSnapshot["units"][number]["unitDepartments"][number];
   } | null>(null);
 
   const editingUnit = useMemo(
@@ -336,6 +341,31 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
     }
   };
 
+  const handleRemoveDepartment = async (
+    unit: ProjectDetailSnapshot["units"][number],
+    department: ProjectDetailSnapshot["units"][number]["unitDepartments"][number],
+  ) => {
+    if (!department.departmentId) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await removeDepartmentFromProjectUnit({
+        projectId,
+        unitId: unit.id,
+        departmentId: department.departmentId,
+      });
+      await Promise.resolve(onChanged());
+      setError(null);
+      toast.success(t("projects.units.toasts.departmentRemovedTitle"), t("projects.units.toasts.departmentRemovedBody"));
+    } catch (nextError) {
+      setError(getUserFacingErrorMessage(nextError, t("projects.units.toasts.departmentRemoveFailed")));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleAssignCrewBatch = async () => {
     if (!crewDialogTarget?.department.departmentId) {
       return;
@@ -426,7 +456,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
       title={t("projects.units.title")}
       aside={
         <div className="surface-card-action-row">
-          <button className="ghost-control" disabled={!units.length || !departments.length} onClick={openDepartmentDialog} type="button">
+          <button className="action-primary-button project-unit-secondary-action" disabled={!units.length || !departments.length} onClick={openDepartmentDialog} type="button">
             <Plus size={14} />
             <span>{t("projects.units.addDepartment")}</span>
           </button>
@@ -455,7 +485,6 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
                   <div className="project-unit-title-row">
                     <span className="shell-project-code-badge">{unit.code}</span>
                     <span className="identity-title">{unit.name}</span>
-                    {unit.isPrimary ? <StatusBadge tone="neutral">{t("projects.units.primaryBadge")}</StatusBadge> : null}
                     <StatusBadge tone={statusTone}>{t(`projects.unitStatuses.${unit.status}`, { defaultValue: unit.status })}</StatusBadge>
                   </div>
                   <span className="identity-meta">
@@ -537,14 +566,28 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
                             </span>
                           </div>
                           {department.departmentId ? (
-                            <button
-                              className="ghost-control project-unit-add-crew-button"
-                              onClick={() => openCrewDialog(unit, department)}
-                              type="button"
-                            >
-                              <Plus size={13} />
-                              <span>{t("projects.units.linkCrew")}</span>
-                            </button>
+                            <div className="project-unit-department-actions">
+                              <button
+                                className="ghost-control project-unit-add-crew-button"
+                                onClick={() => openCrewDialog(unit, department)}
+                                type="button"
+                              >
+                                <Plus size={13} />
+                                <span>{t("projects.units.linkCrew")}</span>
+                              </button>
+                              <button
+                                aria-label={t("projects.units.actions.removeDepartmentAria", {
+                                  department: department.departmentName,
+                                  unit: unit.name,
+                                })}
+                                className="shell-project-action is-danger project-unit-visible-action"
+                                data-tooltip={t("projects.units.actions.removeDepartment")}
+                                onClick={() => setPendingDepartmentAction({ unit, department })}
+                                type="button"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                           ) : (
                             <StatusBadge tone="warning">{t("projects.units.legacyBadge")}</StatusBadge>
                           )}
@@ -753,7 +796,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
           </div>
 
           <div className="project-unit-modal-actions">
-            <button className="ghost-control" onClick={() => setDepartmentDialogOpen(false)} type="button">
+            <button className="action-danger-button project-unit-modal-cancel" onClick={() => setDepartmentDialogOpen(false)} type="button">
               {t("common.cancel")}
             </button>
             <button className="action-primary-button" disabled={!canAddDepartment || isSubmitting} onClick={() => void handleAddDepartment()} type="button">
@@ -876,7 +919,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
           </div>
 
           <div className="project-unit-modal-actions">
-            <button className="ghost-control" onClick={() => setCrewDialogTarget(null)} type="button">
+            <button className="action-danger-button project-unit-modal-cancel" onClick={() => setCrewDialogTarget(null)} type="button">
               {t("common.cancel")}
             </button>
             <button className="action-primary-button" disabled={!canAssignCrewBatch || isSubmitting} onClick={() => void handleAssignCrewBatch()} type="button">
@@ -911,6 +954,27 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
           await runUnitAction(next.unit, next.action);
         }}
         onCancel={() => setPendingUnitAction(null)}
+      />
+    ) : null}
+
+    {pendingDepartmentAction ? (
+      <ConfirmDialog
+        isOpen
+        tone="danger"
+        title={t("projects.units.confirm.removeDepartmentTitle", {
+          department: pendingDepartmentAction.department.departmentName,
+          unit: pendingDepartmentAction.unit.name,
+        })}
+        body={t("projects.units.confirm.removeDepartmentBody")}
+        confirmLabel={t("projects.units.confirm.removeDepartmentConfirm")}
+        cancelLabel={t("common.cancel")}
+        isSubmitting={isSubmitting}
+        onConfirm={async () => {
+          const next = pendingDepartmentAction;
+          setPendingDepartmentAction(null);
+          await handleRemoveDepartment(next.unit, next.department);
+        }}
+        onCancel={() => setPendingDepartmentAction(null)}
       />
     ) : null}
     </>

@@ -11241,6 +11241,17 @@ button.timeline-signal-chip:focus-visible {
   flex-wrap: wrap;
 }
 
+.project-unit-secondary-action {
+  background: rgba(154, 194, 183, 0.12);
+  border-color: rgba(154, 194, 183, 0.26);
+  color: rgba(223, 238, 234, 0.94);
+}
+
+.project-unit-secondary-action:hover:not(:disabled) {
+  background: rgba(154, 194, 183, 0.18);
+  border-color: rgba(154, 194, 183, 0.34);
+}
+
 .project-unit-card {
   display: flex;
   flex-direction: column;
@@ -11264,6 +11275,28 @@ button.timeline-signal-chip:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.project-unit-header .shell-project-item-actions {
+  opacity: 1;
+  transform: none;
+}
+
+.project-unit-header .shell-project-action,
+.project-unit-visible-action {
+  width: 28px;
+  height: 28px;
+  border-color: rgba(255, 255, 255, 0.055);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.018);
+  color: rgba(190, 200, 214, 0.86);
+}
+
+.project-unit-header .shell-project-action:hover,
+.project-unit-visible-action:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.052);
+  color: var(--text-primary);
 }
 
 .project-unit-title-row {
@@ -11329,6 +11362,12 @@ button.timeline-signal-chip:focus-visible {
 
 .project-unit-department-header {
   align-items: flex-start;
+}
+
+.project-unit-department-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .project-unit-department-header .identity-meta {
@@ -11447,6 +11486,19 @@ button.timeline-signal-chip:focus-visible {
   justify-content: flex-end;
   border-top: 1px solid var(--border-subtle);
   border-bottom: 0;
+}
+
+.project-unit-modal-cancel {
+  min-height: 34px;
+  border-color: rgba(227, 113, 113, 0.28);
+  background: rgba(214, 74, 74, 0.78);
+  color: #fff;
+}
+
+.project-unit-modal-cancel:hover:not(:disabled) {
+  border-color: rgba(255, 180, 180, 0.32);
+  background: rgba(232, 88, 88, 0.92);
+  color: #fff;
 }
 
 .project-unit-crew-batch-list {

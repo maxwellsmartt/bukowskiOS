@@ -127,6 +127,7 @@ import {
   renumberQuoteSchema,
   recordRuntimeErrorSchema,
   reportIncidentSchema,
+  removeDepartmentFromProjectUnitSchema,
   resolveIncidentSchema,
   returnPackingSlipItemsSchema,
   importCatalogCsvSchema,
@@ -212,6 +213,7 @@ import type {
   ExportCatalogCsvInput,
   DeleteProjectInput,
   DeleteProjectUnitInput,
+  RemoveDepartmentFromProjectUnitInput,
   FinanceEntryListQuery,
   CollaboratorFeeListQuery,
   CollaboratorFeeMutationResult,
@@ -280,6 +282,7 @@ type RegisterFoundationIpcOptions = {
   };
   projectMutations: {
     addDepartmentToProjectUnit: (input: AddDepartmentToProjectUnitInput) => void;
+    removeDepartmentFromProjectUnit: (input: RemoveDepartmentFromProjectUnitInput) => void;
     createProject: (input: CreateProjectInput) => void;
     createProjectBlueprint: (input: CreateProjectBlueprintInput) => { projectId: string };
     updateProject: (input: UpdateProjectInput) => void;
@@ -1702,6 +1705,11 @@ export const registerFoundationIpc = ({
   safeHandle(ipcChannels.projects.addDepartmentToUnit, addDepartmentToProjectUnitSchema, async (_event, input) => {
     const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "add project unit departments", "write", "projects.manage");
     projectMutations.addDepartmentToProjectUnit(input);
+    return getProjectDetailForWorkspace(workspaceId, input.projectId);
+  });
+  safeHandle(ipcChannels.projects.removeDepartmentFromUnit, removeDepartmentFromProjectUnitSchema, async (_event, input) => {
+    const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "remove project unit departments", "write", "projects.manage");
+    projectMutations.removeDepartmentFromProjectUnit(input);
     return getProjectDetailForWorkspace(workspaceId, input.projectId);
   });
   safeHandle(ipcChannels.projects.assignCrewToUnit, assignCrewToProjectUnitSchema, async (_event, input) => {

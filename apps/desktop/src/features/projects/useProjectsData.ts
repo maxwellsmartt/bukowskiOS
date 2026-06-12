@@ -14,6 +14,7 @@ import type {
   ImportCatalogCsvInput,
   PreviewCatalogCsvImportInput,
   DeleteProjectUnitInput,
+  RemoveDepartmentFromProjectUnitInput,
   ProjectDeletePreview,
   ProjectCreationConflictsSnapshot,
   ProjectListQuery,
@@ -276,6 +277,16 @@ export const addDepartmentToProjectUnit = async (input: AddDepartmentToProjectUn
   }
 
   return window.bukowskiProjects.addDepartmentToUnit(input);
+};
+
+export const removeDepartmentFromProjectUnit = async (
+  input: RemoveDepartmentFromProjectUnitInput,
+): Promise<ProjectDetailSnapshot> => {
+  if (!window.bukowskiProjects) {
+    throw new Error("Projects bridge unavailable");
+  }
+
+  return window.bukowskiProjects.removeDepartmentFromUnit(input);
 };
 
 export const assignCrewToProjectUnit = async (input: AssignCrewToProjectUnitInput): Promise<ProjectDetailSnapshot> => {

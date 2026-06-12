@@ -101,6 +101,7 @@ import type {
   PreviewCatalogCsvImportInput,
   DeleteProjectInput,
   DeleteProjectUnitInput,
+  RemoveDepartmentFromProjectUnitInput,
   FinanceEntryListQuery,
   CollaboratorFeeListQuery,
   CollaboratorFeeRow,
@@ -525,6 +526,8 @@ const bukowskiProjects = {
     ipcRenderer.invoke(ipcChannels.projects.deleteUnit, input) as Promise<ProjectDetailSnapshot>,
   addDepartmentToUnit: (input: AddDepartmentToProjectUnitInput) =>
     ipcRenderer.invoke(ipcChannels.projects.addDepartmentToUnit, input) as Promise<ProjectDetailSnapshot>,
+  removeDepartmentFromUnit: (input: RemoveDepartmentFromProjectUnitInput) =>
+    ipcRenderer.invoke(ipcChannels.projects.removeDepartmentFromUnit, input) as Promise<ProjectDetailSnapshot>,
   assignCrewToUnit: (input: AssignCrewToProjectUnitInput) =>
     ipcRenderer.invoke(ipcChannels.projects.assignCrewToUnit, input) as Promise<ProjectDetailSnapshot>,
   unassignCrewFromUnit: (input: UnassignCrewFromProjectUnitInput) =>

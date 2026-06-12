@@ -4472,6 +4472,8 @@
         "cancelAria": "Cancel {{name}}",
         "delete": "Delete unit",
         "deleteAria": "Delete {{name}}",
+        "removeDepartment": "Remove department",
+        "removeDepartmentAria": "Remove {{department}} from {{unit}}",
         "removeCrewAria": "Remove {{name}} from this unit"
       },
       "fields": {
@@ -4504,7 +4506,10 @@
         "deleteBody": "This only works if the unit has no linked operational records. Action cannot be undone.",
         "wrapBody": "The unit's end date will be set to today.",
         "deleteConfirm": "Delete unit",
-        "wrapConfirm": "Mark wrapped"
+        "wrapConfirm": "Mark wrapped",
+        "removeDepartmentTitle": "Remove {{department}} from {{unit}}?",
+        "removeDepartmentBody": "This only works when the department has no crew or equipment assigned in this unit.",
+        "removeDepartmentConfirm": "Remove department"
       },
       "toasts": {
         "done": "Done",
@@ -4519,6 +4524,9 @@
         "departmentAddedTitle": "Department added",
         "departmentAddedBody": "This unit can now receive crew in that department.",
         "departmentAddFailed": "Unable to add department.",
+        "departmentRemovedTitle": "Department removed",
+        "departmentRemovedBody": "This department no longer appears in the unit.",
+        "departmentRemoveFailed": "Unable to remove department.",
         "crewLinkedTitle": "Crew linked",
         "crewLinkedBody": "Member is now assigned to this unit.",
         "assignCrewFailed": "Unable to assign crew member to unit.",

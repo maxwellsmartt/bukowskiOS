@@ -84,6 +84,12 @@ export type AddDepartmentToProjectUnitInput = {
   departmentId: string;
 };
 
+export type RemoveDepartmentFromProjectUnitInput = {
+  projectId: string;
+  unitId: string;
+  departmentId: string;
+};
+
 export type AssignCrewToProjectUnitInput = {
   projectId: string;
   unitId: string;

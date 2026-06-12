@@ -9,6 +9,7 @@ import type {
   CreateProjectUnitInput,
   DeleteProjectInput,
   DeleteProjectUnitInput,
+  RemoveDepartmentFromProjectUnitInput,
   UnarchiveProjectInput,
   UnassignCrewFromProjectUnitInput,
   UpdateProjectInput,
@@ -2258,6 +2259,48 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
         unitId: input.unitId,
         departmentId: input.departmentId,
         operation: "add_unit_department",
+      },
+    });
+  },
+
+  removeDepartmentFromProjectUnit(input: RemoveDepartmentFromProjectUnitInput) {
+    const project = ensureProjectExists(db, input.projectId);
+    ensureProjectUnitExists(db, input.projectId, input.unitId);
+    ensureProjectUnitDepartmentExists(db, input.unitId, input.departmentId);
+    const now = new Date().toISOString();
+
+    const relationCount = db
+      .prepare(
+        `
+          SELECT
+            (SELECT COUNT(*) FROM project_unit_crew_assignments WHERE project_unit_id = ? AND department_id = ?) AS crew_count,
+            (SELECT COUNT(*) FROM asset_assignments WHERE project_unit_id = ? AND department_id = ?) AS asset_count
+        `,
+      )
+      .get(input.unitId, input.departmentId, input.unitId, input.departmentId) as { crew_count: number; asset_count: number };
+
+    if ((relationCount.crew_count ?? 0) > 0 || (relationCount.asset_count ?? 0) > 0) {
+      throw new Error("This department already has linked crew or equipment. Remove those assignments before deleting it.");
+    }
+
+    db.prepare(
+      `
+        DELETE FROM project_unit_departments
+        WHERE project_unit_id = ?
+          AND department_id = ?
+      `,
+    ).run(input.unitId, input.departmentId);
+
+    enqueueOperationalSnapshotOutbox(db, {
+      workspaceId: project.workspace_id,
+      entityType: "project",
+      entityId: input.projectId,
+      updatedAt: now,
+      payload: {
+        projectId: input.projectId,
+        unitId: input.unitId,
+        departmentId: input.departmentId,
+        operation: "remove_unit_department",
       },
     });
   },
