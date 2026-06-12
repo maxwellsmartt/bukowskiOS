@@ -15,7 +15,7 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import type { ProjectCardRow, ProjectDeletePreview } from "@contracts";
 
 type LinkedItem = { labelKey: string; count: number };
-type ProjectSidebarSort = "name" | "code" | "startDate" | "incidents";
+type ProjectSidebarSort = "name" | "code" | "startDate" | "createdAt" | "updatedAt" | "incidents";
 
 const buildLinkedItems = (preview: ProjectDeletePreview): LinkedItem[] => {
   const relationSummary = preview.operationalRelationSummary;
@@ -80,6 +80,14 @@ export const ShellProjectsPanel = () => {
 
         if (projectSort === "startDate") {
           return (first.startDate ?? "9999-12-31").localeCompare(second.startDate ?? "9999-12-31");
+        }
+
+        if (projectSort === "createdAt") {
+          return (second.createdAt ?? "").localeCompare(first.createdAt ?? "");
+        }
+
+        if (projectSort === "updatedAt") {
+          return (second.updatedAt ?? "").localeCompare(first.updatedAt ?? "");
         }
 
         if (projectSort === "incidents") {
@@ -243,6 +251,8 @@ export const ShellProjectsPanel = () => {
             <option value="name">{t("shell.projectsPanel.sortName", { defaultValue: "Nombre" })}</option>
             <option value="code">{t("shell.projectsPanel.sortCode", { defaultValue: "Código" })}</option>
             <option value="startDate">{t("shell.projectsPanel.sortStartDate", { defaultValue: "Fecha" })}</option>
+            <option value="createdAt">{t("shell.projectsPanel.sortCreatedAt", { defaultValue: "Fecha de creación" })}</option>
+            <option value="updatedAt">{t("shell.projectsPanel.sortUpdatedAt", { defaultValue: "Fecha de actualización" })}</option>
             <option value="incidents">{t("shell.projectsPanel.sortIncidents", { defaultValue: "Incidentes" })}</option>
           </select>
         </label>

@@ -914,6 +914,8 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             projects.preproduction_start_date,
             projects.preproduction_end_date,
             projects.color_key,
+            projects.created_at,
+            projects.updated_at,
             COALESCE(projects.description, '—') AS description,
             COALESCE((
               SELECT group_concat(name, ', ')
@@ -939,8 +941,6 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
               FROM incidents
               WHERE incidents.project_id = projects.id
             ), 0) AS exposure,
-            projects.created_at,
-            projects.updated_at,
             COALESCE((
               SELECT COUNT(*)
               FROM asset_current_state
@@ -1026,7 +1026,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
     return deps.sortRows(
       mappedRows,
       deps.resolveProjectComparator(query.sortBy ?? deps.defaultProjectListQuery.sortBy, query.sortDirection ?? deps.defaultProjectListQuery.sortDirection),
-    ).map(({ exposureValue: _exposureValue, createdAt: _createdAt, updatedAt: _updatedAt, ...row }) => row);
+    ).map(({ exposureValue: _exposureValue, ...row }) => row);
   },
 
   getProjectDeletePreview(projectId: string): ProjectDeletePreview {
@@ -1132,6 +1132,8 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             projects.preproduction_start_date,
             projects.preproduction_end_date,
             projects.color_key,
+            projects.created_at,
+            projects.updated_at,
             COALESCE(projects.description, '—') AS description,
             COALESCE((
               SELECT group_concat(name, ', ')
@@ -1197,6 +1199,8 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           preproduction_start_date: string | null;
           preproduction_end_date: string | null;
           color_key: string | null;
+          created_at: string | null;
+          updated_at: string | null;
           description: string;
           departments: string;
           exposure: number;
@@ -1735,6 +1739,8 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         incidentCount: project.incident_count,
         activeUnitCount: timelineSummary.activeUnits,
         description: project.description,
+        createdAt: project.created_at,
+        updatedAt: project.updated_at,
       },
       schedule: {
         startDate: project.start_date,

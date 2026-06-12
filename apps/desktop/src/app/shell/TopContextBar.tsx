@@ -1,4 +1,4 @@
-import { CloudCog, Search, Wifi, WifiOff } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CloudCog, CloudOff, RefreshCw, Search, Wifi, WifiOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -93,8 +93,18 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const syncState = useMemo(() => {
     if (!diagnostics) {
       return {
-        label: t("shell.topBar.syncIdle"),
-        className: "sync-control-idle",
+        label: t("shell.topBar.syncPopover.noSync", { defaultValue: "Sin sync confirmado" }),
+        className: "sync-control-missing",
+        icon: CloudOff,
+        badge: null as number | null,
+      };
+    }
+
+    if (!diagnostics.lastSyncRunAt) {
+      return {
+        label: t("shell.topBar.syncPopover.noSync", { defaultValue: "Sin sync confirmado" }),
+        className: "sync-control-missing",
+        icon: CloudOff,
         badge: null as number | null,
       };
     }
@@ -105,7 +115,8 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
           diagnostics.syncOutboxFailedCount > 0
             ? t("shell.topBar.syncFailedWithCount", { count: diagnostics.syncOutboxFailedCount })
             : t("shell.topBar.syncFailed"),
-        className: "sync-control-failed",
+        className: "sync-control-review",
+        icon: AlertTriangle,
         badge: diagnostics.syncOutboxFailedCount,
       };
     }
@@ -115,7 +126,8 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     if (queuedCount > 0) {
       return {
         label: t("shell.topBar.syncing", { count: queuedCount }),
-        className: "sync-control-active",
+        className: "sync-control-review",
+        icon: AlertTriangle,
         badge: queuedCount,
       };
     }
@@ -123,9 +135,28 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     return {
       label: t("shell.topBar.upToDate"),
       className: "sync-control-healthy",
+      icon: CheckCircle2,
       badge: null as number | null,
     };
   }, [diagnostics, t]);
+  const SyncStatusIcon = syncState.icon;
+
+  const refreshDiagnostics = async () => {
+    if (!window.bukowskiApp) {
+      return;
+    }
+
+    try {
+      const nextDiagnostics = await window.bukowskiApp.getDiagnostics();
+      if (isMountedRef.current) {
+        setDiagnostics(nextDiagnostics);
+      }
+    } catch {
+      if (isMountedRef.current) {
+        setDiagnostics(null);
+      }
+    }
+  };
 
   const formatSyncDate = (value: string | null | undefined) => {
     if (!value) {
@@ -197,7 +228,12 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
             className={`icon-ghost-control sync-control ${syncState.className}`}
             data-tooltip={syncPopoverOpen ? undefined : syncState.label}
             onClick={() => {
-              setSyncPopoverOpen((current) => !current);
+              setSyncPopoverOpen((current) => {
+                if (!current) {
+                  void refreshDiagnostics();
+                }
+                return !current;
+              });
               setSyncActionError(null);
             }}
             type="button"
@@ -213,7 +249,9 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
                   <span className="sync-popover-kicker">{t("shell.topBar.syncPopover.title", { defaultValue: "Sincronización" })}</span>
                   <strong>{syncState.label}</strong>
                 </div>
-                <span className={`sync-popover-status ${syncState.className}`} />
+                <span className={`sync-popover-status ${syncState.className}`}>
+                  <SyncStatusIcon size={17} />
+                </span>
               </div>
 
               <div className="sync-popover-grid">
@@ -231,7 +269,8 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
               {syncActionError ? <p className="sync-popover-error">{syncActionError}</p> : null}
 
               <div className="sync-popover-actions">
-                <button className="ghost-control" disabled={isRunningSync} onClick={() => void handleRunSync()} type="button">
+                <button className="action-primary-button sync-popover-sync-button" disabled={isRunningSync} onClick={() => void handleRunSync()} type="button">
+                  <RefreshCw size={13} className={isRunningSync ? "is-spinning" : undefined} />
                   {isRunningSync
                     ? t("shell.topBar.syncPopover.syncing", { defaultValue: "Sincronizando" })
                     : t("shell.topBar.syncPopover.syncNow", { defaultValue: "Sincronizar" })}

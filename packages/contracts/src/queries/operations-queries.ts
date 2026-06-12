@@ -171,6 +171,8 @@ export type ProjectCardRow = {
   incidentCount: number;
   activeUnitCount: number;
   description: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 };
 
 export type ProjectSortField =
