@@ -431,7 +431,6 @@ export const ProjectBudgetPage = () => {
           <div className="project-budget-command-copy">
             <span>{t("projects.budget.command.eyebrow")}</span>
             <strong>{data.project.name}</strong>
-            <p>{t("projects.budget.command.body")}</p>
           </div>
 
           <div className="project-budget-command-metrics">
@@ -558,7 +557,6 @@ export const ProjectBudgetPage = () => {
                   })
                 : t("projects.budget.command.targetHint")}
             </span>
-            <span>{cloudEnabled ? t("projects.budget.command.syncCloud") : t("projects.budget.command.syncLocal")}</span>
           </div>
         </section>
 

@@ -371,7 +371,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   };
 
   return (
-    <div className={`page-stack packing-page-stack${isProjectMode ? "" : " packing-page-stack--fill"}`}>
+    <div className="page-stack packing-page-stack packing-page-stack--fill">
       <SectionHeader
         title={isProjectMode ? t("packing.titleProject") : t("packing.title")}
       />
@@ -384,7 +384,6 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
           <div className="project-packing-command-copy">
             <span>{t("packing.projectCommand.eyebrow")}</span>
             <strong>{projectName ?? t("packing.projectCommand.fallbackName")}</strong>
-            <p>{t("packing.projectCommand.body")}</p>
           </div>
 
           <div className="project-packing-command-metrics">
@@ -464,7 +463,6 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
 
           <div className="project-packing-command-footnote">
             <span>{t("packing.projectCommand.selectionHint", { count: selectedRowIds.length })}</span>
-            <span>{t("packing.projectCommand.filterHint")}</span>
           </div>
         </section>
       ) : null}

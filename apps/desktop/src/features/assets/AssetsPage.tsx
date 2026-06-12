@@ -1740,7 +1740,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           <div className="project-assets-command-copy">
             <span>{t("assets.projectInventory.eyebrow")}</span>
             <strong>{projectName ?? t("assets.projectInventory.fallbackName")}</strong>
-            <p>{t("assets.projectInventory.body")}</p>
           </div>
 
           <div className="project-assets-command-metrics">
@@ -2417,7 +2416,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             persistKey={isProjectMode ? "project-assets-registry-v2" : "assets-registry-v2"}
             pruneSelectionOnRowsChange={false}
             rows={assets}
-            shellClassName="table-shell-wide-scroll"
+            shellClassName="table-shell-wide-scroll table-shell-fill"
             selectable
             selectedRowIds={selectedRowIds}
             sortState={

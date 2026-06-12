@@ -28,6 +28,8 @@ type ProjectDetailPanelProps = {
   onIncidentCreated: () => void | Promise<void>;
 };
 
+const technicalProjectPlaceholders = new Set(["project shell placeholder for upcoming inventory and staffing flows."]);
+
 export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }: ProjectDetailPanelProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -69,6 +71,11 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
 
   const project = data.project;
   const canCloseProject = project.status !== "Wrapped";
+  const projectDescription = (project.description ?? "").trim();
+  const displayProjectDescription =
+    projectDescription && !isPlaceholderValue(projectDescription) && !technicalProjectPlaceholders.has(projectDescription.toLowerCase())
+      ? projectDescription
+      : undefined;
   const operationalSignals = [
     {
       label: t("projects.detail.signals.schedule"),
@@ -168,7 +175,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
             <StatusBadge tone={projectStatusTone(project.status)}>{t(`projects.statuses.${project.status}`, { defaultValue: project.status })}</StatusBadge>
           </span>
         }
-        subtitle={project.description}
+        subtitle={displayProjectDescription}
         aside={
           <div className="project-detail-header-actions">
             <button

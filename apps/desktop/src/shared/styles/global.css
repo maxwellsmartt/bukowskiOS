@@ -5739,7 +5739,19 @@ button.project-incidents-command-metric {
 }
 
 .incident-filter-chip {
+  gap: 8px;
   min-height: 28px;
+}
+
+.incident-filter-chip strong {
+  min-width: 18px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text-primary);
+  font-size: var(--font-2xs, 10px);
+  line-height: 1.2;
+  text-align: center;
 }
 
 @media (max-width: 1180px) {
@@ -8119,6 +8131,10 @@ body.is-resizing-side-rail {
   padding-bottom: 0;
 }
 
+.asset-registry-card .table-shell-fill {
+  min-height: 0;
+}
+
 .projects-layout {
   display: grid;
   grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.35fr);
@@ -8205,6 +8221,189 @@ body.is-resizing-side-rail {
   overflow: auto;
   overscroll-behavior: contain;
   padding-right: 2px;
+}
+
+.project-agenda-card {
+  overflow: hidden;
+}
+
+.project-agenda-card .surface-card-body {
+  display: grid;
+  gap: 14px;
+}
+
+.project-agenda-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: stretch;
+  padding: 14px;
+  border: 1px solid rgba(126, 183, 178, 0.12);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.1), transparent 42%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012));
+}
+
+.project-agenda-window {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.project-agenda-window span,
+.project-agenda-progress-copy span,
+.project-agenda-stats span,
+.project-agenda-meta > span {
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 10px);
+  font-weight: var(--weight-semibold, 600);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.project-agenda-window strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: clamp(22px, 2vw, 30px);
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-agenda-window small {
+  color: var(--text-secondary);
+  font-size: var(--font-xs, 11px);
+}
+
+.project-agenda-color {
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  gap: 8px;
+  max-width: 180px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(7, 10, 12, 0.28);
+  color: var(--text-secondary);
+  font-size: var(--font-xs, 11px);
+}
+
+.project-agenda-color-dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.045);
+}
+
+.project-agenda-progress {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  background: rgba(7, 10, 12, 0.22);
+}
+
+.project-agenda-progress-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-agenda-progress-copy strong {
+  color: var(--text-primary);
+  font-size: var(--font-sm, 12px);
+  white-space: nowrap;
+}
+
+.project-agenda-progress-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.project-agenda-progress-track span {
+  display: block;
+  height: 100%;
+  min-width: 8px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(126, 183, 178, 0.78), rgba(169, 210, 205, 0.92));
+}
+
+.project-agenda-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.project-agenda-stats > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.project-agenda-stats strong {
+  color: var(--text-primary);
+  font-size: var(--font-lg, 18px);
+  line-height: 1;
+}
+
+.project-agenda-meta {
+  display: grid;
+  gap: 8px;
+}
+
+.project-agenda-meta > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.project-agenda-meta strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--font-xs, 11px);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  .project-agenda-hero,
+  .project-agenda-progress-copy {
+    grid-template-columns: 1fr;
+  }
+
+  .project-agenda-hero,
+  .project-agenda-progress-copy,
+  .project-agenda-meta > span {
+    align-items: flex-start;
+  }
+
+  .project-agenda-progress-copy,
+  .project-agenda-meta > span {
+    flex-direction: column;
+  }
+
+  .project-agenda-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .project-overview-card .surface-card-header {

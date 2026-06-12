@@ -266,7 +266,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
   const translatedSortOptions = incidentSortOptions.map((option) => ({ ...option, label: t(option.label) }));
 
   return (
-    <div className={`page-stack incidents-page-stack${isProjectMode ? "" : " incidents-page-stack--fill"}`}>
+    <div className="page-stack incidents-page-stack incidents-page-stack--fill">
       <SectionHeader title={isProjectMode ? t("incidents.titleProject", { projectName: projectName ?? t("incidents.thisProject") }) : t("incidents.title")} />
 
       {error ? <div className="empty-state">{t("incidents.unavailable", { message: error })}</div> : null}
@@ -278,7 +278,6 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           <div className="project-incidents-command-copy">
             <span>{t("incidents.projectCommand.eyebrow")}</span>
             <strong>{projectName ?? t("incidents.projectCommand.fallbackName")}</strong>
-            <p>{t("incidents.projectCommand.body")}</p>
           </div>
 
           <div className="project-incidents-command-metrics">
@@ -339,7 +338,6 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
 
           <div className="project-incidents-command-footnote">
             <span>{t("incidents.projectCommand.selectionHint", { count: selectedRowIds.length })}</span>
-            <span>{t("incidents.projectCommand.filterHint")}</span>
           </div>
         </section>
       ) : null}
