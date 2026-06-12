@@ -81,6 +81,7 @@ export type DeleteProjectUnitInput = {
 export type AssignCrewToProjectUnitInput = {
   projectId: string;
   unitId: string;
+  departmentId: string;
   crewMemberId: string;
   roleLabel?: string;
   startDate?: string;

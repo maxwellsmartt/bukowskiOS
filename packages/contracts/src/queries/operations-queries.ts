@@ -475,6 +475,7 @@ export type ProjectScheduleSummary = {
 
 export type ProjectUnitCrewAssignmentRow = {
   id: string;
+  departmentId: string | null;
   crewMemberId: string;
   fullName: string;
   linkedUserId: string | null;
@@ -482,6 +483,12 @@ export type ProjectUnitCrewAssignmentRow = {
   startDate: string | null;
   endDate: string | null;
   notes: string;
+};
+
+export type ProjectUnitDepartmentRow = {
+  departmentId: string | null;
+  departmentName: string;
+  crewAssignments: ProjectUnitCrewAssignmentRow[];
 };
 
 export type ProjectUnitWindowRow = {
@@ -504,6 +511,7 @@ export type ProjectUnitRow = {
   endDate: string | null;
   windows: ProjectUnitWindowRow[];
   departments: string[];
+  unitDepartments: ProjectUnitDepartmentRow[];
   notes: string;
   conflictCount: number;
   crewConflictCount: number;

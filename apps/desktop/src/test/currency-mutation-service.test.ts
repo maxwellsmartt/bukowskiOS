@@ -268,8 +268,8 @@ describe("currency mutation service", () => {
 
     expect(reads.getLatestRate("workspace-metadata", "EUR", "DOP")).toBeNull();
     const outbox = database
-      .prepare("SELECT operation_type FROM sync_outbox WHERE entity_type = 'exchange_rate' AND entity_id = ? ORDER BY updated_at DESC LIMIT 1")
-      .get(created.rateId) as { operation_type: string };
+      .prepare("SELECT operation_type FROM sync_outbox WHERE id = ? LIMIT 1")
+      .get("sync-cmd-rate-del-2") as { operation_type: string };
     expect(outbox.operation_type).toBe("delete");
 
     cleanup();

@@ -86,6 +86,8 @@ const statusToneMap = {
   cancelled: "critical",
 } as const;
 
+const getCrewDraftKey = (unitId: string, departmentId: string) => `${unitId}:${departmentId}`;
+
 export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChanged, projectId, units }: ProjectUnitsManagerProps) => {
   const { t } = useTranslation();
   const unitListRef = useRef<HTMLDivElement | null>(null);
@@ -247,14 +249,27 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
     }
   };
 
-  const handleAssignCrew = async (unitId: string) => {
-    const draft = crewDrafts[unitId] ?? emptyCrewDraft;
+  const getCrewOptionsForDepartment = (departmentId: string) =>
+    [...crewMembers].sort((left, right) => {
+      const leftMatches = left.primaryDepartmentId === departmentId ? 0 : 1;
+      const rightMatches = right.primaryDepartmentId === departmentId ? 0 : 1;
+      if (leftMatches !== rightMatches) {
+        return leftMatches - rightMatches;
+      }
+
+      return left.fullName.localeCompare(right.fullName);
+    });
+
+  const handleAssignCrew = async (unitId: string, departmentId: string) => {
+    const draftKey = getCrewDraftKey(unitId, departmentId);
+    const draft = crewDrafts[draftKey] ?? emptyCrewDraft;
 
     try {
       setIsSubmitting(true);
       const nextSnapshot = await assignCrewToProjectUnit({
         projectId,
         unitId,
+        departmentId,
         crewMemberId: draft.crewMemberId,
         roleLabel: normalizeOptional(draft.roleLabel),
         startDate: normalizeOptional(draft.startDate),
@@ -262,7 +277,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
         notes: normalizeOptional(draft.notes),
       });
       await Promise.resolve(onChanged());
-      setCrewDrafts((current) => ({ ...current, [unitId]: emptyCrewDraft }));
+      setCrewDrafts((current) => ({ ...current, [draftKey]: emptyCrewDraft }));
       setError(null);
       toast.success(t("projects.units.toasts.crewLinkedTitle"), t("projects.units.toasts.crewLinkedBody"));
       setWarning(nextSnapshot.units.find((unit) => unit.id === unitId)?.conflictSummary ?? null);
@@ -308,7 +323,6 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
 
       <div ref={unitListRef} className="project-unit-list">
         {units.map((unit) => {
-          const crewDraft = crewDrafts[unit.id] ?? emptyCrewDraft;
           const statusTone = statusToneMap[unit.status as keyof typeof statusToneMap] ?? "neutral";
 
           return (
@@ -382,128 +396,168 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
 
               {unit.conflictSummary ? <div className="action-feedback action-feedback-warning">{unit.conflictSummary}</div> : null}
 
-              {unit.crewAssignments.length ? (
-                <div className="queue-list">
-                  {unit.crewAssignments.map((assignment) => (
-                    <div key={assignment.id} className="queue-item">
-                      <div className="identity-cell">
-                        <span className="identity-title">{assignment.fullName}</span>
-                        <span className="identity-meta">
-                          {assignment.roleLabel} · {assignment.startDate ?? t("projects.fallbacks.noStart")} - {assignment.endDate ?? t("projects.fallbacks.open")}
-                        </span>
-                      </div>
+              {unit.unitDepartments.length ? (
+                <div className="project-unit-department-grid">
+                  {unit.unitDepartments.map((department) => {
+                    const departmentId = department.departmentId ?? "";
+                    const draftKey = getCrewDraftKey(unit.id, departmentId);
+                    const crewDraft = crewDrafts[draftKey] ?? emptyCrewDraft;
+                    const crewOptions = department.departmentId ? getCrewOptionsForDepartment(department.departmentId) : [];
+                    const canAssign = Boolean(department.departmentId && crewDraft.crewMemberId);
 
-                      <button
-                        className="shell-project-action"
-                        onClick={() => void handleRemoveCrew(unit.id, assignment.id)}
-                        type="button"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
+                    return (
+                      <div key={department.departmentId ?? "unclassified"} className={`project-unit-department-card${department.departmentId ? "" : " is-legacy"}`}>
+                        <div className="project-unit-department-header">
+                          <div className="identity-cell">
+                            <span className="identity-title">
+                              {department.departmentId ? department.departmentName : t("projects.units.unclassifiedDepartment")}
+                            </span>
+                            <span className="identity-meta">
+                              {t("projects.units.departmentCrewCount", { count: department.crewAssignments.length })}
+                            </span>
+                          </div>
+                          {!department.departmentId ? <StatusBadge tone="warning">{t("projects.units.legacyBadge")}</StatusBadge> : null}
+                        </div>
+
+                        {department.crewAssignments.length ? (
+                          <div className="queue-list project-unit-crew-list">
+                            {department.crewAssignments.map((assignment) => (
+                              <div key={assignment.id} className="queue-item project-unit-crew-row">
+                                <div className="identity-cell">
+                                  <span className="identity-title">{assignment.fullName}</span>
+                                  <span className="identity-meta">
+                                    {assignment.roleLabel} · {assignment.startDate ?? t("projects.fallbacks.noStart")} - {assignment.endDate ?? t("projects.fallbacks.open")}
+                                  </span>
+                                </div>
+
+                                <button
+                                  aria-label={t("projects.units.actions.removeCrewAria", { name: assignment.fullName })}
+                                  className="shell-project-action"
+                                  onClick={() => void handleRemoveCrew(unit.id, assignment.id)}
+                                  type="button"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="empty-state project-unit-department-empty">
+                            {department.departmentId ? t("projects.units.noCrewInDepartment") : t("projects.units.unclassifiedHelp")}
+                          </div>
+                        )}
+
+                        {department.departmentId ? (
+                          <div className="project-unit-crew-form">
+                            <div className="action-form-grid">
+                              <label className="action-field">
+                                <span className="action-field-label">{t("projects.units.fields.crew")}</span>
+                                <SelectField
+                                  onChange={(event) => {
+                                    const nextCrewMember = crewMembers.find((crewMember) => crewMember.id === event.target.value);
+                                    setCrewDrafts((current) => ({
+                                      ...current,
+                                      [draftKey]: {
+                                        ...crewDraft,
+                                        crewMemberId: event.target.value,
+                                        roleLabel: crewDraft.roleLabel || nextCrewMember?.roleLabel || "",
+                                        startDate: crewDraft.startDate || unit.startDate || "",
+                                        endDate: crewDraft.endDate || unit.endDate || "",
+                                      },
+                                    }));
+                                  }}
+                                  value={crewDraft.crewMemberId}
+                                >
+                                  <option value="">{t("projects.units.fields.chooseCrew")}</option>
+                                  {crewOptions.map((crewMember) => (
+                                    <option key={crewMember.id} value={crewMember.id}>
+                                      {crewMember.fullName}
+                                      {crewMember.primaryDepartmentId === department.departmentId
+                                        ? ` · ${crewMember.roleLabel || t("projects.units.fields.defaultRole")}`
+                                        : ` · ${crewMember.primaryDepartment ?? t("projects.units.otherDepartment")}`}
+                                    </option>
+                                  ))}
+                                </SelectField>
+                              </label>
+
+                              <label className="action-field">
+                                <span className="action-field-label">{t("projects.units.fields.role")}</span>
+                                <input
+                                  className="action-field-control"
+                                  onChange={(event) =>
+                                    setCrewDrafts((current) => ({
+                                      ...current,
+                                      [draftKey]: { ...crewDraft, roleLabel: event.target.value },
+                                    }))
+                                  }
+                                  value={crewDraft.roleLabel}
+                                />
+                              </label>
+
+                              <label className="action-field">
+                                <span className="action-field-label">{t("projects.units.fields.start")}</span>
+                                <input
+                                  className="action-field-control"
+                                  onChange={(event) =>
+                                    setCrewDrafts((current) => ({
+                                      ...current,
+                                      [draftKey]: { ...crewDraft, startDate: event.target.value },
+                                    }))
+                                  }
+                                  type="date"
+                                  value={crewDraft.startDate}
+                                />
+                              </label>
+
+                              <label className="action-field">
+                                <span className="action-field-label">{t("projects.units.fields.end")}</span>
+                                <input
+                                  className="action-field-control"
+                                  onChange={(event) =>
+                                    setCrewDrafts((current) => ({
+                                      ...current,
+                                      [draftKey]: { ...crewDraft, endDate: event.target.value },
+                                    }))
+                                  }
+                                  type="date"
+                                  value={crewDraft.endDate}
+                                />
+                              </label>
+
+                              <label className="action-field action-field-wide">
+                                <span className="action-field-label">{t("projects.units.fields.notes")}</span>
+                                <input
+                                  className="action-field-control"
+                                  onChange={(event) =>
+                                    setCrewDrafts((current) => ({
+                                      ...current,
+                                      [draftKey]: { ...crewDraft, notes: event.target.value },
+                                    }))
+                                  }
+                                  value={crewDraft.notes}
+                                />
+                              </label>
+                            </div>
+
+                            <div className="action-panel-actions action-panel-actions-start">
+                              <button
+                                className="ghost-control"
+                                disabled={!canAssign || isSubmitting}
+                                onClick={() => void handleAssignCrew(unit.id, department.departmentId!)}
+                                type="button"
+                              >
+                                {t("projects.units.linkCrew")}
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="empty-state">{t("projects.units.noCrewAssigned")}</div>
+                <div className="empty-state">{t("projects.units.noDepartments")}</div>
               )}
-
-              <div className="action-form-grid project-unit-crew-form">
-                <label className="action-field">
-                  <span className="action-field-label">{t("projects.units.fields.crew")}</span>
-                  <SelectField
-                    onChange={(event) =>
-                      setCrewDrafts((current) => ({
-                        ...current,
-                        [unit.id]: { ...crewDraft, crewMemberId: event.target.value },
-                      }))
-                    }
-                    value={crewDraft.crewMemberId}
-                  >
-                    <option value="">{t("projects.units.fields.chooseCrew")}</option>
-                    {crewMembers.map((crewMember) => (
-                      <option key={crewMember.id} value={crewMember.id}>
-                        {crewMember.fullName}
-                      </option>
-                    ))}
-                  </SelectField>
-                </label>
-              </div>
-
-              <details className="detail-disclosure">
-                <summary className="detail-disclosure-summary">{t("projects.units.moreDetails")}</summary>
-                <div className="detail-disclosure-content">
-                  <div className="action-form-grid project-unit-crew-form">
-                    <label className="action-field">
-                      <span className="action-field-label">{t("projects.units.fields.role")}</span>
-                      <input
-                        className="action-field-control"
-                        onChange={(event) =>
-                          setCrewDrafts((current) => ({
-                            ...current,
-                            [unit.id]: { ...crewDraft, roleLabel: event.target.value },
-                          }))
-                        }
-                        value={crewDraft.roleLabel}
-                      />
-                    </label>
-
-                    <label className="action-field">
-                      <span className="action-field-label">{t("projects.units.fields.start")}</span>
-                      <input
-                        className="action-field-control"
-                        onChange={(event) =>
-                          setCrewDrafts((current) => ({
-                            ...current,
-                            [unit.id]: { ...crewDraft, startDate: event.target.value },
-                          }))
-                        }
-                        type="date"
-                        value={crewDraft.startDate}
-                      />
-                    </label>
-
-                    <label className="action-field">
-                      <span className="action-field-label">{t("projects.units.fields.end")}</span>
-                      <input
-                        className="action-field-control"
-                        onChange={(event) =>
-                          setCrewDrafts((current) => ({
-                            ...current,
-                            [unit.id]: { ...crewDraft, endDate: event.target.value },
-                          }))
-                        }
-                        type="date"
-                        value={crewDraft.endDate}
-                      />
-                    </label>
-
-                    <label className="action-field action-field-wide">
-                      <span className="action-field-label">{t("projects.units.fields.notes")}</span>
-                      <input
-                        className="action-field-control"
-                        onChange={(event) =>
-                          setCrewDrafts((current) => ({
-                            ...current,
-                            [unit.id]: { ...crewDraft, notes: event.target.value },
-                          }))
-                        }
-                        value={crewDraft.notes}
-                      />
-                    </label>
-                  </div>
-                </div>
-              </details>
-
-              <div className="action-panel-actions action-panel-actions-start">
-                <button
-                  className="ghost-control"
-                  disabled={!crewDraft.crewMemberId || isSubmitting}
-                  onClick={() => void handleAssignCrew(unit.id)}
-                  type="button"
-                >
-                  {t("projects.units.linkCrew")}
-                </button>
-              </div>
             </div>
           );
         })}

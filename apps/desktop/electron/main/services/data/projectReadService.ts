@@ -1406,6 +1406,8 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
               )
             ), '—')) AS departments,
             project_unit_crew_assignments.id AS assignment_id,
+            project_unit_crew_assignments.department_id AS assignment_department_id,
+            assignment_departments.name AS assignment_department_name,
             project_unit_crew_assignments.crew_member_id,
             COALESCE(crew_members.full_name, '—') AS crew_full_name,
             crew_members.linked_user_id,
@@ -1415,6 +1417,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             COALESCE(project_unit_crew_assignments.notes, '') AS assignment_notes
           FROM project_units
           LEFT JOIN project_unit_crew_assignments ON project_unit_crew_assignments.project_unit_id = project_units.id
+          LEFT JOIN departments assignment_departments ON assignment_departments.id = project_unit_crew_assignments.department_id
           LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
           WHERE project_units.project_id = ?
             AND COALESCE(project_units.is_primary, 0) = 0
@@ -1434,6 +1437,8 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       notes: string;
       departments: string;
       assignment_id: string | null;
+      assignment_department_id: string | null;
+      assignment_department_name: string | null;
       crew_member_id: string | null;
       crew_full_name: string;
       linked_user_id: string | null;
@@ -1475,6 +1480,50 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       const list = unitWindowsByUnitId.get(row.project_unit_id) ?? [];
       list.push(row);
       unitWindowsByUnitId.set(row.project_unit_id, list);
+    });
+    const unitDepartmentRows = db
+      .prepare(
+        `
+          SELECT
+            project_unit_id,
+            department_id,
+            department_name
+          FROM (
+            SELECT
+              project_unit_departments.project_unit_id,
+              departments.id AS department_id,
+              departments.name AS department_name,
+              project_units.sort_order AS unit_sort_order
+            FROM project_unit_departments
+            JOIN departments ON departments.id = project_unit_departments.department_id
+            JOIN project_units ON project_units.id = project_unit_departments.project_unit_id
+            WHERE project_units.project_id = ?
+              AND COALESCE(project_units.is_primary, 0) = 0
+            UNION
+            SELECT
+              asset_assignments.project_unit_id,
+              departments.id AS department_id,
+              departments.name AS department_name,
+              project_units.sort_order AS unit_sort_order
+            FROM asset_assignments
+            JOIN departments ON departments.id = asset_assignments.department_id
+            JOIN project_units ON project_units.id = asset_assignments.project_unit_id
+            WHERE project_units.project_id = ?
+              AND COALESCE(project_units.is_primary, 0) = 0
+          )
+          ORDER BY unit_sort_order, department_name
+        `,
+      )
+      .all(projectId, projectId) as Array<{
+      project_unit_id: string;
+      department_id: string;
+      department_name: string;
+    }>;
+    const unitDepartmentsByUnitId = new Map<string, typeof unitDepartmentRows>();
+    unitDepartmentRows.forEach((row) => {
+      const list = unitDepartmentsByUnitId.get(row.project_unit_id) ?? [];
+      list.push(row);
+      unitDepartmentsByUnitId.set(row.project_unit_id, list);
     });
     const projectUnitIds = uniqueStrings(unitRows.map((row) => row.id));
     const allCrewAssignmentRows = db
@@ -1559,6 +1608,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
 
     unitRows.forEach((row) => {
       const derived = deps.deriveProjectUnitStatus(row.start_date, row.end_date, row.status, row.status_source);
+      const explicitDepartments = unitDepartmentsByUnitId.get(row.id) ?? [];
       const unit =
         unitsMap.get(row.id) ??
         {
@@ -1578,7 +1628,16 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             sortOrder: window.sort_order,
             label: window.label,
           })),
-          departments: row.departments === "—" ? [] : row.departments.split(", ").filter(Boolean),
+          departments: explicitDepartments.length
+            ? explicitDepartments.map((department) => department.department_name)
+            : row.departments === "—"
+              ? []
+              : row.departments.split(", ").filter(Boolean),
+          unitDepartments: explicitDepartments.map((department) => ({
+            departmentId: department.department_id,
+            departmentName: department.department_name,
+            crewAssignments: [],
+          })),
           notes: row.notes,
           conflictCount: 0,
           crewConflictCount: 0,
@@ -1592,8 +1651,9 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       }
 
       if (row.assignment_id && row.crew_member_id) {
-        unit.crewAssignments.push({
+        const assignment = {
           id: row.assignment_id,
+          departmentId: row.assignment_department_id,
           crewMemberId: row.crew_member_id,
           fullName: row.crew_full_name,
           linkedUserId: row.linked_user_id,
@@ -1601,7 +1661,22 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           startDate: row.assignment_start_date,
           endDate: row.assignment_end_date,
           notes: row.assignment_notes,
-        });
+        };
+        unit.crewAssignments.push(assignment);
+
+        const departmentBucket =
+          unit.unitDepartments.find((department) => department.departmentId === row.assignment_department_id) ??
+          {
+            departmentId: row.assignment_department_id,
+            departmentName: row.assignment_department_name ?? "",
+            crewAssignments: [],
+          };
+
+        if (!unit.unitDepartments.includes(departmentBucket)) {
+          unit.unitDepartments.push(departmentBucket);
+        }
+
+        departmentBucket.crewAssignments.push(assignment);
       }
     });
 

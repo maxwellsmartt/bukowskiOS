@@ -92,10 +92,14 @@ describe("project mutation service", () => {
     const studioDetail = reads.getProjectDetail("project-studio");
     const overlapUnit = studioDetail.units.find((unit) => unit.code === "OVR");
     expect(overlapUnit).toBeTruthy();
+    database
+      .prepare("INSERT OR IGNORE INTO project_unit_departments (project_unit_id, department_id, created_at) VALUES (?, ?, ?)")
+      .run(overlapUnit!.id, "dept-camera", new Date().toISOString());
 
     mutations.assignCrewToProjectUnit({
       projectId: "project-studio",
       unitId: overlapUnit!.id,
+      departmentId: "dept-camera",
       crewMemberId: "crew-user-paola",
       roleLabel: "Camera overlap",
       startDate: "2026-04-10",
@@ -111,6 +115,38 @@ describe("project mutation service", () => {
     expect(conflictedStudioUnit?.crewConflictCount).toBeGreaterThan(0);
     expect(conflictedStudioUnit?.conflictSummary).toContain("crew overlap");
     expect(conflictedAuroraUnit?.conflictCount).toBeGreaterThan(0);
+
+    cleanup();
+  });
+
+  it("requires crew assignments to use a department linked to the selected unit", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-unit-department-guard-test");
+    const mutations = createProjectMutationService(database);
+
+    mutations.createProjectUnit({
+      projectId: "project-studio",
+      code: "DEP",
+      name: "Department Guard Unit",
+      startDate: "2026-04-10",
+      endDate: "2026-04-12",
+    });
+
+    const unit = database
+      .prepare("SELECT id FROM project_units WHERE project_id = ? AND code = ? LIMIT 1")
+      .get("project-studio", "DEP") as { id: string } | undefined;
+    expect(unit).toBeTruthy();
+
+    expect(() =>
+      mutations.assignCrewToProjectUnit({
+        projectId: "project-studio",
+        unitId: unit!.id,
+        departmentId: "dept-camera",
+        crewMemberId: "crew-user-paola",
+        roleLabel: "Camera overlap",
+        startDate: "2026-04-10",
+        endDate: "2026-04-12",
+      }),
+    ).toThrow("department that belongs to this unit");
 
     cleanup();
   });
@@ -167,6 +203,9 @@ describe("project mutation service", () => {
     expect(detail.units).toHaveLength(1);
     expect(detail.units[0]?.name).toBe("Second Unit");
     expect(detail.units[0]?.crewAssignments).toHaveLength(1);
+    expect(detail.units[0]?.unitDepartments).toHaveLength(1);
+    expect(detail.units[0]?.unitDepartments[0]?.departmentId).toBe("dept-video");
+    expect(detail.units[0]?.unitDepartments[0]?.crewAssignments).toHaveLength(1);
 
     const timeline = reads.getScheduleTimeline("90d", "week");
     const timelineProject = timeline.projects.find((row) => row.id === project!.id);

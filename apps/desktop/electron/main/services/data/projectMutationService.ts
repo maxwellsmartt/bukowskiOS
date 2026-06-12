@@ -819,6 +819,26 @@ const ensureProjectUnitExists = (db: DatabaseSync, projectId: string, unitId: st
   return unit;
 };
 
+const ensureProjectUnitDepartmentExists = (db: DatabaseSync, projectUnitId: string, departmentId: string) => {
+  ensureDepartmentExists(db, departmentId, "Unit department");
+
+  const row = db
+    .prepare(
+      `
+        SELECT project_unit_id
+        FROM project_unit_departments
+        WHERE project_unit_id = ?
+          AND department_id = ?
+        LIMIT 1
+      `,
+    )
+    .get(projectUnitId, departmentId) as { project_unit_id: string } | undefined;
+
+  if (!row) {
+    throw new Error("Select a department that belongs to this unit before assigning crew.");
+  }
+};
+
 const ensureCrewMemberExists = (db: DatabaseSync, crewMemberId: string, workspaceId = fallbackWorkspaceId) => {
   const crewMember = db
     .prepare(
@@ -2212,6 +2232,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
     const project = ensureProjectExists(db, input.projectId);
     const unit = ensureProjectUnitExists(db, input.projectId, input.unitId);
     const workspaceId = project.workspace_id;
+    ensureProjectUnitDepartmentExists(db, input.unitId, input.departmentId);
     ensureCrewMemberExists(db, input.crewMemberId, workspaceId);
     const startDate = normalizeDateOnly(input.startDate);
     const endDate = normalizeDateOnly(input.endDate);
@@ -2242,6 +2263,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
           id,
           workspace_id,
           project_unit_id,
+          department_id,
           crew_member_id,
           role_label,
           start_date,
@@ -2250,12 +2272,13 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     ).run(
       `unit-crew-${Date.now().toString(36)}`,
       workspaceId,
       input.unitId,
+      input.departmentId,
       input.crewMemberId,
       input.roleLabel?.trim() || null,
       startDate,

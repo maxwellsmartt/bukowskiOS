@@ -673,6 +673,7 @@ export const assignCrewToProjectUnitSchema = z
   .object({
     projectId: nonEmptyString,
     unitId: nonEmptyString,
+    departmentId: nonEmptyString,
     crewMemberId: nonEmptyString,
     roleLabel: optionalTrimmedString,
     startDate: optionalTrimmedString,

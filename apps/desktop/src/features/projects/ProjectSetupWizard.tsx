@@ -796,10 +796,14 @@ export const ProjectSetupWizard = ({
               const department = catalog.departments.find((row) => row.id === departmentId);
               const bucket = activeAssignmentUnit.unitDepartments.find((row) => row.departmentId === departmentId);
               const active = departmentId === activeAssignmentDepartmentId;
+              const crewPreview = (bucket?.crewAssignments ?? [])
+                .filter(assignmentHasCrewMember)
+                .slice(0, 2)
+                .map((assignment) => catalog.crewMembers.find((crewMember) => crewMember.id === assignment.crewMemberId)?.fullName ?? t("projectSetup.crew.assignmentFallback"));
               return (
                 <button
                   key={departmentId}
-                  className={`project-setup-department-chip${active ? " is-active" : ""}`}
+                  className={`project-setup-department-chip${mode === "crew" ? " is-crew" : ""}${active ? " is-active" : ""}`}
                   onClick={() => setActiveAssignmentDepartmentId(departmentId)}
                   type="button"
                 >
@@ -810,6 +814,13 @@ export const ProjectSetupWizard = ({
                       crew: countAssignedCrew(bucket?.crewAssignments ?? []),
                     })}
                   </span>
+                  {mode === "crew" ? (
+                    <small>
+                      {crewPreview.length
+                        ? crewPreview.join(", ")
+                        : t("projectSetup.crew.emptyDepartment")}
+                    </small>
+                  ) : null}
                 </button>
               );
             })}
@@ -1081,11 +1092,17 @@ export const ProjectSetupWizard = ({
       .filter((crewMember) => !(activeAssignmentBucket?.crewAssignments ?? []).some((assignment) => assignment.crewMemberId === crewMember.id))
       .filter((crewMember) => matchesSearch(deferredCrewAvailableSearch, [crewMember.fullName, crewMember.roleLabel]))
       .sort((left, right) => {
+        const leftDepartmentPriority = left.primaryDepartmentId === activeAssignmentDepartmentId ? 0 : 1;
+        const rightDepartmentPriority = right.primaryDepartmentId === activeAssignmentDepartmentId ? 0 : 1;
+        if (leftDepartmentPriority !== rightDepartmentPriority) {
+          return leftDepartmentPriority - rightDepartmentPriority;
+        }
+
         const leftValue = crewAvailableSort === "role" ? left.roleLabel : left.fullName;
         const rightValue = crewAvailableSort === "role" ? right.roleLabel : right.fullName;
         return compareValues(leftValue, rightValue, crewAvailableDirection);
       });
-  }, [activeAssignmentBucket?.crewAssignments, catalog.crewMembers, crewAvailableDirection, deferredCrewAvailableSearch, crewAvailableSort]);
+  }, [activeAssignmentBucket?.crewAssignments, activeAssignmentDepartmentId, catalog.crewMembers, crewAvailableDirection, deferredCrewAvailableSearch, crewAvailableSort]);
 
   const blockingCrewAssignmentsByMember = useMemo(() => {
     const nextMap = new Map<
