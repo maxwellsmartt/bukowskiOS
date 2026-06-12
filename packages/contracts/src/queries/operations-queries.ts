@@ -441,6 +441,7 @@ export type ProjectDetailAssetRow = {
 export type ProjectDetailIncidentRow = {
   id: string;
   title: string;
+  assetCode: string;
   asset: string;
   responsible: string;
   severity: string;

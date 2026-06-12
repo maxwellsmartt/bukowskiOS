@@ -1283,6 +1283,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             incidents.id,
             incidents.title,
             COALESCE(assets.internal_code, '—') AS asset_code,
+            COALESCE(assets.name, '—') AS asset_name,
             COALESCE(users.full_name, '—') AS responsible,
             incidents.severity,
             incidents.cost_estimate,
@@ -1305,6 +1306,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       id: string;
       title: string;
       asset_code: string;
+      asset_name: string;
       responsible: string;
       severity: string;
       cost_estimate: number | null;
@@ -1537,7 +1539,8 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
     const incidentRows: ProjectDetailIncidentRow[] = incidents.map((row) => ({
       id: row.id,
       title: row.title,
-      asset: row.asset_code,
+      assetCode: row.asset_code,
+      asset: row.asset_name,
       responsible: row.responsible,
       severity: row.severity,
       costEstimate: includeFinancials ? deps.formatCurrency(row.cost_estimate) : "—",

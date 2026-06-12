@@ -4412,6 +4412,7 @@
         "empty": "No cost-bearing incidents yet.",
         "columns": {
           "incident": "Incident",
+          "assetCode": "Code",
           "responsible": "Responsible",
           "severity": "Severity",
           "estimate": "Estimate",

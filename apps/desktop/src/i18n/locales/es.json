@@ -4416,6 +4416,7 @@
         "empty": "Aún no hay incidentes con costo.",
         "columns": {
           "incident": "Incidente",
+          "assetCode": "Código",
           "responsible": "Responsable",
           "severity": "Severidad",
           "estimate": "Estimado",

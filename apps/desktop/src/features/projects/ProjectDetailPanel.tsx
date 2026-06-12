@@ -419,7 +419,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
                 <div className="identity-cell">
                   <span className="identity-title">{row.title}</span>
                   <span className="identity-meta">
-                    {row.asset} · {t(`incidents.severity.${row.severity}`, { defaultValue: row.severity })}
+                    {row.assetCode} · {row.asset} · {t(`incidents.severity.${row.severity}`, { defaultValue: row.severity })}
                     {row.costEstimate ? ` · ${row.costEstimate}` : ""}
                   </span>
                 </div>

@@ -144,7 +144,7 @@ const buildCurrencyBreakdown = (rows: FinanceEntryLike[]) => {
 };
 
 const projectBudgetFinanceColumnKeys = ["date", "type", "category", "amount", "status"];
-const projectBudgetIncidentColumnKeys = ["incident", "responsible", "severity", "costEstimate", "status"];
+const projectBudgetIncidentColumnKeys = ["incident", "assetCode", "responsible", "severity", "costEstimate", "status"];
 
 export const ProjectBudgetPage = () => {
   const { t } = useTranslation();
@@ -703,6 +703,7 @@ export const ProjectBudgetPage = () => {
                     </div>
                   ),
                 },
+                { key: "assetCode", label: t("projects.budget.incidents.columns.assetCode"), width: 96, minWidth: 82, render: (row) => row.assetCode },
                 { key: "responsible", label: t("projects.budget.incidents.columns.responsible"), width: 160, minWidth: 128, render: (row) => row.responsible },
                 {
                   key: "severity",
