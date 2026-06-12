@@ -5984,7 +5984,7 @@ button.project-incidents-command-metric {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  z-index: 60;
+  z-index: 1500;
   display: grid;
   gap: 4px;
   width: 100%;
