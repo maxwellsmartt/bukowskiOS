@@ -280,6 +280,15 @@ export const ProjectInfoPage = () => {
                   </SelectField>
                 </label>
 
+                <label className="action-field">
+                  <span className="action-field-label">{t("projects.info.fields.timelineColor")}</span>
+                  <ProjectColorSelect
+                    onChange={(nextColorKey) => setColorKey(nextColorKey)}
+                    placeholder={t("projects.info.fields.defaultSystemTone")}
+                    value={colorKey as ProjectColorKey | ""}
+                  />
+                </label>
+
                 <div className="action-field-pair">
                   <label className="action-field">
                     <span className="action-field-label">{t("projects.info.fields.startDate")}</span>
@@ -332,15 +341,6 @@ export const ProjectInfoPage = () => {
                     </label>
                   </div>
                 ) : null}
-
-                <label className="action-field">
-                  <span className="action-field-label">{t("projects.info.fields.timelineColor")}</span>
-                  <ProjectColorSelect
-                    onChange={(nextColorKey) => setColorKey(nextColorKey)}
-                    placeholder={t("projects.info.fields.defaultSystemTone")}
-                    value={colorKey as ProjectColorKey | ""}
-                  />
-                </label>
 
                 <label className="action-field action-field-wide">
                   <span className="action-field-label">{t("projects.info.fields.description")}</span>

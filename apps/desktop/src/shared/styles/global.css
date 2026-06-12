@@ -8483,14 +8483,18 @@ body.is-resizing-side-rail {
 }
 
 .project-info-card .action-form-grid {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
 .project-info-card .action-field-pair {
-  grid-column: auto;
+  grid-column: 1 / -1;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.project-info-card .project-setup-toggle {
+  grid-column: 1 / -1;
 }
 
 .project-info-card .action-textarea {
