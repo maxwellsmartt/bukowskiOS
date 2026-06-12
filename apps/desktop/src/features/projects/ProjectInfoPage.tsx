@@ -292,7 +292,13 @@ export const ProjectInfoPage = () => {
 
                 <label className="action-field">
                   <span className="action-field-label">{t("projects.info.fields.endDate")}</span>
-                  <input className="action-field-control" onChange={(event) => setEndDate(event.target.value)} type="date" value={endDate} />
+                  <input
+                    className="action-field-control"
+                    min={startDate || undefined}
+                    onChange={(event) => setEndDate(event.target.value)}
+                    type="date"
+                    value={endDate}
+                  />
                 </label>
               </div>
 
@@ -319,6 +325,7 @@ export const ProjectInfoPage = () => {
                     <span className="action-field-label">{t("projects.info.fields.preproductionEnd")}</span>
                     <input
                       className="action-field-control"
+                      min={preproductionStartDate || undefined}
                       onChange={(event) => setPreproductionEndDate(event.target.value)}
                       type="date"
                       value={preproductionEndDate}

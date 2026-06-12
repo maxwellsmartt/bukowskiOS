@@ -625,9 +625,14 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
                   })}
                 </div>
               ) : (
-                <button className="empty-state project-unit-empty-action" onClick={openDepartmentDialog} type="button">
-                  <Plus size={16} />
-                  <span>{t("projects.units.noDepartments")}</span>
+                <button className="project-unit-empty-action" onClick={openDepartmentDialog} type="button">
+                  <span className="project-unit-empty-action-icon" aria-hidden="true">
+                    <Plus size={16} />
+                  </span>
+                  <span className="project-unit-empty-action-copy">
+                    <strong>{t("projects.units.addDepartment")}</strong>
+                    <small>{t("projects.units.noDepartments")}</small>
+                  </span>
                 </button>
               )}
             </div>
@@ -678,6 +683,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
               <span className="action-field-label">{t("projects.units.fields.endDate")}</span>
               <input
                 className="action-field-control"
+                min={unitDraft.startDate || undefined}
                 onChange={(event) => setUnitDraft((current) => ({ ...current, endDate: event.target.value }))}
                 type="date"
                 value={unitDraft.endDate}
@@ -892,6 +898,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
                         <span className="action-field-label">{t("projects.units.fields.end")}</span>
                         <input
                           className="action-field-control"
+                          min={draft.startDate || undefined}
                           onChange={(event) => updateCrewAssignmentDraft(draft.localId, { endDate: event.target.value })}
                           type="date"
                           value={draft.endDate}

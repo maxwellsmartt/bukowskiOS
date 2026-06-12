@@ -630,6 +630,7 @@ export const FinanceOverviewPage = () => {
                 <span className="action-field-label">{t("finance.overview.endDate")}</span>
                 <input
                   className="action-field-control"
+                  min={customStartDate || undefined}
                   onChange={(event) => setCustomEndDate(event.target.value)}
                   type="date"
                   value={customEndDate}

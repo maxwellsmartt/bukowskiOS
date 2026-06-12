@@ -2353,7 +2353,13 @@ export const TreasuryPage = () => {
                     </label>
                     <label className="compact-filter-field treasury-table-date-filter">
                       <span>{t("finance.treasury.filters.to")}</span>
-                      <input className="field-input" onChange={(event) => setDateTo(event.target.value)} type="date" value={dateTo} />
+                      <input
+                        className="field-input"
+                        min={dateFrom || undefined}
+                        onChange={(event) => setDateTo(event.target.value)}
+                        type="date"
+                        value={dateTo}
+                      />
                     </label>
                   </>
                 ) : null}

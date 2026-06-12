@@ -629,7 +629,13 @@ export const AssetLicensesPage = () => {
             {draft.licenseType !== "perpetual" && draft.licenseType !== "usage_based" ? (
               <label className="field-block">
                 <span className="field-label">{draft.licenseType === "trial" ? t("assets.licenses.fields.trialEnds") : t("assets.licenses.fields.expires")}</span>
-                <input className="field-input" onChange={(event) => updateDraft("expiresAt", event.target.value)} type="date" value={draft.expiresAt} />
+                <input
+                  className="field-input"
+                  min={draft.startsAt || undefined}
+                  onChange={(event) => updateDraft("expiresAt", event.target.value)}
+                  type="date"
+                  value={draft.expiresAt}
+                />
               </label>
             ) : null}
             <label className="field-block field-block-span-2">

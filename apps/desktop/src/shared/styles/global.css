@@ -11374,18 +11374,76 @@ button.timeline-signal-chip:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 78px;
+  gap: 12px;
+  min-height: 76px;
   width: 100%;
-  border: 1px dashed rgba(154, 194, 183, 0.16);
-  color: rgba(196, 218, 213, 0.78);
+  padding: 14px 18px;
+  border: 1px dashed rgba(126, 183, 178, 0.28);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(126, 183, 178, 0.09), transparent 54%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.01)),
+    rgba(10, 13, 17, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 10px 28px rgba(0, 0, 0, 0.08);
+  color: rgba(211, 232, 228, 0.9);
   cursor: pointer;
+  text-align: left;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.project-unit-empty-action-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(126, 183, 178, 0.32);
+  border-radius: 999px;
+  background: rgba(126, 183, 178, 0.12);
+  color: rgba(220, 246, 241, 0.96);
+}
+
+.project-unit-empty-action-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.project-unit-empty-action-copy strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.project-unit-empty-action-copy small {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .project-unit-empty-action:hover {
-  border-color: rgba(154, 194, 183, 0.3);
-  background: rgba(154, 194, 183, 0.045);
+  border-color: rgba(126, 183, 178, 0.44);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(126, 183, 178, 0.14), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.014)),
+    rgba(13, 18, 22, 0.62);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 14px 34px rgba(0, 0, 0, 0.14);
   color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.project-unit-empty-action:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .project-unit-modal-shell {

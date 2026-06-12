@@ -467,7 +467,13 @@ export const InvoiceEditorPage = () => {
               </label>
               <label className="field-block">
                 <span className="field-label">{t("finance.invoices.editor.fields.dueDate")}</span>
-                <input className="field-input" onChange={(event) => updateDraft("dueDate", event.target.value)} type="date" value={draft.dueDate} />
+                <input
+                  className="field-input"
+                  min={draft.issueDate || undefined}
+                  onChange={(event) => updateDraft("dueDate", event.target.value)}
+                  type="date"
+                  value={draft.dueDate}
+                />
               </label>
               <label className="field-block">
                 <span className="field-label"><RequiredLabel>{t("finance.invoices.editor.fields.currency")}</RequiredLabel></span>

@@ -1375,6 +1375,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
                   <span>{t("finance.treasury.invoices.reimbursements.cycleEnd", { defaultValue: "Ciclo hasta" })}</span>
                   <input
                     className="field-input"
+                    min={reimbursementCycleStartFilter || undefined}
                     type="date"
                     value={reimbursementCycleEndFilter}
                     onChange={(event) => setReimbursementCycleEndFilter(event.target.value)}

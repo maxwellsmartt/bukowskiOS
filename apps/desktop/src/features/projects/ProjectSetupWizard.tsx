@@ -1437,7 +1437,13 @@ export const ProjectSetupWizard = ({
 
                 <label className="action-field">
                   <span className="action-field-label">{t("projectSetup.fields.endDate")}</span>
-                  <input className="action-field-control" onChange={(event) => setGeneralInfo("endDate", event.target.value)} type="date" value={draft.generalInfo.endDate} />
+                  <input
+                    className="action-field-control"
+                    min={draft.generalInfo.startDate || undefined}
+                    onChange={(event) => setGeneralInfo("endDate", event.target.value)}
+                    type="date"
+                    value={draft.generalInfo.endDate}
+                  />
                 </label>
 
                 <div className="action-field action-field-wide">
@@ -1473,6 +1479,7 @@ export const ProjectSetupWizard = ({
                       <span className="action-field-label">{t("projectSetup.fields.preproductionEnd")}</span>
                       <input
                         className="action-field-control"
+                        min={draft.generalInfo.preproductionStartDate || undefined}
                         onChange={(event) => setGeneralInfo("preproductionEndDate", event.target.value)}
                         type="date"
                         value={draft.generalInfo.preproductionEndDate}
@@ -1989,6 +1996,7 @@ export const ProjectSetupWizard = ({
                                     <span className="action-field-label">{t("projectSetup.fields.end")}</span>
                                     <input
                                       className="action-field-control"
+                                      min={assignment.startDate ?? undefined}
                                       onChange={(event) => updateCrewAssignmentForActiveUnit(sourceIndex, { endDate: event.target.value })}
                                       type="date"
                                       value={assignment.endDate ?? ""}
@@ -2162,6 +2170,7 @@ export const ProjectSetupWizard = ({
                                       <span className="action-field-label">{t("projectSetup.fields.end")}</span>
                                       <input
                                         className="action-field-control"
+                                        min={window.startDate ?? undefined}
                                         onChange={(event) => updateAdditionalUnitWindow(unit.id!, windowIndex, { endDate: event.target.value })}
                                         type="date"
                                         value={window.endDate ?? ""}
