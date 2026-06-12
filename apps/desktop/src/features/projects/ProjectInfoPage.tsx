@@ -12,7 +12,6 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
-import { resolveProjectColor } from "@shared/lib/projectColors";
 
 import { ProjectUnitsManager } from "./ProjectUnitsManager";
 import { useProjectMode } from "./useProjectMode";
@@ -126,7 +125,12 @@ export const ProjectInfoPage = () => {
   const scheduleWindow = data.schedule?.windowLabel ?? t("projects.fallbacks.unscheduled");
   const scheduleStart = data.schedule?.startDate ?? t("projects.info.schedule.noStartDate");
   const scheduleEnd = data.schedule?.endDate ?? t("projects.info.schedule.openEnded");
-  const scheduleColor = resolveProjectColor(data.schedule?.colorKey);
+  const scheduleStats = [
+    { label: t("projects.info.schedule.activeUnits"), value: activeUnits },
+    { label: t("projects.info.schedule.plannedUnits"), value: plannedUnits },
+    { label: t("projects.info.schedule.wrappedUnits"), value: wrappedUnits },
+    { label: t("projects.info.schedule.cancelledUnits"), value: cancelledUnits },
+  ];
 
   const handleSave = async () => {
     if (validationErrors.length) {
@@ -192,10 +196,43 @@ export const ProjectInfoPage = () => {
 
         <div className="project-detail-support-grid">
           <SurfaceCard
-            className="project-scroll-card"
+            className="project-scroll-card project-info-card"
             title={t("projects.info.cardTitle")}
             aside={<StatusBadge>{t(`projects.statuses.${currentProject.status}`, { defaultValue: currentProject.status })}</StatusBadge>}
           >
+            <div className="project-info-summary" aria-label={t("projects.info.schedule.title")}>
+              <div className="project-info-summary-window">
+                <span>{t("projects.info.schedule.window")}</span>
+                <strong>{scheduleWindow}</strong>
+                <small>
+                  {scheduleStart} - {scheduleEnd}
+                </small>
+              </div>
+
+              <div className="project-info-summary-progress">
+                <div className="project-info-summary-progress-copy">
+                  <span>{t("projects.info.schedule.completion")}</span>
+                  <strong>
+                    {totalScheduledUnits
+                      ? t("projects.info.schedule.completionValue", { wrapped: wrappedUnits, total: totalScheduledUnits })
+                      : t("projects.info.schedule.noUnits")}
+                  </strong>
+                </div>
+                <div className="project-info-summary-progress-track" aria-hidden="true">
+                  <span style={{ width: `${wrappedRatio}%` }} />
+                </div>
+              </div>
+
+              <div className="project-info-summary-stats">
+                {scheduleStats.map((stat) => (
+                  <div key={stat.label}>
+                    <span>{stat.label}</span>
+                    <strong>{stat.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="action-form-grid">
               <label className="action-field">
                 <span className="action-field-label">{t("projects.info.fields.code")}</span>
@@ -314,70 +351,6 @@ export const ProjectInfoPage = () => {
               <button className="action-primary-button" disabled={isSubmitting || validationErrors.length > 0} onClick={() => void handleSave()} type="button">
                 {isSubmitting ? t("common.saving") : t("projects.info.saveChanges")}
               </button>
-            </div>
-          </SurfaceCard>
-
-          <SurfaceCard className="project-scroll-card project-agenda-card" title={t("projects.info.schedule.title")}>
-            <div className="project-agenda-hero">
-              <div className="project-agenda-window">
-                <span>{t("projects.info.schedule.window")}</span>
-                <strong>{scheduleWindow}</strong>
-                <small>
-                  {scheduleStart} - {scheduleEnd}
-                </small>
-              </div>
-              <div className="project-agenda-color">
-                <span aria-hidden="true" className="project-agenda-color-dot" style={{ background: scheduleColor }} />
-                <span>{data.schedule?.colorKey ?? t("projects.fallbacks.default")}</span>
-              </div>
-            </div>
-
-            <div className="project-agenda-progress">
-              <div className="project-agenda-progress-copy">
-                <span>{t("projects.info.schedule.completion")}</span>
-                <strong>
-                  {totalScheduledUnits
-                    ? t("projects.info.schedule.completionValue", { wrapped: wrappedUnits, total: totalScheduledUnits })
-                    : t("projects.info.schedule.noUnits")}
-                </strong>
-              </div>
-              <div className="project-agenda-progress-track" aria-hidden="true">
-                <span style={{ width: `${wrappedRatio}%` }} />
-              </div>
-            </div>
-
-            <div className="project-agenda-stats">
-              <div>
-                <span>{t("projects.info.schedule.activeUnits")}</span>
-                <strong>{activeUnits}</strong>
-              </div>
-              <div>
-                <span>{t("projects.info.schedule.plannedUnits")}</span>
-                <strong>{plannedUnits}</strong>
-              </div>
-              <div>
-                <span>{t("projects.info.schedule.wrappedUnits")}</span>
-                <strong>{wrappedUnits}</strong>
-              </div>
-              <div>
-                <span>{t("projects.info.schedule.cancelledUnits")}</span>
-                <strong>{cancelledUnits}</strong>
-              </div>
-            </div>
-
-            <div className="project-agenda-meta">
-              <span>
-                {t("projects.info.schedule.productionCompany")}
-                <strong>{currentProject.productionCompany !== "—" ? currentProject.productionCompany : t("projects.info.schedule.notLinked")}</strong>
-              </span>
-              {currentProject.hasPreproduction ? (
-                <span>
-                  {t("projects.info.schedule.preproduction")}
-                  <strong>
-                    {currentProject.preproductionStartDate ?? t("projects.fallbacks.open")} - {currentProject.preproductionEndDate ?? t("projects.fallbacks.open")}
-                  </strong>
-                </span>
-              ) : null}
             </div>
           </SurfaceCard>
         </div>
