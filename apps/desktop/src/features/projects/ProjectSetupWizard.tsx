@@ -19,12 +19,12 @@ import type {
   ProjectCardRow,
   StagingPackingSlipRow,
 } from "@contracts";
-import { projectColorPalette } from "@contracts";
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { useCatalogData, exportProjectBlueprintPdf, getProjectCreationConflicts, getStagingPackingSlips } from "@features/projects/useProjectsData";
 import { ListToolbar } from "@shared/components/ListToolbar";
+import { ProjectColorSelect } from "@shared/components/ProjectColorSelect";
 import { RequiredLabel } from "@shared/components/RequiredLabel";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -745,7 +745,6 @@ export const ProjectSetupWizard = ({
             <span className={`project-setup-checklist-toggle${selected ? " is-selected" : ""}`} />
             <span className="project-setup-checklist-copy">
               <strong>{department.name}</strong>
-              <span>{department.code}</span>
             </span>
           </button>
         );
@@ -1478,14 +1477,11 @@ export const ProjectSetupWizard = ({
 
                 <label className="action-field">
                   <span className="action-field-label">{t("projectSetup.fields.timelineColor")}</span>
-                  <SelectField onChange={(event) => setGeneralInfo("colorKey", event.target.value)} value={draft.generalInfo.colorKey}>
-                    <option value="">{t("projectSetup.placeholders.defaultTone")}</option>
-                    {projectColorPalette.map((color) => (
-                      <option key={color.key} value={color.key}>
-                        {color.label}
-                      </option>
-                    ))}
-                  </SelectField>
+                  <ProjectColorSelect
+                    onChange={(nextColorKey) => setGeneralInfo("colorKey", nextColorKey)}
+                    placeholder={t("projectSetup.placeholders.defaultTone")}
+                    value={draft.generalInfo.colorKey as ProjectColorKey | ""}
+                  />
                 </label>
 
                 <label className="action-field action-field-wide">
@@ -2096,14 +2092,11 @@ export const ProjectSetupWizard = ({
 
                               <label className="action-field">
                                 <span className="action-field-label">{t("projectSetup.units.color")}</span>
-                                <SelectField onChange={(event) => updateAdditionalUnit(unit.id!, { colorKey: event.target.value as ProjectColorKey | "" })} value={unit.colorKey ?? ""}>
-                                  <option value="">{t("projectSetup.units.derivedFromProject")}</option>
-                                  {projectColorPalette.map((color) => (
-                                    <option key={color.key} value={color.key}>
-                                      {color.label}
-                                    </option>
-                                  ))}
-                                </SelectField>
+                                <ProjectColorSelect
+                                  onChange={(nextColorKey) => updateAdditionalUnit(unit.id!, { colorKey: nextColorKey })}
+                                  placeholder={t("projectSetup.units.derivedFromProject")}
+                                  value={(unit.colorKey ?? "") as ProjectColorKey | ""}
+                                />
                               </label>
 
                               <label className="action-field action-field-wide">

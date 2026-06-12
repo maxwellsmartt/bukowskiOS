@@ -2,11 +2,11 @@ import { Check, Pencil, RotateCcw, Trash2, WrapText, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { CatalogSnapshot, ProjectDetailSnapshot } from "@contracts";
-import { projectColorPalette } from "@contracts";
+import type { CatalogSnapshot, ProjectColorKey, ProjectDetailSnapshot } from "@contracts";
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
+import { ProjectColorSelect } from "@shared/components/ProjectColorSelect";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -575,17 +575,11 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
 
                 <label className="action-field">
                   <span className="action-field-label">{t("projects.units.fields.color")}</span>
-                  <SelectField
-                    onChange={(event) => setUnitDraft((current) => ({ ...current, colorKey: event.target.value }))}
-                    value={unitDraft.colorKey}
-                  >
-                    <option value="">{t("projects.units.fields.useProjectColor")}</option>
-                    {projectColorPalette.map((color) => (
-                      <option key={color.key} value={color.key}>
-                        {color.label}
-                      </option>
-                    ))}
-                  </SelectField>
+                  <ProjectColorSelect
+                    onChange={(nextColorKey) => setUnitDraft((current) => ({ ...current, colorKey: nextColorKey }))}
+                    placeholder={t("projects.units.fields.useProjectColor")}
+                    value={unitDraft.colorKey as ProjectColorKey | ""}
+                  />
                 </label>
 
                 <label className="action-field action-field-wide">

@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
-import { projectColorPalette } from "@contracts";
+import type { ProjectColorKey } from "@contracts";
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { SelectField } from "@shared/components/SelectField";
+import { ProjectColorSelect } from "@shared/components/ProjectColorSelect";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -291,14 +292,11 @@ export const ProjectInfoPage = () => {
 
               <label className="action-field">
                 <span className="action-field-label">{t("projects.info.fields.timelineColor")}</span>
-                <SelectField onChange={(event) => setColorKey(event.target.value)} value={colorKey}>
-                  <option value="">{t("projects.info.fields.defaultSystemTone")}</option>
-                  {projectColorPalette.map((color) => (
-                    <option key={color.key} value={color.key}>
-                      {color.label}
-                    </option>
-                  ))}
-                </SelectField>
+                <ProjectColorSelect
+                  onChange={(nextColorKey) => setColorKey(nextColorKey)}
+                  placeholder={t("projects.info.fields.defaultSystemTone")}
+                  value={colorKey as ProjectColorKey | ""}
+                />
               </label>
 
               <label className="action-field action-field-wide">
