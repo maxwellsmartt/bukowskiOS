@@ -18,6 +18,9 @@ type TopContextBarProps = {
   onOpenSearch: () => void;
 };
 
+const syncSnapshotTimeoutMs = 3_500;
+const runSyncTimeoutMs = 5_000;
+
 export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const { activeProject, scopeChipLabel } = useShellContext();
   const navigate = useNavigate();
@@ -31,6 +34,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const [syncActionError, setSyncActionError] = useState<string | null>(null);
   const [syncActionNotice, setSyncActionNotice] = useState<string | null>(null);
   const [hasLoadedSyncSnapshot, setHasLoadedSyncSnapshot] = useState(false);
+  const [isLoadingSyncSnapshot, setIsLoadingSyncSnapshot] = useState(false);
   const isMountedRef = useRef(true);
   const syncPopoverRef = useRef<HTMLDivElement | null>(null);
   const projectChipStyle = useMemo(
@@ -76,28 +80,62 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     };
   }, [syncPopoverOpen]);
 
-  useVisiblePolling(
-    async () => {
-      if (!window.bukowskiApp) {
-        return;
+  const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string) => {
+    let timeoutId = 0;
+    const timeout = new Promise<T>((_, reject) => {
+      timeoutId = window.setTimeout(() => {
+        reject(new Error(timeoutMessage));
+      }, timeoutMs);
+    });
+
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  };
+
+  const loadSyncSnapshot = async ({ showLoading = false } = {}) => {
+    if (!window.bukowskiApp) {
+      return false;
+    }
+
+    if (showLoading && isMountedRef.current) {
+      setIsLoadingSyncSnapshot(true);
+    }
+
+    try {
+      const [diagnosticsResult, cursorsResult] = await Promise.allSettled([
+        withTimeout(window.bukowskiApp.getDiagnostics(), syncSnapshotTimeoutMs, "sync-snapshot-timeout"),
+        withTimeout(window.bukowskiApp.getSyncPullCursors(), syncSnapshotTimeoutMs, "sync-cursors-timeout"),
+      ]);
+
+      const nextDiagnostics = diagnosticsResult.status === "fulfilled" ? diagnosticsResult.value : null;
+      const nextPullCursors = cursorsResult.status === "fulfilled" ? cursorsResult.value : null;
+
+      if (isMountedRef.current) {
+        if (nextDiagnostics) {
+          setDiagnostics(nextDiagnostics);
+        }
+        if (nextPullCursors) {
+          setPullCursors(nextPullCursors);
+        }
+        if (nextDiagnostics || nextPullCursors) {
+          setHasLoadedSyncSnapshot(true);
+        }
       }
 
-      try {
-        const [nextDiagnostics, nextPullCursors] = await Promise.all([
-          window.bukowskiApp.getDiagnostics(),
-          window.bukowskiApp.getSyncPullCursors().catch(() => pullCursors),
-        ]);
-        if (isMountedRef.current) {
-          setDiagnostics(nextDiagnostics);
-          setPullCursors(nextPullCursors);
-          setHasLoadedSyncSnapshot(true);
-        }
-      } catch {
-        if (isMountedRef.current) {
-          setDiagnostics(null);
-          setHasLoadedSyncSnapshot(true);
-        }
+      return Boolean(nextDiagnostics || nextPullCursors);
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoadingSyncSnapshot(false);
       }
+    }
+  };
+
+  useVisiblePolling(
+    () => {
+      void loadSyncSnapshot();
     },
     { intervalMs: 15_000 },
   );
@@ -161,28 +199,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   }, [diagnostics, hasLoadedSyncSnapshot, inboundFailedCount, latestSyncActivity, t]);
   const SyncStatusIcon = syncState.icon;
 
-  const refreshDiagnostics = async () => {
-    if (!window.bukowskiApp) {
-      return;
-    }
-
-    try {
-      const [nextDiagnostics, nextPullCursors] = await Promise.all([
-        window.bukowskiApp.getDiagnostics(),
-        window.bukowskiApp.getSyncPullCursors().catch(() => pullCursors),
-      ]);
-      if (isMountedRef.current) {
-        setDiagnostics(nextDiagnostics);
-        setPullCursors(nextPullCursors);
-        setHasLoadedSyncSnapshot(true);
-      }
-    } catch {
-      if (isMountedRef.current) {
-        setDiagnostics(null);
-        setHasLoadedSyncSnapshot(true);
-      }
-    }
-  };
+  const refreshDiagnostics = () => loadSyncSnapshot({ showLoading: true });
 
   const formatSyncDate = (value: string | null | undefined) => {
     if (!value) {
@@ -190,21 +207,6 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     }
 
     return formatDateTime(value) || value;
-  };
-
-  const withSyncTimeout = async <T,>(promise: Promise<T>) => {
-    let timeoutId = 0;
-    const timeout = new Promise<T>((_, reject) => {
-      timeoutId = window.setTimeout(() => {
-        reject(new Error("sync-timeout"));
-      }, 12_000);
-    });
-
-    try {
-      return await Promise.race([promise, timeout]);
-    } finally {
-      window.clearTimeout(timeoutId);
-    }
   };
 
   const handleRunSync = async () => {
@@ -217,25 +219,28 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     setSyncActionNotice(null);
 
     try {
-      const result = await withSyncTimeout(window.bukowskiApp.runLocalSync());
+      const result = await withTimeout(window.bukowskiApp.runLocalSync(), runSyncTimeoutMs, "sync-timeout");
       requestImmediatePull();
-      const nextPullCursors = await window.bukowskiApp.getSyncPullCursors().catch(() => pullCursors);
       if (isMountedRef.current) {
         setDiagnostics(result.diagnostics);
-        setPullCursors(nextPullCursors);
         setHasLoadedSyncSnapshot(true);
         setSyncActionNotice(t("shell.topBar.syncPopover.syncComplete", { defaultValue: "Sincronización revisada." }));
       }
-      window.setTimeout(() => void refreshDiagnostics(), 1200);
+      window.setTimeout(() => void refreshDiagnostics(), 800);
     } catch (error) {
       if (isMountedRef.current) {
-        const message =
-          error instanceof Error && error.message === "sync-timeout"
-            ? t("shell.topBar.syncPopover.syncStillRunning", {
-                defaultValue: "La sincronización sigue en segundo plano. Revisaremos el estado en unos segundos.",
-              })
-            : t("shell.topBar.syncPopover.syncFailed", { defaultValue: "No se pudo sincronizar ahora." });
-        setSyncActionError(message);
+        if (error instanceof Error && error.message === "sync-timeout") {
+          requestImmediatePull();
+          setSyncActionNotice(
+            t("shell.topBar.syncPopover.syncStillRunning", {
+              defaultValue: "Solicitud enviada. Revisaremos el estado en unos segundos.",
+            }),
+          );
+          window.setTimeout(() => void refreshDiagnostics(), 600);
+          window.setTimeout(() => void refreshDiagnostics(), 2_500);
+        } else {
+          setSyncActionError(t("shell.topBar.syncPopover.syncFailed", { defaultValue: "No se pudo sincronizar ahora." }));
+        }
         void refreshDiagnostics();
       }
     } finally {
@@ -243,6 +248,16 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
         setIsRunningSync(false);
       }
     }
+  };
+
+  const renderMetric = (value: number | string) => (hasLoadedSyncSnapshot ? value : "...");
+  const renderLastRun = () => {
+    if (!hasLoadedSyncSnapshot) {
+      return isLoadingSyncSnapshot
+        ? t("shell.topBar.syncPopover.checkingShort", { defaultValue: "Revisando..." })
+        : t("common.notAvailable", { defaultValue: "No disponible" });
+    }
+    return formatSyncDate(latestSyncActivity);
   };
 
   return (
@@ -310,15 +325,21 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
 
               <div className="sync-popover-grid">
                 <span>{t("shell.topBar.syncPopover.pending", { defaultValue: "Pendientes" })}</span>
-                <strong>{diagnostics?.syncOutboxPendingCount ?? 0}</strong>
+                <strong>{renderMetric(diagnostics?.syncOutboxPendingCount ?? 0)}</strong>
                 <span>{t("shell.topBar.syncPopover.processing", { defaultValue: "Procesando" })}</span>
-                <strong>{diagnostics?.syncOutboxProcessingCount ?? 0}</strong>
+                <strong>{renderMetric(diagnostics?.syncOutboxProcessingCount ?? 0)}</strong>
                 <span>{t("shell.topBar.syncPopover.failed", { defaultValue: "Fallidas" })}</span>
-                <strong>{diagnostics?.syncOutboxFailedCount ?? 0}</strong>
+                <strong>{renderMetric(diagnostics?.syncOutboxFailedCount ?? 0)}</strong>
                 <span>{t("shell.topBar.syncPopover.inbound", { defaultValue: "Entrantes" })}</span>
-                <strong>{inboundFailedCount ? t("shell.topBar.syncPopover.inboundErrors", { defaultValue: "{{count}} con error", count: inboundFailedCount }) : pullCursors.length}</strong>
+                <strong>
+                  {renderMetric(
+                    inboundFailedCount
+                      ? t("shell.topBar.syncPopover.inboundErrors", { defaultValue: "{{count}} con error", count: inboundFailedCount })
+                      : pullCursors.length,
+                  )}
+                </strong>
                 <span>{t("shell.topBar.syncPopover.lastRun", { defaultValue: "Última pasada" })}</span>
-                <strong>{formatSyncDate(latestSyncActivity)}</strong>
+                <strong>{renderLastRun()}</strong>
               </div>
 
               {diagnostics?.lastSyncSummary ? <p className="sync-popover-summary">{diagnostics.lastSyncSummary}</p> : null}
