@@ -69,10 +69,22 @@ const resolveDateLocale = (language: string, mode: DateFormatMode): string => {
   }
 };
 
+const sqliteUtcTimestampPattern = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+
+const normalizeDateInput = (value: string) => {
+  // SQLite CURRENT_TIMESTAMP returns UTC without a timezone suffix
+  // (`2026-06-13 17:42:00`). Browsers parse that shape as local time, which
+  // makes sync checks appear several hours in the future for UTC-4 users.
+  if (sqliteUtcTimestampPattern.test(value)) {
+    return `${value.replace(" ", "T")}Z`;
+  }
+  return value;
+};
+
 const toDate = (value: Date | string | number | null | undefined): Date | null => {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-  const next = new Date(value);
+  const next = new Date(typeof value === "string" ? normalizeDateInput(value) : value);
   return Number.isNaN(next.getTime()) ? null : next;
 };
 

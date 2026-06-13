@@ -8,6 +8,7 @@ import { useConnectivity } from "@shared/hooks/useConnectivity";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import { requestImmediatePull } from "@shared/hooks/useWorkspaceDataRefresh";
+import { useLocale } from "@shared/hooks/useLocale";
 import { resolveProjectColor } from "@shared/lib/projectColors";
 import type { AppDiagnosticsSnapshot, AppSyncPullCursorRow } from "@contracts";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
@@ -21,12 +22,15 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const { activeProject, scopeChipLabel } = useShellContext();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { formatDateTime } = useLocale();
   const isOnline = useConnectivity();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot | null>(null);
   const [pullCursors, setPullCursors] = useState<AppSyncPullCursorRow[]>([]);
   const [syncPopoverOpen, setSyncPopoverOpen] = useState(false);
   const [isRunningSync, setIsRunningSync] = useState(false);
   const [syncActionError, setSyncActionError] = useState<string | null>(null);
+  const [syncActionNotice, setSyncActionNotice] = useState<string | null>(null);
+  const [hasLoadedSyncSnapshot, setHasLoadedSyncSnapshot] = useState(false);
   const isMountedRef = useRef(true);
   const syncPopoverRef = useRef<HTMLDivElement | null>(null);
   const projectChipStyle = useMemo(
@@ -86,10 +90,12 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
         if (isMountedRef.current) {
           setDiagnostics(nextDiagnostics);
           setPullCursors(nextPullCursors);
+          setHasLoadedSyncSnapshot(true);
         }
       } catch {
         if (isMountedRef.current) {
           setDiagnostics(null);
+          setHasLoadedSyncSnapshot(true);
         }
       }
     },
@@ -98,19 +104,23 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
 
   const inboundFailedCount = pullCursors.filter((cursor) => cursor.lastError).length;
   const latestInboundCheck = pullCursors[0]?.updatedAt ?? null;
+  const latestSyncActivity = diagnostics?.lastSyncRunAt ?? latestInboundCheck;
 
   const syncState = useMemo(() => {
-    if (!diagnostics) {
+    if (!hasLoadedSyncSnapshot) {
       return {
-        label: t("shell.topBar.syncPopover.noSync", { defaultValue: "Sin sync confirmado" }),
-        className: "sync-control-missing",
-        icon: CloudOff,
+        label: t("shell.topBar.syncPopover.checking", { defaultValue: "Revisando sync" }),
+        className: "sync-control-review",
+        icon: RefreshCw,
         badge: null as number | null,
       };
     }
 
-    if (diagnostics.syncOutboxFailedCount > 0 || diagnostics.lastSyncStatus === "failed" || inboundFailedCount > 0) {
-      const failedCount = diagnostics.syncOutboxFailedCount + inboundFailedCount;
+    const outboundFailedCount = diagnostics?.syncOutboxFailedCount ?? 0;
+    const lastSyncStatus = diagnostics?.lastSyncStatus ?? "idle";
+
+    if (outboundFailedCount > 0 || lastSyncStatus === "failed" || inboundFailedCount > 0) {
+      const failedCount = outboundFailedCount + inboundFailedCount;
       return {
         label:
           failedCount > 0
@@ -122,7 +132,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       };
     }
 
-    const queuedCount = diagnostics.syncOutboxPendingCount + diagnostics.syncOutboxProcessingCount;
+    const queuedCount = (diagnostics?.syncOutboxPendingCount ?? 0) + (diagnostics?.syncOutboxProcessingCount ?? 0);
 
     if (queuedCount > 0) {
       return {
@@ -133,7 +143,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       };
     }
 
-    if (!diagnostics.lastSyncRunAt && !pullCursors.length) {
+    if (!latestSyncActivity) {
       return {
         label: t("shell.topBar.syncPopover.noSync", { defaultValue: "Sin sync confirmado" }),
         className: "sync-control-missing",
@@ -148,7 +158,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       icon: CheckCircle2,
       badge: null as number | null,
     };
-  }, [diagnostics, inboundFailedCount, pullCursors.length, t]);
+  }, [diagnostics, hasLoadedSyncSnapshot, inboundFailedCount, latestSyncActivity, t]);
   const SyncStatusIcon = syncState.icon;
 
   const refreshDiagnostics = async () => {
@@ -164,10 +174,12 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       if (isMountedRef.current) {
         setDiagnostics(nextDiagnostics);
         setPullCursors(nextPullCursors);
+        setHasLoadedSyncSnapshot(true);
       }
     } catch {
       if (isMountedRef.current) {
         setDiagnostics(null);
+        setHasLoadedSyncSnapshot(true);
       }
     }
   };
@@ -177,7 +189,22 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       return t("common.never", { defaultValue: "Nunca" });
     }
 
-    return new Date(value).toLocaleString();
+    return formatDateTime(value) || value;
+  };
+
+  const withSyncTimeout = async <T,>(promise: Promise<T>) => {
+    let timeoutId = 0;
+    const timeout = new Promise<T>((_, reject) => {
+      timeoutId = window.setTimeout(() => {
+        reject(new Error("sync-timeout"));
+      }, 12_000);
+    });
+
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
   };
 
   const handleRunSync = async () => {
@@ -187,17 +214,29 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
 
     setIsRunningSync(true);
     setSyncActionError(null);
+    setSyncActionNotice(null);
 
     try {
-      const result = await window.bukowskiApp.runLocalSync();
+      const result = await withSyncTimeout(window.bukowskiApp.runLocalSync());
       requestImmediatePull();
+      const nextPullCursors = await window.bukowskiApp.getSyncPullCursors().catch(() => pullCursors);
       if (isMountedRef.current) {
         setDiagnostics(result.diagnostics);
+        setPullCursors(nextPullCursors);
+        setHasLoadedSyncSnapshot(true);
+        setSyncActionNotice(t("shell.topBar.syncPopover.syncComplete", { defaultValue: "Sincronización revisada." }));
       }
       window.setTimeout(() => void refreshDiagnostics(), 1200);
-    } catch {
+    } catch (error) {
       if (isMountedRef.current) {
-        setSyncActionError(t("shell.topBar.syncPopover.syncFailed", { defaultValue: "No se pudo sincronizar ahora." }));
+        const message =
+          error instanceof Error && error.message === "sync-timeout"
+            ? t("shell.topBar.syncPopover.syncStillRunning", {
+                defaultValue: "La sincronización sigue en segundo plano. Revisaremos el estado en unos segundos.",
+              })
+            : t("shell.topBar.syncPopover.syncFailed", { defaultValue: "No se pudo sincronizar ahora." });
+        setSyncActionError(message);
+        void refreshDiagnostics();
       }
     } finally {
       if (isMountedRef.current) {
@@ -279,10 +318,11 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
                 <span>{t("shell.topBar.syncPopover.inbound", { defaultValue: "Entrantes" })}</span>
                 <strong>{inboundFailedCount ? t("shell.topBar.syncPopover.inboundErrors", { defaultValue: "{{count}} con error", count: inboundFailedCount }) : pullCursors.length}</strong>
                 <span>{t("shell.topBar.syncPopover.lastRun", { defaultValue: "Última pasada" })}</span>
-                <strong>{formatSyncDate(diagnostics?.lastSyncRunAt ?? latestInboundCheck)}</strong>
+                <strong>{formatSyncDate(latestSyncActivity)}</strong>
               </div>
 
               {diagnostics?.lastSyncSummary ? <p className="sync-popover-summary">{diagnostics.lastSyncSummary}</p> : null}
+              {syncActionNotice ? <p className="sync-popover-success">{syncActionNotice}</p> : null}
               {syncActionError ? <p className="sync-popover-error">{syncActionError}</p> : null}
 
               <div className="sync-popover-actions">

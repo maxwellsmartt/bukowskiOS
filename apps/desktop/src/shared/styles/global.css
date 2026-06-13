@@ -3373,11 +3373,16 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .sync-popover-summary,
+.sync-popover-success,
 .sync-popover-error {
   margin: 10px 0 0;
   color: var(--text-secondary);
   font-size: 11px;
   line-height: 1.4;
+}
+
+.sync-popover-success {
+  color: var(--status-success-fg);
 }
 
 .sync-popover-error {

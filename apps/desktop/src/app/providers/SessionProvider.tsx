@@ -249,9 +249,9 @@ const resolveSessionUser = async (
     cacheAvatarDataUrl(sessionUser.id, avatarDataUrl);
     return { ...sessionUser, avatarUrl: avatarDataUrl };
   }
-  // No data URL (e.g. offline): reuse the cached avatar rather than a remote URL
-  // that won't load without a connection.
-  return { ...sessionUser, avatarUrl: sessionUser.avatarUrl ?? readCachedAvatarDataUrl(sessionUser.id) };
+  // No data URL (e.g. offline): reuse the cached avatar before falling back to a
+  // remote URL that may be blocked by connectivity/CSP and collapse to initials.
+  return { ...sessionUser, avatarUrl: readCachedAvatarDataUrl(sessionUser.id) ?? sessionUser.avatarUrl };
 };
 
 const acceptWorkspaceInvite = async (workspaceId: string | null) => {
