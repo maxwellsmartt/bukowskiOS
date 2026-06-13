@@ -1612,8 +1612,23 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
 
   const getSyncOutboxRows = () => syncOutboxWorker.listRows();
 
-  const getSyncPullCursors = (): AppSyncPullCursorRow[] =>
-    (
+  const clearResolvedPullCursorErrors = () => {
+    database
+      .prepare(
+        `
+          UPDATE sync_pull_cursors
+          SET last_error = NULL,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE entity_type = 'transaction_links'
+            AND lower(COALESCE(last_error, '')) LIKE '%idx_txn_links_dedupe_v4%'
+        `,
+      )
+      .run();
+  };
+
+  const getSyncPullCursors = (): AppSyncPullCursorRow[] => {
+    clearResolvedPullCursorErrors();
+    return (
       database
         .prepare(
           `
@@ -1644,6 +1659,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       lastError: row.last_error,
       updatedAt: row.updated_at,
     }));
+  };
 
   const retrySyncOutboxRow = async (id: string) => {
     const retried = syncOutboxWorker.retryRow(id);

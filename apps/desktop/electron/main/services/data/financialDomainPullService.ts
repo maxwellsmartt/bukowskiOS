@@ -225,6 +225,41 @@ const upsertRow = (
   ).run(...entries.map(([, value]) => toSqlInputValue(value)));
 };
 
+const isTransactionLinkSemanticDedupeConflict = (table: string, message: string) =>
+  table === "transaction_links" &&
+  /constraint failed/i.test(message) &&
+  /idx_txn_links_dedupe_v4/i.test(message);
+
+const reconcileTransactionLinkBySemanticKey = (db: DatabaseSync, row: Record<string, unknown>) => {
+  const filtered = filterRowToTable(db, "transaction_links", row);
+  const entries = Object.entries(filtered).filter(([column]) => column !== "id");
+  if (!entries.length) return 0;
+
+  const updates = entries.map(([column]) => `${column} = ?`).join(", ");
+  const result = db
+    .prepare(
+      `
+        UPDATE transaction_links
+        SET ${updates}
+        WHERE workspace_id = ?
+          AND linked_entity_type = ?
+          AND linked_entity_id = ?
+          AND COALESCE(transaction_id, '') = COALESCE(?, '')
+          AND COALESCE(payment_instrument_id, '') = COALESCE(?, '')
+      `,
+    )
+    .run(
+      ...entries.map(([, value]) => toSqlInputValue(value)),
+      toSqlInputValue(row.workspace_id),
+      toSqlInputValue(row.linked_entity_type),
+      toSqlInputValue(row.linked_entity_id),
+      toSqlInputValue(row.transaction_id),
+      toSqlInputValue(row.payment_instrument_id),
+    ) as { changes?: number | bigint };
+
+  return Number(result.changes ?? 0);
+};
+
 const ensureCrewMember = (db: DatabaseSync, workspaceId: string, crewMemberId: unknown, updatedAt: string) => {
   if (!crewMemberId || rowExists(db, "crew_members", crewMemberId)) return;
   const crewId = String(crewMemberId);
@@ -483,6 +518,14 @@ const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTab
         markCursorApplied();
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown financial pull error.";
+        if (isTransactionLinkSemanticDedupeConflict(table, message)) {
+          const reconciledCount = reconcileTransactionLinkBySemanticKey(db, row);
+          if (reconciledCount > 0) {
+            result.appliedCount += 1;
+            markCursorApplied();
+            continue;
+          }
+        }
         result.errors.push(`${String(rawRow[config.entityIdColumn] ?? rawRow.id ?? table)}: ${message}`);
         logger.warn("Financial domain pull row failed.", { table, error: message });
         // A constraint violation is permanent for this row payload: retrying it can

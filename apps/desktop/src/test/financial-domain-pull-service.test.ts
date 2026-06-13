@@ -356,7 +356,7 @@ describe("financialDomainPullService", () => {
     cleanup();
   });
 
-  it("advances the cursor past rows that fail with a permanent constraint violation", () => {
+  it("reconciles transaction links that arrive under a duplicate semantic key", () => {
     const { cleanup, database } = createTestDatabase("bukowski-financial-pull-constraint-cursor");
     const workspaceId = "workspace-metadata";
     const service = createFinancialDomainPullService(database);
@@ -411,17 +411,20 @@ describe("financialDomainPullService", () => {
     ]);
     expect(firstPull.appliedCount).toBe(1);
 
-    // Same dedupe key (entity + instrument) under a different id: the upsert
-    // conflicts on idx_txn_links_dedupe_v4 and can never succeed. The cursor
-    // must still advance so the puller does not re-fetch this row forever.
+    // Same dedupe key (entity + instrument) under a different id: reconcile
+    // the existing semantic link instead of leaving sync in an error state.
     const conflictPull = service.applyRemoteTreasuryRows(workspaceId, "transaction_links", [
       { ...baseLink, id: "txn-link-dedupe-divergent", updated_at: "2026-06-09T08:00:00.000Z" },
     ]);
 
-    expect(conflictPull.appliedCount).toBe(0);
-    expect(conflictPull.errors).toHaveLength(1);
-    expect(conflictPull.errors[0]).toContain("idx_txn_links_dedupe_v4");
+    expect(conflictPull.appliedCount).toBe(1);
+    expect(conflictPull.errors).toHaveLength(0);
     expect(conflictPull.cursorAfter).toBe("2026-06-09T08:00:00.000Z");
+    const localLink = database
+      .prepare(`SELECT id, updated_at FROM transaction_links WHERE linked_entity_id = ?`)
+      .get("invoice-extraction-remote-dup") as { id: string; updated_at: string };
+    expect(localLink.id).toBe("txn-link-dedupe-original");
+    expect(localLink.updated_at).toBe("2026-06-09T08:00:00.000Z");
 
     cleanup();
   });
