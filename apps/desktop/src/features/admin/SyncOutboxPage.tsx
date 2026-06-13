@@ -224,14 +224,13 @@ export const SyncOutboxPage = () => {
     }
 
     try {
-      const [nextDiagnostics, nextRows] = await Promise.all([
-        window.bukowskiApp.getDiagnostics(),
+      const [nextSyncStatus, nextRows] = await Promise.all([
+        window.bukowskiApp.getSyncStatusSnapshot(),
         window.bukowskiApp.getSyncOutboxRows(),
       ]);
-      const nextPullCursors = await window.bukowskiApp.getSyncPullCursors().catch(() => []);
-      setDiagnostics(nextDiagnostics);
+      setDiagnostics(nextSyncStatus.diagnostics);
       setRows(nextRows);
-      setPullCursors(nextPullCursors);
+      setPullCursors(nextSyncStatus.pullCursors);
       setError(null);
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, t("settings.sync.couldNotLoad")));
@@ -382,12 +381,16 @@ export const SyncOutboxPage = () => {
       toast.success(t("settings.sync.toasts.backfillComplete"), result.summary);
       setDiagnostics(result.diagnostics);
       setError(null);
-      const [nextRows, nextPullCursors] = await Promise.all([
+      const [nextRows, nextSyncStatus] = await Promise.all([
         window.bukowskiApp.getSyncOutboxRows(),
-        window.bukowskiApp.getSyncPullCursors().catch(() => pullCursors),
+        window.bukowskiApp.getSyncStatusSnapshot().catch(() => ({
+          diagnostics: result.diagnostics,
+          pullCursors,
+        })),
       ]);
       setRows(nextRows);
-      setPullCursors(nextPullCursors);
+      setDiagnostics(nextSyncStatus.diagnostics);
+      setPullCursors(nextSyncStatus.pullCursors);
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, t("settings.sync.couldNotBackfill")));
     } finally {

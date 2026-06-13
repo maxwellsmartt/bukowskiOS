@@ -10,7 +10,7 @@ import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import { requestImmediatePull } from "@shared/hooks/useWorkspaceDataRefresh";
 import { useLocale } from "@shared/hooks/useLocale";
 import { resolveProjectColor } from "@shared/lib/projectColors";
-import type { AppDiagnosticsSnapshot, AppSyncPullCursorRow } from "@contracts";
+import type { AppDiagnosticsSnapshot, AppSyncPullCursorRow, AppSyncStatusSnapshot } from "@contracts";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { NotificationsButton } from "./NotificationsTray";
 
@@ -18,8 +18,7 @@ type TopContextBarProps = {
   onOpenSearch: () => void;
 };
 
-const syncSnapshotTimeoutMs = 3_500;
-const runSyncTimeoutMs = 5_000;
+const syncButtonReleaseMs = 5_000;
 
 export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const { activeProject, scopeChipLabel } = useShellContext();
@@ -36,6 +35,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const [hasLoadedSyncSnapshot, setHasLoadedSyncSnapshot] = useState(false);
   const [isLoadingSyncSnapshot, setIsLoadingSyncSnapshot] = useState(false);
   const isMountedRef = useRef(true);
+  const syncButtonReleaseTimerRef = useRef<number | null>(null);
   const syncPopoverRef = useRef<HTMLDivElement | null>(null);
   const projectChipStyle = useMemo(
     () =>
@@ -50,6 +50,9 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   useEffect(
     () => () => {
       isMountedRef.current = false;
+      if (syncButtonReleaseTimerRef.current) {
+        window.clearTimeout(syncButtonReleaseTimerRef.current);
+      }
     },
     [],
   );
@@ -80,19 +83,20 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     };
   }, [syncPopoverOpen]);
 
-  const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string) => {
-    let timeoutId = 0;
-    const timeout = new Promise<T>((_, reject) => {
-      timeoutId = window.setTimeout(() => {
-        reject(new Error(timeoutMessage));
-      }, timeoutMs);
-    });
-
-    try {
-      return await Promise.race([promise, timeout]);
-    } finally {
-      window.clearTimeout(timeoutId);
+  const readSyncStatusSnapshot = async (): Promise<AppSyncStatusSnapshot> => {
+    if (window.bukowskiApp?.getSyncStatusSnapshot) {
+      return window.bukowskiApp.getSyncStatusSnapshot();
     }
+
+    const [nextDiagnostics, nextPullCursors] = await Promise.all([
+      window.bukowskiApp!.getDiagnostics(),
+      window.bukowskiApp!.getSyncPullCursors(),
+    ]);
+
+    return {
+      diagnostics: nextDiagnostics,
+      pullCursors: nextPullCursors,
+    };
   };
 
   const loadSyncSnapshot = async ({ showLoading = false } = {}) => {
@@ -105,33 +109,30 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     }
 
     try {
-      const [diagnosticsResult, cursorsResult] = await Promise.allSettled([
-        withTimeout(window.bukowskiApp.getDiagnostics(), syncSnapshotTimeoutMs, "sync-snapshot-timeout"),
-        withTimeout(window.bukowskiApp.getSyncPullCursors(), syncSnapshotTimeoutMs, "sync-cursors-timeout"),
-      ]);
-
-      const nextDiagnostics = diagnosticsResult.status === "fulfilled" ? diagnosticsResult.value : null;
-      const nextPullCursors = cursorsResult.status === "fulfilled" ? cursorsResult.value : null;
-
+      const nextSnapshot = await readSyncStatusSnapshot();
       if (isMountedRef.current) {
-        if (nextDiagnostics) {
-          setDiagnostics(nextDiagnostics);
-        }
-        if (nextPullCursors) {
-          setPullCursors(nextPullCursors);
-        }
-        if (nextDiagnostics || nextPullCursors) {
-          setHasLoadedSyncSnapshot(true);
-        }
+        setDiagnostics(nextSnapshot.diagnostics);
+        setPullCursors(nextSnapshot.pullCursors);
+        setHasLoadedSyncSnapshot(true);
+        setSyncActionError(null);
       }
 
-      return Boolean(nextDiagnostics || nextPullCursors);
+      return true;
+    } catch (error) {
+      if (isMountedRef.current && !hasLoadedSyncSnapshot) {
+        setSyncActionError(t("shell.topBar.syncPopover.loadFailed", { defaultValue: "No se pudo leer el estado de sync." }));
+      }
+      return false;
     } finally {
       if (isMountedRef.current) {
         setIsLoadingSyncSnapshot(false);
       }
     }
   };
+
+  useEffect(() => {
+    void loadSyncSnapshot({ showLoading: true });
+  }, []);
 
   useVisiblePolling(
     () => {
@@ -201,6 +202,16 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
 
   const refreshDiagnostics = () => loadSyncSnapshot({ showLoading: true });
 
+  const releaseSyncButton = () => {
+    if (syncButtonReleaseTimerRef.current) {
+      window.clearTimeout(syncButtonReleaseTimerRef.current);
+      syncButtonReleaseTimerRef.current = null;
+    }
+    if (isMountedRef.current) {
+      setIsRunningSync(false);
+    }
+  };
+
   const formatSyncDate = (value: string | null | undefined) => {
     if (!value) {
       return t("common.never", { defaultValue: "Nunca" });
@@ -209,7 +220,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     return formatDateTime(value) || value;
   };
 
-  const handleRunSync = async () => {
+  const handleRunSync = () => {
     if (!window.bukowskiApp || isRunningSync) {
       return;
     }
@@ -218,39 +229,59 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     setSyncActionError(null);
     setSyncActionNotice(null);
 
-    try {
-      const result = await withTimeout(window.bukowskiApp.runLocalSync(), runSyncTimeoutMs, "sync-timeout");
-      requestImmediatePull();
+    requestImmediatePull();
+
+    syncButtonReleaseTimerRef.current = window.setTimeout(() => {
+      releaseSyncButton();
       if (isMountedRef.current) {
-        setDiagnostics(result.diagnostics);
-        setHasLoadedSyncSnapshot(true);
-        setSyncActionNotice(t("shell.topBar.syncPopover.syncComplete", { defaultValue: "Sincronización revisada." }));
-      }
-      window.setTimeout(() => void refreshDiagnostics(), 800);
-    } catch (error) {
-      if (isMountedRef.current) {
-        if (error instanceof Error && error.message === "sync-timeout") {
-          requestImmediatePull();
-          setSyncActionNotice(
-            t("shell.topBar.syncPopover.syncStillRunning", {
-              defaultValue: "Solicitud enviada. Revisaremos el estado en unos segundos.",
-            }),
-          );
-          window.setTimeout(() => void refreshDiagnostics(), 600);
-          window.setTimeout(() => void refreshDiagnostics(), 2_500);
-        } else {
-          setSyncActionError(t("shell.topBar.syncPopover.syncFailed", { defaultValue: "No se pudo sincronizar ahora." }));
-        }
+        setSyncActionNotice(
+          t("shell.topBar.syncPopover.syncStillRunning", {
+            defaultValue: "Solicitud enviada. Revisando estado...",
+          }),
+        );
         void refreshDiagnostics();
       }
-    } finally {
-      if (isMountedRef.current) {
-        setIsRunningSync(false);
-      }
-    }
+    }, syncButtonReleaseMs);
+
+    window.bukowskiApp
+      .runLocalSync()
+      .then((result) => {
+        if (isMountedRef.current) {
+          setDiagnostics(result.diagnostics);
+          setHasLoadedSyncSnapshot(true);
+          setSyncActionNotice(t("shell.topBar.syncPopover.syncComplete", { defaultValue: "Sincronización revisada." }));
+          setSyncActionError(null);
+        }
+      })
+      .catch(() => {
+        if (isMountedRef.current) {
+          setSyncActionError(t("shell.topBar.syncPopover.syncFailed", { defaultValue: "No se pudo sincronizar ahora." }));
+        }
+      })
+      .finally(() => {
+        releaseSyncButton();
+        requestImmediatePull();
+        window.setTimeout(() => void refreshDiagnostics(), 600);
+        window.setTimeout(() => void refreshDiagnostics(), 2_500);
+      });
   };
 
-  const renderMetric = (value: number | string) => (hasLoadedSyncSnapshot ? value : "...");
+  useEffect(() => {
+    if (!isRunningSync && syncButtonReleaseTimerRef.current) {
+      window.clearTimeout(syncButtonReleaseTimerRef.current);
+      syncButtonReleaseTimerRef.current = null;
+    }
+  }, [isRunningSync]);
+
+  const renderMetric = (value: number | string) => {
+    if (!hasLoadedSyncSnapshot) {
+      if (isLoadingSyncSnapshot) {
+        return "...";
+      }
+      return t("common.notAvailableShort", { defaultValue: "N/D" });
+    }
+    return value;
+  };
   const renderLastRun = () => {
     if (!hasLoadedSyncSnapshot) {
       return isLoadingSyncSnapshot
@@ -319,7 +350,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
                   <strong>{syncState.label}</strong>
                 </div>
                 <span className={`sync-popover-status ${syncState.className}`}>
-                  <SyncStatusIcon size={17} />
+                  <SyncStatusIcon size={14} />
                 </span>
               </div>
 

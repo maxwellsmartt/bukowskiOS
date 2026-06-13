@@ -30,6 +30,7 @@ export const ipcChannels = {
     runLocalSync: "bukowskiApp:runLocalSync",
     getSyncOutboxRows: "bukowskiApp:getSyncOutboxRows",
     getSyncPullCursors: "bukowskiApp:getSyncPullCursors",
+    getSyncStatusSnapshot: "bukowskiApp:getSyncStatusSnapshot",
     retrySyncOutboxRow: "bukowskiApp:retrySyncOutboxRow",
     retryAllFailedSyncOutboxRows: "bukowskiApp:retryAllFailedSyncOutboxRows",
     backfillOperationalSnapshots: "bukowskiApp:backfillOperationalSnapshots",

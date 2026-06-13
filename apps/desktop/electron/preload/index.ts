@@ -54,6 +54,7 @@ import type {
   AppStorageUploadResult,
   AppSupportSnapshot,
   AppSyncPullCursorRow,
+  AppSyncStatusSnapshot,
   AppSyncOutboxRow,
   AppUploadUserAvatarCommand,
   AppUploadWorkspaceImageAssetCommand,
@@ -264,6 +265,8 @@ const bukowskiApp = {
   getSyncOutboxRows: () => ipcRenderer.invoke(ipcChannels.app.getSyncOutboxRows) as Promise<AppSyncOutboxRow[]>,
   getSyncPullCursors: () =>
     ipcRenderer.invoke(ipcChannels.app.getSyncPullCursors) as Promise<AppSyncPullCursorRow[]>,
+  getSyncStatusSnapshot: () =>
+    ipcRenderer.invoke(ipcChannels.app.getSyncStatusSnapshot) as Promise<AppSyncStatusSnapshot>,
   retrySyncOutboxRow: (id: string) =>
     ipcRenderer.invoke(ipcChannels.app.retrySyncOutboxRow, id) as Promise<AppActionResult>,
   retryAllFailedSyncOutboxRows: () =>

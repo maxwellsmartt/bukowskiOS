@@ -97,6 +97,11 @@ export type AppSyncPullCursorRow = {
   updatedAt: string;
 };
 
+export type AppSyncStatusSnapshot = {
+  diagnostics: AppDiagnosticsSnapshot;
+  pullCursors: AppSyncPullCursorRow[];
+};
+
 export type EnsureLocalWorkspaceInput = {
   id: string;
   name: string;

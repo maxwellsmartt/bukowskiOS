@@ -3335,14 +3335,16 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   flex: 0 0 auto;
   background: transparent;
   box-shadow: none;
 }
 
 .sync-popover-status svg {
+  width: 14px;
+  height: 14px;
   color: currentColor;
   filter: none;
 }

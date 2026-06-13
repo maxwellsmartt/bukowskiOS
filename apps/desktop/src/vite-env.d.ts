@@ -204,6 +204,7 @@ declare global {
       runLocalSync: () => Promise<AppActionResult>;
       getSyncOutboxRows: () => Promise<AppSyncOutboxRow[]>;
       getSyncPullCursors: () => Promise<AppSyncPullCursorRow[]>;
+      getSyncStatusSnapshot: () => Promise<import("@contracts").AppSyncStatusSnapshot>;
       retrySyncOutboxRow: (id: string) => Promise<AppActionResult>;
       retryAllFailedSyncOutboxRows: () => Promise<AppActionResult>;
       backfillOperationalSnapshots: (

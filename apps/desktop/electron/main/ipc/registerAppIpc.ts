@@ -869,6 +869,15 @@ export const registerAppIpc = ({
     () => getSyncPullCursors(),
     "The app could not load inbound sync status.",
   );
+  safeHandleReadWithSchema(
+    ipcChannels.app.getSyncStatusSnapshot,
+    emptyReadArgsSchema,
+    () => ({
+      diagnostics: getDiagnosticsSnapshot(),
+      pullCursors: getSyncPullCursors(),
+    }),
+    "The app could not load sync status.",
+  );
   safeHandleRead(
     ipcChannels.app.retrySyncOutboxRow,
     async (_event, id: string) => ({
