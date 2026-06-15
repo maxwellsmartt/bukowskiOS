@@ -203,18 +203,36 @@ const assertWorkspaceRole = async (input: { workspaceId: string; roleId: string;
 
 const applyRemoteCatalogRowsSchema = z.object({
   workspaceId: z.string().trim().min(1),
-  entityType: z.enum(["asset_categories", "locations", "clients", "manufacturers", "production_companies"]),
+  entityType: z.enum([
+    "asset_categories",
+    "locations",
+    "clients",
+    "manufacturers",
+    "production_companies",
+    "crew_members",
+    "departments",
+  ]),
+  // code/name are optional: crew_members carries full_name instead of code/name.
   rows: z.array(
     z.object({
       id: z.string().trim().min(1),
       workspace_id: z.string().trim().min(1),
-      code: z.string().trim().min(1),
-      name: z.string().trim().min(1),
+      code: z.string().nullable().optional(),
+      name: z.string().nullable().optional(),
       description: z.string().nullable().optional(),
       parent_category_id: z.string().nullable().optional(),
       type: z.string().nullable().optional(),
       is_active: z.boolean().nullable().optional(),
       updated_at: z.string().min(1),
+      contact_name: z.string().nullable().optional(),
+      email: z.string().nullable().optional(),
+      support_email: z.string().nullable().optional(),
+      phone: z.string().nullable().optional(),
+      rnc: z.string().nullable().optional(),
+      pur: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+      full_name: z.string().nullable().optional(),
+      role_label: z.string().nullable().optional(),
     }),
   ),
 });

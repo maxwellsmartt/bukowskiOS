@@ -45,6 +45,7 @@ import { createCatalogPullService } from "./catalogPullService";
 import { createFinancialDomainPullService } from "./financialDomainPullService";
 import { applyConnectorFoundationMigration, bootstrapConnectorFoundation } from "./connectorFoundationBootstrap";
 import { applyCrewCatalogFoundationMigration } from "./crewCatalogFoundationBootstrap";
+import { backfillCrewDepartmentSyncOutbox } from "./crewDepartmentSyncBackfill";
 import { createDataRetentionService, summarizeDataRetention } from "./dataRetentionService";
 import { createCurrencyMutationService } from "./currencyMutationService";
 import { createCurrencyRateProviderService, type CurrencyRateProviderService } from "./currencyRateProviderService";
@@ -677,6 +678,9 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   );
   runStartupStep("apply crew catalog foundation migration", () =>
     applyTrackedStep(database, "runtime_crew_catalog_foundation_v2", () => applyCrewCatalogFoundationMigration(database)),
+  );
+  runStartupStep("backfill crew + department sync outbox", () =>
+    applyTrackedStep(database, "runtime_crew_department_sync_backfill_v1", () => backfillCrewDepartmentSyncOutbox(database)),
   );
   runStartupStep("apply AI gateway foundation migration", () =>
     applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database)),
@@ -1411,6 +1415,14 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         const rows = selectAll("SELECT * FROM production_companies WHERE id = ?", row.entity_id);
         return rows.length ? [{ table: "production_companies", onConflict: "id", rows }] : [];
       }
+      case "crew": {
+        const rows = selectAll("SELECT * FROM crew_members WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "crew_members", onConflict: "id", rows }] : [];
+      }
+      case "department": {
+        const rows = selectAll("SELECT * FROM departments WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "departments", onConflict: "id", rows }] : [];
+      }
       case "quote": {
         const quotes = selectAll("SELECT * FROM quotes WHERE id = ?", row.entity_id).map((r) =>
           parseJsonColumn(nullNonUuid(r, ["created_by_user_id", "updated_by_user_id"]), ["exchange_rate_snapshot_json"]),
@@ -2101,21 +2113,8 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     invoiceInbox,
     packingMutations,
     rmaMutations,
-    applyRemoteCatalogRows: (input: {
-      workspaceId: string;
-      entityType: "asset_categories" | "locations" | "clients" | "manufacturers" | "production_companies";
-      rows: Array<{
-        id: string;
-        workspace_id: string;
-        code: string;
-        name: string;
-        description?: string | null;
-        parent_category_id?: string | null;
-        type?: string | null;
-        is_active?: boolean | null;
-        updated_at: string;
-      }>;
-    }) => createCatalogPullService(database).applyRemoteRows(input.workspaceId, input.entityType, input.rows),
+    applyRemoteCatalogRows: (input: import("@contracts").AppApplyRemoteCatalogRowsCommand) =>
+      createCatalogPullService(database).applyRemoteRows(input.workspaceId, input.entityType, input.rows),
     applyRemoteExchangeRates: (input: import("@contracts").AppApplyRemoteExchangeRatesCommand) => {
       const result = createCatalogPullService(database).applyRemoteExchangeRates(input.workspaceId, input.rows);
       return { workspaceId: input.workspaceId, ...result };

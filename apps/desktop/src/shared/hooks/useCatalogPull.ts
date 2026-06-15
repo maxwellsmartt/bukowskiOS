@@ -54,6 +54,8 @@ const entityTables: CatalogPullEntityType[] = [
   "clients",
   "manufacturers",
   "production_companies",
+  "crew_members",
+  "departments",
 ];
 const RATES_CURSOR_KEY = (workspaceId: string) =>
   `bukowski:catalog-pull-cursor:${workspaceId}:exchange_rates`;

@@ -249,18 +249,36 @@ export type AppOperationalBackfillResult = AppActionResult & {
   }>;
 };
 
-export type CatalogPullEntityType = "asset_categories" | "locations" | "clients" | "manufacturers" | "production_companies";
+export type CatalogPullEntityType =
+  | "asset_categories"
+  | "locations"
+  | "clients"
+  | "manufacturers"
+  | "production_companies"
+  | "crew_members"
+  | "departments";
 
 export type AppRemoteCatalogRow = {
   id: string;
   workspace_id: string;
-  code: string;
-  name: string;
+  code?: string | null;
+  name?: string | null;
   description?: string | null;
   parent_category_id?: string | null;
   type?: string | null;
   is_active?: boolean | null;
   updated_at: string;
+  // Business-catalog fields (clients / manufacturers / production_companies).
+  contact_name?: string | null;
+  email?: string | null;
+  support_email?: string | null;
+  phone?: string | null;
+  rnc?: string | null;
+  pur?: string | null;
+  notes?: string | null;
+  // crew_members
+  full_name?: string | null;
+  role_label?: string | null;
 };
 
 export type AppApplyRemoteCatalogRowsCommand = {

@@ -4,13 +4,20 @@ import { getDesktopLogger } from "../logger";
 
 const logger = getDesktopLogger("catalog-pull-service");
 
-export type CatalogEntityType = "asset_categories" | "locations" | "clients" | "manufacturers" | "production_companies";
+export type CatalogEntityType =
+  | "asset_categories"
+  | "locations"
+  | "clients"
+  | "manufacturers"
+  | "production_companies"
+  | "crew_members"
+  | "departments";
 
 export type RemoteCatalogRow = {
   id: string;
   workspace_id: string;
-  code: string;
-  name: string;
+  code?: string | null;
+  name?: string | null;
   description?: string | null;
   parent_category_id?: string | null;
   type?: string | null;
@@ -24,7 +31,15 @@ export type RemoteCatalogRow = {
   rnc?: string | null;
   pur?: string | null;
   notes?: string | null;
+  // crew_members
+  full_name?: string | null;
+  role_label?: string | null;
 };
+
+// departments is the only synced catalog without a local updated_at column
+// (it tracks created_at only); the remote mirror carries updated_at for the
+// pull cursor, and locally we fall back to created_at for the staleness check.
+const localTimestampColumn = (entityType: CatalogEntityType) => (entityType === "departments" ? "created_at" : "updated_at");
 
 export type CatalogPullResult = {
   entityType: CatalogEntityType;
@@ -65,10 +80,11 @@ const readLocalUpdatedAt = (
   entityType: CatalogEntityType,
   entityId: string,
 ): string | null => {
+  const column = localTimestampColumn(entityType);
   const row = db
-    .prepare(`SELECT updated_at FROM ${entityType} WHERE id = ?`)
-    .get(entityId) as { updated_at?: string | null } | undefined;
-  return isoOrNull(row?.updated_at);
+    .prepare(`SELECT ${column} AS ts FROM ${entityType} WHERE id = ?`)
+    .get(entityId) as { ts?: string | null } | undefined;
+  return isoOrNull(row?.ts);
 };
 
 const upsertLocations = (db: DatabaseSync, row: RemoteCatalogRow) => {
@@ -89,8 +105,8 @@ const upsertLocations = (db: DatabaseSync, row: RemoteCatalogRow) => {
     .run(
       row.id,
       row.workspace_id,
-      row.code,
-      row.name,
+      row.code ?? "",
+      row.name ?? "",
       row.type ?? "warehouse",
       row.description ?? null,
       row.is_active === false ? 0 : 1,
@@ -118,8 +134,8 @@ const upsertAssetCategories = (db: DatabaseSync, row: RemoteCatalogRow) => {
       row.id,
       row.workspace_id,
       row.parent_category_id ?? null,
-      row.code,
-      row.name,
+      row.code ?? "",
+      row.name ?? "",
       row.description ?? null,
       row.id,
       row.updated_at,
@@ -149,7 +165,7 @@ const upsertClients = (db: DatabaseSync, row: RemoteCatalogRow) => {
     .run(
       row.id,
       row.workspace_id,
-      row.name,
+      row.name ?? "",
       row.contact_name ?? null,
       row.email ?? null,
       row.phone ?? null,
@@ -181,7 +197,7 @@ const upsertManufacturers = (db: DatabaseSync, row: RemoteCatalogRow) => {
     .run(
       row.id,
       row.workspace_id,
-      row.name,
+      row.name ?? "",
       row.contact_name ?? null,
       row.support_email ?? null,
       row.phone ?? null,
@@ -213,7 +229,7 @@ const upsertProductionCompanies = (db: DatabaseSync, row: RemoteCatalogRow) => {
     .run(
       row.id,
       row.workspace_id,
-      row.name,
+      row.name ?? "",
       row.contact_name ?? null,
       row.email ?? null,
       row.phone ?? null,
@@ -222,6 +238,63 @@ const upsertProductionCompanies = (db: DatabaseSync, row: RemoteCatalogRow) => {
       activeFlag(row),
       row.id,
       row.updated_at,
+      row.updated_at,
+    );
+};
+
+const upsertCrewMembers = (db: DatabaseSync, row: RemoteCatalogRow) => {
+  db
+    .prepare(
+      `
+        INSERT INTO crew_members (id, workspace_id, full_name, role_label, email, phone, notes, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM crew_members WHERE id = ?), ?), ?)
+        ON CONFLICT(id) DO UPDATE SET
+          full_name = excluded.full_name,
+          role_label = excluded.role_label,
+          email = excluded.email,
+          phone = excluded.phone,
+          notes = excluded.notes,
+          is_active = excluded.is_active,
+          updated_at = excluded.updated_at
+      `,
+    )
+    .run(
+      row.id,
+      row.workspace_id,
+      row.full_name ?? row.name ?? "",
+      row.role_label ?? null,
+      row.email ?? null,
+      row.phone ?? null,
+      row.notes ?? null,
+      activeFlag(row),
+      row.id,
+      row.updated_at,
+      row.updated_at,
+    );
+};
+
+const upsertDepartments = (db: DatabaseSync, row: RemoteCatalogRow) => {
+  // Local departments has no updated_at column — only created_at.
+  db
+    .prepare(
+      `
+        INSERT INTO departments (id, workspace_id, code, name, description, is_active, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM departments WHERE id = ?), ?))
+        ON CONFLICT(id) DO UPDATE SET
+          code = excluded.code,
+          name = excluded.name,
+          description = excluded.description,
+          is_active = excluded.is_active
+      `,
+    )
+    .run(
+      row.id,
+      row.workspace_id,
+      row.code ?? "",
+      row.name ?? "",
+      row.description ?? null,
+      activeFlag(row),
+      row.id,
       row.updated_at,
     );
 };
@@ -241,6 +314,14 @@ const applyOne = (db: DatabaseSync, entityType: CatalogEntityType, row: RemoteCa
   }
   if (entityType === "production_companies") {
     upsertProductionCompanies(db, row);
+    return;
+  }
+  if (entityType === "crew_members") {
+    upsertCrewMembers(db, row);
+    return;
+  }
+  if (entityType === "departments") {
+    upsertDepartments(db, row);
     return;
   }
   upsertClients(db, row);

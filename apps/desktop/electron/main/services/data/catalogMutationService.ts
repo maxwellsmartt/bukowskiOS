@@ -381,7 +381,7 @@ const replaceKitAssets = (
 // Business catalogs that sync local-first to Supabase (clients/manufacturers/
 // production_companies). asset_categories/locations/kits/etc. are NOT here —
 // they either ship as a static seed or are not yet mirrored.
-const SYNCED_CATALOG_ENTITIES = new Set(["client", "manufacturer", "production_company"]);
+const SYNCED_CATALOG_ENTITIES = new Set(["client", "manufacturer", "production_company", "crew", "department"]);
 
 export const createCatalogMutationService = (db: DatabaseSync) => {
   const codeService = createCodeGenerationService(db);
