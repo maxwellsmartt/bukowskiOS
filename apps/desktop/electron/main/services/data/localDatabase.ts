@@ -45,7 +45,7 @@ import { createCatalogPullService } from "./catalogPullService";
 import { createFinancialDomainPullService } from "./financialDomainPullService";
 import { applyConnectorFoundationMigration, bootstrapConnectorFoundation } from "./connectorFoundationBootstrap";
 import { applyCrewCatalogFoundationMigration } from "./crewCatalogFoundationBootstrap";
-import { backfillCrewDepartmentSyncOutbox } from "./crewDepartmentSyncBackfill";
+import { backfillCrewDepartmentSyncOutbox, cleanupSeedCrewDepartmentOutbox } from "./crewDepartmentSyncBackfill";
 import { createDataRetentionService, summarizeDataRetention } from "./dataRetentionService";
 import { createCurrencyMutationService } from "./currencyMutationService";
 import { createCurrencyRateProviderService, type CurrencyRateProviderService } from "./currencyRateProviderService";
@@ -681,6 +681,9 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   );
   runStartupStep("backfill crew + department sync outbox", () =>
     applyTrackedStep(database, "runtime_crew_department_sync_backfill_v1", () => backfillCrewDepartmentSyncOutbox(database)),
+  );
+  runStartupStep("clean up seed-workspace crew/department outbox", () =>
+    applyTrackedStep(database, "runtime_crew_department_seed_outbox_cleanup_v1", () => cleanupSeedCrewDepartmentOutbox(database)),
   );
   runStartupStep("apply AI gateway foundation migration", () =>
     applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database)),

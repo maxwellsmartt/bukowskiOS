@@ -33,6 +33,12 @@ const enqueueUpsert = (db: DatabaseSync, workspaceId: unknown, entityType: strin
   );
 };
 
+// Only real (Supabase-backed) workspaces sync: their ids are uuids (36 chars).
+// The seed/demo workspace ("workspace-metadata") is local-only — pushing its
+// rows fails with `invalid input syntax for type uuid` because the mirror's
+// workspace_id is a uuid FK and no such remote workspace exists.
+const isSyncableWorkspaceId = (workspaceId: string) => workspaceId.length === 36 && workspaceId.split("-").length === 5;
+
 export const backfillCrewDepartmentSyncOutbox = (db: DatabaseSync) => {
   const now = new Date().toISOString();
 
@@ -48,6 +54,7 @@ export const backfillCrewDepartmentSyncOutbox = (db: DatabaseSync) => {
     .all() as Array<{ id: string; workspace_id: string }>;
 
   for (const row of crew) {
+    if (!isSyncableWorkspaceId(row.workspace_id)) continue;
     db.prepare("UPDATE crew_members SET updated_at = ? WHERE id = ?").run(now, row.id);
     enqueueUpsert(db, row.workspace_id, "crew", row.id, now);
   }
@@ -57,6 +64,20 @@ export const backfillCrewDepartmentSyncOutbox = (db: DatabaseSync) => {
     .all() as Array<{ id: string; workspace_id: string }>;
 
   for (const row of departments) {
+    if (!isSyncableWorkspaceId(row.workspace_id)) continue;
     enqueueUpsert(db, row.workspace_id, "department", row.id, now);
   }
+};
+
+// One-time cleanup for machines that ran the first backfill (v1) before the
+// uuid-workspace filter existed: drop the crew/department outbox rows for the
+// seed/demo workspace that can never push (invalid uuid workspace_id).
+export const cleanupSeedCrewDepartmentOutbox = (db: DatabaseSync) => {
+  db.prepare(
+    `
+      DELETE FROM sync_outbox
+      WHERE entity_type IN ('crew', 'department')
+        AND (length(workspace_id) != 36 OR workspace_id NOT LIKE '%-%-%-%-%')
+    `,
+  ).run();
 };
