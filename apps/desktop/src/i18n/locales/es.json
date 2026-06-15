@@ -1498,6 +1498,8 @@
         "openDocument": "La app no pudo abrir ese documento financiero."
       },
       "empty": {
+        "kicker": "Sin asientos",
+        "filteredKicker": "Sin resultados",
         "noMatchesTitle": "Sin resultados",
         "noMatchesBody": "Prueba otra búsqueda o límpiala para ver todas las entradas.",
         "noEntriesTitle": "Aún no hay entradas financieras",

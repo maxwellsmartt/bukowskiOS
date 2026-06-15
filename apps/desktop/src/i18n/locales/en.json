@@ -1496,6 +1496,8 @@
         "openDocument": "The app could not open that finance document."
       },
       "empty": {
+        "kicker": "No entries",
+        "filteredKicker": "No results",
         "noMatchesTitle": "No matches",
         "noMatchesBody": "Try a different search, or clear it to see every entry.",
         "noEntriesTitle": "No finance entries yet",

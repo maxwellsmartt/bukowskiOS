@@ -11,8 +11,8 @@ import { useAssetsList } from "@features/assets/useAssetsData";
 import { useIncidentsData } from "@features/incidents/useIncidentsData";
 import { useProjectsRegistry } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
-import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListToolbar } from "@shared/components/ListToolbar";
+import { ModalShell } from "@shared/components/ModalShell";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -138,15 +138,8 @@ export const FinanceEntriesPage = () => {
 
   return (
     <div className="page-stack page-stack--fill">
-      <SectionHeader title={t("finance.entries.title")} />
-
-      {error ? <div className="empty-state">{t("finance.entries.unavailable", { message: error })}</div> : null}
-
-      <div className="chip-row">
-        {selectedRowIds.length ? <StatusBadge>{t("finance.entries.selected", { count: selectedRowIds.length })}</StatusBadge> : null}
-      </div>
-
-      <div className="action-panel-actions action-panel-actions-start">
+      <div className="page-stack-row">
+        <SectionHeader eyebrow={t("finance.title")} title={t("finance.entries.title")} titleTone="accent" />
         <button
           className="action-primary-button"
           onClick={() => {
@@ -161,6 +154,8 @@ export const FinanceEntriesPage = () => {
           <span>{t("finance.entries.newEntry")}</span>
         </button>
       </div>
+
+      {error ? <div className="empty-state">{t("finance.entries.unavailable", { message: error })}</div> : null}
 
       {selectedRowIds.length ? (
         <div className="selection-action-bar">
@@ -195,6 +190,14 @@ export const FinanceEntriesPage = () => {
       ) : null}
 
       {isEditorOpen ? (
+        <ModalShell
+          onClose={() => {
+            setIsEditorOpen(false);
+            setEditingEntryId(null);
+            setInitialProjectIdForCreate(null);
+            setSubmitError(null);
+          }}
+        >
         <FinanceEntryEditorPanel
           assets={assets}
           documents={documents}
@@ -239,6 +242,7 @@ export const FinanceEntriesPage = () => {
           onSubmit={handleSubmit}
           projects={projects}
         />
+        </ModalShell>
       ) : null}
 
       <SurfaceCard className="surface-card--fill" title={t("finance.entries.title")}>
@@ -262,35 +266,17 @@ export const FinanceEntriesPage = () => {
           activeRowId={editingEntryId}
           fillParent
           emptyContent={
-            <GuidedEmptyState
-              title={financeControls.searchValue ? t("finance.entries.empty.noMatchesTitle") : t("finance.entries.empty.noEntriesTitle")}
-              body={
-                financeControls.searchValue
-                  ? t("finance.entries.empty.noMatchesBody")
-                  : t("finance.entries.empty.noEntriesBody")
-              }
-              tone="subtle"
-              actionLabel={financeControls.searchValue ? t("finance.entries.empty.clearSearch") : t("finance.entries.empty.addFirst")}
-              onAction={
-                financeControls.searchValue
-                  ? () => financeControls.setSearchValue("")
-                  : () => {
-                      setEditingEntryId(null);
-                      setInitialProjectIdForCreate(null);
-                      setSubmitError(null);
-                      setIsEditorOpen(true);
-                    }
-              }
-              tips={
-                financeControls.searchValue
-                  ? undefined
-                  : [
-                      t("finance.entries.empty.tipProject"),
-                      t("finance.entries.empty.tipDocuments"),
-                      t("finance.entries.empty.tipStatus"),
-                    ]
-              }
-            />
+            <div className="table-empty-state">
+              <span className="table-empty-kicker">
+                {financeControls.searchValue ? t("finance.entries.empty.filteredKicker") : t("finance.entries.empty.kicker")}
+              </span>
+              <strong>
+                {financeControls.searchValue ? t("finance.entries.empty.noMatchesTitle") : t("finance.entries.empty.noEntriesTitle")}
+              </strong>
+              <span>
+                {financeControls.searchValue ? t("finance.entries.empty.noMatchesBody") : t("finance.entries.empty.noEntriesBody")}
+              </span>
+            </div>
           }
           getRowId={(row) => row.id}
           onRowClick={(row) => {

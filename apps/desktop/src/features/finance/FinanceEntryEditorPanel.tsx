@@ -1,8 +1,9 @@
-import { Save, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AssetListRow, FinanceEntryRow, FinancialDocumentRow, IncidentListRow, ProjectCardRow } from "@contracts";
+import { useModalCloseGuard } from "@shared/components/ModalShell";
 import { SearchSelect } from "@shared/components/SearchSelect";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -95,33 +96,51 @@ export const FinanceEntryEditorPanel = ({
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
 
-  useEffect(() => {
-    if (!initialValue) {
-      setEntryType("reserve");
-      setCategory("");
-      setAmount("");
-      setCurrency("USD");
-      setStatus("Draft");
-      setProjectId(initialProjectId ?? "");
-      setAssetId("");
-      setIncidentId("");
-      setEntryDate(resolveDefaultDate());
-      setDescription("");
-      setNotes("");
-      return;
-    }
+  // Snapshot of the fields as the editor opened — the unsaved-changes guard
+  // compares the live draft against this.
+  const initialSnapshotRef = useRef("");
 
-    setEntryType(initialValue.type);
-    setCategory(initialValue.category);
-    setAmount(initialValue.amountValue !== undefined ? String(initialValue.amountValue) : "");
-    setCurrency(initialValue.currency ?? "USD");
-    setStatus(initialValue.status);
-    setProjectId(initialValue.projectId ?? "");
-    setAssetId(initialValue.assetId ?? "");
-    setIncidentId(initialValue.incidentId ?? "");
-    setEntryDate(initialValue.date);
-    setDescription(initialValue.description ?? "");
-    setNotes(initialValue.notes ?? "");
+  useEffect(() => {
+    const snapshot = initialValue
+      ? {
+          entryType: initialValue.type,
+          category: initialValue.category,
+          amount: initialValue.amountValue !== undefined ? String(initialValue.amountValue) : "",
+          currency: initialValue.currency ?? "USD",
+          status: initialValue.status,
+          projectId: initialValue.projectId ?? "",
+          assetId: initialValue.assetId ?? "",
+          incidentId: initialValue.incidentId ?? "",
+          entryDate: initialValue.date,
+          description: initialValue.description ?? "",
+          notes: initialValue.notes ?? "",
+        }
+      : {
+          entryType: "reserve",
+          category: "",
+          amount: "",
+          currency: "USD",
+          status: "Draft",
+          projectId: initialProjectId ?? "",
+          assetId: "",
+          incidentId: "",
+          entryDate: resolveDefaultDate(),
+          description: "",
+          notes: "",
+        };
+
+    setEntryType(snapshot.entryType);
+    setCategory(snapshot.category);
+    setAmount(snapshot.amount);
+    setCurrency(snapshot.currency);
+    setStatus(snapshot.status);
+    setProjectId(snapshot.projectId);
+    setAssetId(snapshot.assetId);
+    setIncidentId(snapshot.incidentId);
+    setEntryDate(snapshot.entryDate);
+    setDescription(snapshot.description);
+    setNotes(snapshot.notes);
+    initialSnapshotRef.current = JSON.stringify(snapshot);
   }, [initialProjectId, initialValue]);
 
   const selectedProjectLabel = useMemo(
@@ -149,15 +168,65 @@ export const FinanceEntryEditorPanel = ({
     [documents, selectedDocumentId],
   );
 
+  const submitDraft = () =>
+    onSubmit({
+      entryType,
+      category,
+      amount: Number(amount || 0),
+      currency,
+      status,
+      projectId: normalizeOptional(projectId),
+      assetId: normalizeOptional(assetId),
+      incidentId: normalizeOptional(incidentId),
+      entryDate,
+      description: normalizeOptional(description),
+      notes: normalizeOptional(notes),
+    });
+
+  // Unsaved-changes guard: any field moved away from how the editor opened.
+  const closeGuard = useModalCloseGuard();
+  const currentSnapshot = JSON.stringify({
+    entryType,
+    category,
+    amount,
+    currency,
+    status,
+    projectId,
+    assetId,
+    incidentId,
+    entryDate,
+    description,
+    notes,
+  });
+  const snapshotRef = useRef(currentSnapshot);
+  snapshotRef.current = currentSnapshot;
+  const submitRef = useRef(submitDraft);
+  submitRef.current = submitDraft;
+
+  useEffect(() => {
+    if (!closeGuard) {
+      return undefined;
+    }
+    closeGuard.registerGuard({
+      isDirty: () => snapshotRef.current !== initialSnapshotRef.current,
+      apply: () => submitRef.current(),
+    });
+    return () => closeGuard.registerGuard(null);
+  }, [closeGuard]);
+
+  const requestClose = closeGuard?.requestClose ?? onClose;
+
   return (
-    <SurfaceCard
-      aside={
-        <button aria-label={t("finance.entries.editor.closeAria")} className="icon-ghost-control" onClick={onClose} type="button">
-          <X size={14} />
+    <div className="incident-report-dialog">
+      <div className="document-preview-header">
+        <span className="document-preview-title">
+          {mode === "create" ? t("finance.entries.editor.titleCreate") : t("finance.entries.editor.titleEdit")}
+        </span>
+        <button aria-label={t("finance.entries.editor.closeAria")} className="icon-ghost-control" onClick={requestClose} type="button">
+          <X size={16} />
         </button>
-      }
-      title={mode === "create" ? t("finance.entries.editor.titleCreate") : t("finance.entries.editor.titleEdit")}
-    >
+      </div>
+      <div className="modal-form-body">
       <div className="summary-grid compact-summary-grid">
         <div className="summary-row">
           <span className="summary-label">{t("finance.entries.editor.mode")}</span>
@@ -390,28 +459,13 @@ export const FinanceEntryEditorPanel = ({
         </SurfaceCard>
       ) : null}
 
-      <div className="action-panel-actions">
-        <button
-          className="action-primary-button"
-          disabled={isSubmitting}
-          onClick={() =>
-            void onSubmit({
-              entryType,
-              category,
-              amount: Number(amount || 0),
-              currency,
-              status,
-              projectId: normalizeOptional(projectId),
-              assetId: normalizeOptional(assetId),
-              incidentId: normalizeOptional(incidentId),
-              entryDate,
-              description: normalizeOptional(description),
-              notes: normalizeOptional(notes),
-            })
-          }
-          type="button"
-        >
-          <Save size={14} />
+      </div>
+
+      <div className="document-preview-header packing-insurance-export-footer">
+        <button className="ghost-control" disabled={isSubmitting} onClick={requestClose} type="button">
+          {t("common.cancel")}
+        </button>
+        <button className="action-primary-button" disabled={isSubmitting} onClick={() => void submitDraft()} type="button">
           <span>
             {isSubmitting
               ? t("common.saving")
@@ -420,10 +474,7 @@ export const FinanceEntryEditorPanel = ({
                 : t("common.saveChanges")}
           </span>
         </button>
-        <button className="ghost-control cancel-control" disabled={isSubmitting} onClick={onClose} type="button">
-          {t("common.cancel")}
-        </button>
       </div>
-    </SurfaceCard>
+    </div>
   );
 };
