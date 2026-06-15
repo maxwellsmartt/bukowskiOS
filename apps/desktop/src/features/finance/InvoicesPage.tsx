@@ -179,7 +179,7 @@ export const InvoicesPage = () => {
     <div className="page-stack page-stack--fill">
       <div className="page-stack-row">
         <SectionHeader eyebrow={t("finance.title")} title={t("finance.invoices.title")} titleTone="accent" />
-        <button className="ghost-control is-active" onClick={() => navigate("/finance/invoices/new")} type="button">
+        <button className="action-primary-button" onClick={() => navigate("/finance/invoices/new")} type="button">
           <Plus size={13} />
           <span>{t("finance.invoices.actions.newManual")}</span>
         </button>

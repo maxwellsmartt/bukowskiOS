@@ -327,31 +327,33 @@ export const CollaboratorFeesPage = () => {
             <CreditCard size={13} />
             <span>{t("finance.collaboratorFees.actions.recordPayment")}</span>
           </button>
-          <button className="ghost-control is-active" onClick={() => openCreate()} type="button">
+          <button className="action-primary-button" onClick={() => openCreate()} type="button">
             <Plus size={13} />
             <span>{t("finance.collaboratorFees.actions.newFee")}</span>
           </button>
         </div>
       </div>
 
-      <div className="quotes-summary-grid">
-        <SurfaceCard className="quotes-summary-tile">
-          <span className="quotes-summary-tile-label">{t("finance.collaboratorFees.summary.pending")}</span>
-          <strong className="quotes-summary-tile-value">{formatCurrency(summary.pendingAmount, "DOP", language)}</strong>
-        </SurfaceCard>
-        <SurfaceCard className="quotes-summary-tile">
-          <span className="quotes-summary-tile-label">{t("finance.collaboratorFees.summary.approvedToPay")}</span>
-          <strong className="quotes-summary-tile-value">{formatCurrency(summary.approvedAmount, "DOP", language)}</strong>
-        </SurfaceCard>
-        <SurfaceCard className="quotes-summary-tile">
-          <span className="quotes-summary-tile-label">{t("finance.collaboratorFees.summary.paidThisMonth")}</span>
-          <strong className="quotes-summary-tile-value">{formatCurrency(summary.paidThisMonth, "DOP", language)}</strong>
-        </SurfaceCard>
-        <SurfaceCard className="quotes-summary-tile">
-          <span className="quotes-summary-tile-label">{t("finance.collaboratorFees.summary.withBalance")}</span>
-          <strong className="quotes-summary-tile-value">{summary.collaboratorsWithBalance}</strong>
-        </SurfaceCard>
-      </div>
+      <SurfaceCard className="quotes-summary-card">
+        <div className="quotes-summary-grid">
+          <div className="quotes-summary-tile">
+            <span className="quotes-summary-tile-label">{t("finance.collaboratorFees.summary.pending")}</span>
+            <strong className="quotes-summary-tile-value">{formatCurrency(summary.pendingAmount, "DOP", language)}</strong>
+          </div>
+          <div className="quotes-summary-tile">
+            <span className="quotes-summary-tile-label">{t("finance.collaboratorFees.summary.approvedToPay")}</span>
+            <strong className="quotes-summary-tile-value">{formatCurrency(summary.approvedAmount, "DOP", language)}</strong>
+          </div>
+          <div className="quotes-summary-tile">
+            <span className="quotes-summary-tile-label">{t("finance.collaboratorFees.summary.paidThisMonth")}</span>
+            <strong className="quotes-summary-tile-value">{formatCurrency(summary.paidThisMonth, "DOP", language)}</strong>
+          </div>
+          <div className="quotes-summary-tile">
+            <span className="quotes-summary-tile-label">{t("finance.collaboratorFees.summary.withBalance")}</span>
+            <strong className="quotes-summary-tile-value">{summary.collaboratorsWithBalance}</strong>
+          </div>
+        </div>
+      </SurfaceCard>
 
       {loadError ? <div className="form-inline-error">{loadError}</div> : null}
 
