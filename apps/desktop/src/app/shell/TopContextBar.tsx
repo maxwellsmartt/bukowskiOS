@@ -47,15 +47,20 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     [activeProject],
   );
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // Must re-arm on every mount: under StrictMode (and any remount) the
+    // cleanup of the prior mount sets this false, and a ref initialized once to
+    // `true` is never restored — leaving every `if (isMountedRef.current)`
+    // state guard permanently false (sync snapshot stuck on "…", Sincronizar
+    // button stuck on "Sincronizando").
+    isMountedRef.current = true;
+    return () => {
       isMountedRef.current = false;
       if (syncButtonReleaseTimerRef.current) {
         window.clearTimeout(syncButtonReleaseTimerRef.current);
       }
-    },
-    [],
-  );
+    };
+  }, []);
 
   useEffect(() => {
     if (!syncPopoverOpen) {
