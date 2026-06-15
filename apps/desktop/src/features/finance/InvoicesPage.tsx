@@ -1,4 +1,4 @@
-import { Eye, FileText, Pencil, Plus } from "lucide-react";
+import { Eye, Pencil, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -275,13 +275,6 @@ export const InvoicesPage = () => {
         />
 
         {error ? <div className="form-inline-error">{error}</div> : null}
-      </SurfaceCard>
-
-      <SurfaceCard className="invoice-footnote-card">
-        <div className="invoice-footnote-content">
-          <FileText size={15} />
-          <span>{t("finance.invoices.footnote")}</span>
-        </div>
       </SurfaceCard>
     </div>
   );
