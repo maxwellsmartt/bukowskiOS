@@ -29,8 +29,31 @@ CREATE TABLE IF NOT EXISTS public.crew_members (
   notes text,
   is_active integer NOT NULL DEFAULT 1,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  -- The local crew_members table grew these columns in later migrations
+  -- (crew catalog foundation + payroll rates). The outbox push sends the full
+  -- local row (SELECT *), so the mirror must carry every column or PostgREST
+  -- rejects the upsert ("Could not find the '<col>' column ... in the schema
+  -- cache"). They are plain columns here — no FKs — so a crew row never blocks
+  -- on an unsynced department/document/user.
+  linked_user_id text,
+  primary_department_id text,
+  document_id text,
+  default_daily_rate numeric,
+  default_weekly_rate numeric,
+  default_overtime_rate numeric,
+  rate_currency text
 );
+
+-- Idempotent for environments that already created crew_members from an earlier
+-- version of this migration (before the extra columns were included).
+ALTER TABLE public.crew_members ADD COLUMN IF NOT EXISTS linked_user_id text;
+ALTER TABLE public.crew_members ADD COLUMN IF NOT EXISTS primary_department_id text;
+ALTER TABLE public.crew_members ADD COLUMN IF NOT EXISTS document_id text;
+ALTER TABLE public.crew_members ADD COLUMN IF NOT EXISTS default_daily_rate numeric;
+ALTER TABLE public.crew_members ADD COLUMN IF NOT EXISTS default_weekly_rate numeric;
+ALTER TABLE public.crew_members ADD COLUMN IF NOT EXISTS default_overtime_rate numeric;
+ALTER TABLE public.crew_members ADD COLUMN IF NOT EXISTS rate_currency text;
 
 CREATE TABLE IF NOT EXISTS public.departments (
   id text PRIMARY KEY,

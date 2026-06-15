@@ -233,6 +233,10 @@ const applyRemoteCatalogRowsSchema = z.object({
       notes: z.string().nullable().optional(),
       full_name: z.string().nullable().optional(),
       role_label: z.string().nullable().optional(),
+      default_daily_rate: z.number().nullable().optional(),
+      default_weekly_rate: z.number().nullable().optional(),
+      default_overtime_rate: z.number().nullable().optional(),
+      rate_currency: z.string().nullable().optional(),
     }),
   ),
 });

@@ -34,6 +34,10 @@ export type RemoteCatalogRow = {
   // crew_members
   full_name?: string | null;
   role_label?: string | null;
+  default_daily_rate?: number | null;
+  default_weekly_rate?: number | null;
+  default_overtime_rate?: number | null;
+  rate_currency?: string | null;
 };
 
 // departments is the only synced catalog without a local updated_at column
@@ -243,11 +247,20 @@ const upsertProductionCompanies = (db: DatabaseSync, row: RemoteCatalogRow) => {
 };
 
 const upsertCrewMembers = (db: DatabaseSync, row: RemoteCatalogRow) => {
+  // FK columns (primary_department_id, document_id, linked_user_id) are
+  // intentionally left to the local row: hydrating them here risks an FK
+  // failure if the referenced row hasn't synced yet, and they aren't needed to
+  // resolve project crew assignments (those only need the crew row to exist).
+  // Identity, contact and payroll-rate columns are safe plain values.
   db
     .prepare(
       `
-        INSERT INTO crew_members (id, workspace_id, full_name, role_label, email, phone, notes, is_active, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM crew_members WHERE id = ?), ?), ?)
+        INSERT INTO crew_members (
+          id, workspace_id, full_name, role_label, email, phone, notes, is_active,
+          default_daily_rate, default_weekly_rate, default_overtime_rate, rate_currency,
+          created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM crew_members WHERE id = ?), ?), ?)
         ON CONFLICT(id) DO UPDATE SET
           full_name = excluded.full_name,
           role_label = excluded.role_label,
@@ -255,6 +268,10 @@ const upsertCrewMembers = (db: DatabaseSync, row: RemoteCatalogRow) => {
           phone = excluded.phone,
           notes = excluded.notes,
           is_active = excluded.is_active,
+          default_daily_rate = excluded.default_daily_rate,
+          default_weekly_rate = excluded.default_weekly_rate,
+          default_overtime_rate = excluded.default_overtime_rate,
+          rate_currency = excluded.rate_currency,
           updated_at = excluded.updated_at
       `,
     )
@@ -267,6 +284,10 @@ const upsertCrewMembers = (db: DatabaseSync, row: RemoteCatalogRow) => {
       row.phone ?? null,
       row.notes ?? null,
       activeFlag(row),
+      row.default_daily_rate ?? null,
+      row.default_weekly_rate ?? null,
+      row.default_overtime_rate ?? null,
+      row.rate_currency ?? null,
       row.id,
       row.updated_at,
       row.updated_at,

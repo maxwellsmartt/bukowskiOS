@@ -279,6 +279,10 @@ export type AppRemoteCatalogRow = {
   // crew_members
   full_name?: string | null;
   role_label?: string | null;
+  default_daily_rate?: number | null;
+  default_weekly_rate?: number | null;
+  default_overtime_rate?: number | null;
+  rate_currency?: string | null;
 };
 
 export type AppApplyRemoteCatalogRowsCommand = {
