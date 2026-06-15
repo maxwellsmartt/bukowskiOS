@@ -986,6 +986,17 @@
         "all": "Todas",
         "status": "Estado"
       },
+      "toolbar": {
+        "resultLabel": "facturas"
+      },
+      "sort": {
+        "issueDate": "Fecha de emisión",
+        "number": "Factura #",
+        "client": "Cliente",
+        "dueDate": "Vencimiento",
+        "total": "Total",
+        "status": "Estado"
+      },
       "columns": {
         "invoiceNumber": "Factura #",
         "ncf": "NCF",
@@ -999,7 +1010,8 @@
       },
       "actions": {
         "newManual": "Factura manual",
-        "view": "Ver factura"
+        "view": "Ver factura",
+        "edit": "Editar borrador"
       },
       "toasts": {
         "issued": "Factura emitida",
@@ -1178,6 +1190,8 @@
       },
       "empty": {
         "clearFilters": "Limpiar filtros",
+        "kicker": "Sin facturas",
+        "filteredKicker": "Sin resultados",
         "noMatchesTitle": "No hay facturas con estos filtros",
         "noMatchesBody": "Amplía el filtro de estado o limpia la búsqueda.",
         "noInvoicesTitle": "Aún no hay facturas",

@@ -984,6 +984,17 @@
         "all": "All",
         "status": "Status"
       },
+      "toolbar": {
+        "resultLabel": "invoices"
+      },
+      "sort": {
+        "issueDate": "Issue date",
+        "number": "Invoice #",
+        "client": "Client",
+        "dueDate": "Due date",
+        "total": "Total",
+        "status": "Status"
+      },
       "columns": {
         "invoiceNumber": "Invoice #",
         "ncf": "NCF",
@@ -997,7 +1008,8 @@
       },
       "actions": {
         "newManual": "Manual invoice",
-        "view": "View invoice"
+        "view": "View invoice",
+        "edit": "Edit draft"
       },
       "toasts": {
         "issued": "Invoice issued",
@@ -1176,6 +1188,8 @@
       },
       "empty": {
         "clearFilters": "Clear filters",
+        "kicker": "No invoices",
+        "filteredKicker": "No results",
         "noMatchesTitle": "No invoices match these filters",
         "noMatchesBody": "Try widening the status filter or clearing the search.",
         "noInvoicesTitle": "No invoices yet",
