@@ -21,7 +21,7 @@ export type RemoteCatalogRow = {
   description?: string | null;
   parent_category_id?: string | null;
   type?: string | null;
-  is_active?: boolean | null;
+  is_active?: boolean | number | null;
   updated_at: string;
   // Business-catalog fields (clients / manufacturers / production_companies).
   contact_name?: string | null;
@@ -147,7 +147,9 @@ const upsertAssetCategories = (db: DatabaseSync, row: RemoteCatalogRow) => {
     );
 };
 
-const activeFlag = (row: RemoteCatalogRow) => (row.is_active === false ? 0 : 1);
+// Accept boolean (locations) or integer (crew_members/clients…) is_active; only
+// an explicit false / 0 means inactive.
+const activeFlag = (row: RemoteCatalogRow) => (row.is_active === false || row.is_active === 0 ? 0 : 1);
 
 const upsertClients = (db: DatabaseSync, row: RemoteCatalogRow) => {
   db

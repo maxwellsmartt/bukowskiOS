@@ -266,7 +266,7 @@ export type AppRemoteCatalogRow = {
   description?: string | null;
   parent_category_id?: string | null;
   type?: string | null;
-  is_active?: boolean | null;
+  is_active?: boolean | number | null;
   updated_at: string;
   // Business-catalog fields (clients / manufacturers / production_companies).
   contact_name?: string | null;

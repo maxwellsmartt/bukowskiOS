@@ -222,7 +222,9 @@ const applyRemoteCatalogRowsSchema = z.object({
       description: z.string().nullable().optional(),
       parent_category_id: z.string().nullable().optional(),
       type: z.string().nullable().optional(),
-      is_active: z.boolean().nullable().optional(),
+      // PostgREST returns integer is_active columns (crew_members, clients…) as
+      // numbers and boolean columns (locations) as booleans — accept both.
+      is_active: z.union([z.boolean(), z.number()]).nullable().optional(),
       updated_at: z.string().min(1),
       contact_name: z.string().nullable().optional(),
       email: z.string().nullable().optional(),
