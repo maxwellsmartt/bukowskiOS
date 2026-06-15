@@ -222,20 +222,23 @@ export const InvoicesPage = () => {
           sortBy={sortBy}
           sortDirection={sortDirection}
           sortOptions={sortOptions.map((option) => ({ ...option, label: t(option.label) }))}
+          rightActions={
+            <label className="compact-filter-field">
+              <span>{t("finance.invoices.filters.status")}</span>
+              <select
+                className="compact-filter-select"
+                onChange={(event) => setStatusFilter(event.target.value as InvoiceStatus | "all")}
+                value={statusFilter}
+              >
+                {allStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {statusLabel(status)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          }
         />
-
-        <div className="packing-filter-row" aria-label={t("finance.invoices.filters.status")}>
-          {allStatuses.map((status) => (
-            <button
-              className={`filter-chip${statusFilter === status ? " active" : ""}`}
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              type="button"
-            >
-              <span>{statusLabel(status)}</span>
-            </button>
-          ))}
-        </div>
 
         {isLoading && data.length === 0 ? <TableSkeleton rows={6} /> : null}
 

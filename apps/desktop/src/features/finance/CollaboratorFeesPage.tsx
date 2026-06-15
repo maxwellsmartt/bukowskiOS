@@ -382,6 +382,20 @@ export const CollaboratorFeesPage = () => {
       <SurfaceCard className="surface-card--fill" title={t("finance.collaboratorFees.cardTitle")}>
         <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap" }}>
           <label className="compact-filter-field">
+            <span>{t("finance.collaboratorFees.filters.status")}</span>
+            <select
+              className="compact-filter-select"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as FeeStatusFilter)}
+            >
+              {statusFilters.map((status) => (
+                <option key={status} value={status}>
+                  {statusLabel(status)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="compact-filter-field">
             <span>{t("finance.collaboratorFees.filters.project")}</span>
             <select className="compact-filter-select" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}>
               <option value="">{t("finance.collaboratorFees.filters.allProjects")}</option>
@@ -415,18 +429,6 @@ export const CollaboratorFeesPage = () => {
           sortOptions={sortOptions.map((option) => ({ ...option, label: t(option.label) }))}
         />
 
-        <div className="packing-filter-row" aria-label={t("finance.collaboratorFees.filters.status")}>
-          {statusFilters.map((status) => (
-            <button
-              className={`filter-chip${statusFilter === status ? " active" : ""}`}
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              type="button"
-            >
-              <span>{statusLabel(status)}</span>
-            </button>
-          ))}
-        </div>
 
         {isLoading && data.length === 0 ? <TableSkeleton rows={6} /> : null}
 
