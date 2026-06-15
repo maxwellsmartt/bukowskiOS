@@ -20,6 +20,7 @@ export const uiPreferenceKeys = {
   projectsSideRailWidth: "projects-side-rail-width",
   splitSideRailWidth: "split-side-rail-width",
   shellProjectsShowArchived: "shell-projects-show-archived",
+  shellProjectsSort: "shell-projects-sort",
   activeWorkspaceId: "active-workspace-id",
   onboardingTourCompletedWorkspaces: "onboarding-tour-completed-workspaces",
   autoLogoutInactivityMinutes: "auto-logout-inactivity-minutes",

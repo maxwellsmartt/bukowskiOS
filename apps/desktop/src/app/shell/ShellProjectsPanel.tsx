@@ -12,10 +12,18 @@ import { useProjectTimelinePreferences } from "@features/projects/useProjectTime
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 import type { ProjectCardRow, ProjectDeletePreview } from "@contracts";
 
 type LinkedItem = { labelKey: string; count: number };
 type ProjectSidebarSort = "name" | "code" | "startDate" | "createdAt" | "updatedAt" | "incidents";
+
+const projectSortValues: ProjectSidebarSort[] = ["name", "code", "startDate", "createdAt", "updatedAt", "incidents"];
+
+const readStoredProjectSort = (): ProjectSidebarSort => {
+  const stored = readStringPreference(uiPreferenceKeys.shellProjectsSort);
+  return projectSortValues.includes(stored as ProjectSidebarSort) ? (stored as ProjectSidebarSort) : "name";
+};
 
 const buildLinkedItems = (preview: ProjectDeletePreview): LinkedItem[] => {
   const relationSummary = preview.operationalRelationSummary;
@@ -57,7 +65,12 @@ export const ShellProjectsPanel = () => {
   const [deletePreview, setDeletePreview] = useState<{ project: ProjectCardRow; preview: ProjectDeletePreview } | null>(null);
   const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
   const [projectSearch, setProjectSearch] = useState("");
-  const [projectSort, setProjectSort] = useState<ProjectSidebarSort>("name");
+  const [projectSort, setProjectSort] = useState<ProjectSidebarSort>(readStoredProjectSort);
+
+  const handleProjectSortChange = (next: ProjectSidebarSort) => {
+    setProjectSort(next);
+    writePreference(uiPreferenceKeys.shellProjectsSort, next);
+  };
 
   const visibleProjects = useMemo(() => {
     const query = projectSearch.trim().toLocaleLowerCase();
@@ -245,7 +258,7 @@ export const ShellProjectsPanel = () => {
           <ListFilter size={12} />
           <select
             aria-label={t("shell.projectsPanel.sortAria", { defaultValue: "Ordenar proyectos" })}
-            onChange={(event) => setProjectSort(event.target.value as ProjectSidebarSort)}
+            onChange={(event) => handleProjectSortChange(event.target.value as ProjectSidebarSort)}
             value={projectSort}
           >
             <option value="name">{t("shell.projectsPanel.sortName", { defaultValue: "Nombre" })}</option>
