@@ -6091,6 +6091,16 @@ button.project-incidents-command-metric {
   overflow: hidden;
 }
 
+/* Finance registry routes (cost-links, quotes, invoices, collaborators,
+   entries) fill the viewport like the other tables: the shell stops scrolling
+   so the page-stack--fill + surface-card--fill + fillParent chain owns the
+   height and only the table scrolls. */
+.shell-content-finance-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .incidents-page-stack--fill {
   flex: 1 1 auto;
   min-height: 0;

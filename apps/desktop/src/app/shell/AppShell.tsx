@@ -83,6 +83,15 @@ export const AppShell = () => {
   const isPackingRoute = location.pathname === "/packing-slips";
   const isIncidentsRoute = location.pathname === "/incidents";
   const isRmaRoute = location.pathname === "/rma";
+  // Finance list/registry routes (table screens) fill the viewport like the
+  // other registries. Detail/editor finance routes scroll normally.
+  const isFinanceListRoute = [
+    "/finance/cost-links",
+    "/finance/quotes",
+    "/finance/invoices",
+    "/finance/collaborators",
+    "/finance/entries",
+  ].includes(location.pathname);
   const [sidebarWidth, setSidebarWidth] = useState(() =>
     clampSidebarWidth(readNumberPreference(uiPreferenceKeys.shellSidebarWidth, sidebarWidthDefault)),
   );
@@ -356,7 +365,7 @@ export const AppShell = () => {
           <Breadcrumb />
           {subnavItems.length ? <SubnavTabs items={subnavItems} /> : null}
           <RouteTransitionMain
-            className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}${activeRoute.domain === "projects" ? " shell-content-projects" : ""}${activeRoute.domain === "assets" ? " shell-content-assets" : ""}${isLicensesRoute ? " shell-content-licenses" : ""}${isCatalogRoute ? " shell-content-catalog" : ""}${isPackingRoute ? " shell-content-packing" : ""}${isIncidentsRoute ? " shell-content-incidents" : ""}${isRmaRoute ? " shell-content-rma" : ""}`}
+            className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}${activeRoute.domain === "projects" ? " shell-content-projects" : ""}${activeRoute.domain === "assets" ? " shell-content-assets" : ""}${isLicensesRoute ? " shell-content-licenses" : ""}${isCatalogRoute ? " shell-content-catalog" : ""}${isPackingRoute ? " shell-content-packing" : ""}${isIncidentsRoute ? " shell-content-incidents" : ""}${isRmaRoute ? " shell-content-rma" : ""}${isFinanceListRoute ? " shell-content-finance-list" : ""}`}
             transitionKey={location.pathname}
           >
             {!isScopeReady ? (
