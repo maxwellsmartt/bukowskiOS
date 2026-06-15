@@ -1323,6 +1323,125 @@
         "financeStatus": "Estado financiero"
       }
     },
+    "collaboratorFees": {
+      "title": "Honorarios",
+      "cardTitle": "Honorarios",
+      "actions": {
+        "recordPayment": "Registrar pago",
+        "newFee": "Nuevo honorario"
+      },
+      "summary": {
+        "pending": "Pendiente",
+        "approvedToPay": "Aprobado por pagar",
+        "paidThisMonth": "Pagado este mes",
+        "withBalance": "Con balance"
+      },
+      "filters": {
+        "status": "Estado",
+        "project": "Proyecto",
+        "crew": "Colaborador",
+        "allProjects": "Todos",
+        "allCrew": "Todos"
+      },
+      "statuses": {
+        "all": "Todos",
+        "draft": "Borrador",
+        "approved": "Aprobado",
+        "scheduled": "Programado",
+        "partially_paid": "Pago parcial",
+        "paid": "Pagado",
+        "cancelled": "Cancelado"
+      },
+      "sort": {
+        "expectedDate": "Fecha esperada",
+        "crew": "Colaborador",
+        "project": "Proyecto",
+        "feeType": "Tipo",
+        "amount": "Monto",
+        "outstanding": "Pendiente",
+        "status": "Estado"
+      },
+      "columns": {
+        "crew": "Colaborador",
+        "project": "Proyecto",
+        "feeType": "Tipo",
+        "date": "Fecha",
+        "amount": "Monto",
+        "outstanding": "Pendiente",
+        "status": "Estado"
+      },
+      "toolbar": {
+        "searchPlaceholder": "Buscar por colaborador, proyecto o tipo…",
+        "resultLabel": "honorarios"
+      },
+      "empty": {
+        "kicker": "Sin honorarios",
+        "title": "No hay honorarios todavía",
+        "body": "Crea un honorario manual o usa una sugerencia desde asignaciones de crew.",
+        "filteredTitle": "Nada coincide con estos filtros",
+        "filteredBody": "Prueba con otro término o limpia los filtros para ver todos los honorarios."
+      },
+      "editor": {
+        "newTitle": "Nuevo honorario",
+        "editTitle": "Editar honorario",
+        "crew": "Colaborador",
+        "chooseCrew": "Selecciona colaborador",
+        "project": "Proyecto",
+        "noProject": "Sin proyecto",
+        "type": "Tipo",
+        "typePlaceholder": "Ej: Honorario de crew",
+        "amount": "Monto",
+        "currency": "Moneda",
+        "expectedDate": "Fecha esperada",
+        "description": "Descripción",
+        "notes": "Notas",
+        "prefillNote": "Prellenado desde una asignación de crew. Nada se crea hasta guardar.",
+        "save": "Guardar honorario"
+      },
+      "payment": {
+        "title": "Registrar pago",
+        "selectionSummary_one": "{{count}} honorario · {{amount}} seleccionado",
+        "selectionSummary_other": "{{count}} honorarios · {{amount}} seleccionados",
+        "amount": "Monto a pagar",
+        "date": "Fecha",
+        "method": "Método",
+        "reference": "Referencia",
+        "notes": "Notas",
+        "submit": "Registrar pago"
+      },
+      "suggestions": {
+        "title": "Sugerencias desde asignaciones de crew",
+        "subtitle": "Puedes convertir una asignación en honorario sin automatizar pagos.",
+        "use": "Usar"
+      },
+      "rowActions": {
+        "edit": "Editar",
+        "approve": "Aprobar",
+        "cancel": "Cancelar"
+      },
+      "toasts": {
+        "feeCreated": "Honorario creado",
+        "feeUpdated": "Honorario actualizado",
+        "feeApproved": "Honorario aprobado",
+        "feeCancelled": "Honorario cancelado",
+        "paymentRecorded": "Pago registrado",
+        "approveFailed": "No se pudo aprobar",
+        "cancelFailed": "No se pudo cancelar",
+        "saveFailed": "No se pudo guardar el honorario.",
+        "paymentFailed": "No se pudo registrar el pago.",
+        "retry": "Intenta de nuevo."
+      },
+      "validation": {
+        "feeRequired": "Elige un colaborador, tipo y un monto positivo.",
+        "paymentRange": "El monto debe ser positivo y no puede exceder el saldo seleccionado."
+      },
+      "confirmDuplicate": {
+        "title": "¿Honorario duplicado?",
+        "body": "Ya existe un honorario con el mismo colaborador, tipo, monto y proyecto. ¿Crearlo de todos modos?",
+        "action": "Crear de todos modos"
+      },
+      "cancelReason": "Cancelado desde Finanzas > Honorarios."
+    },
     "entries": {
       "title": "Entradas",
       "newEntry": "Nueva entrada",

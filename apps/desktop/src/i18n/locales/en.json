@@ -1321,6 +1321,125 @@
         "financeStatus": "Finance status"
       }
     },
+    "collaboratorFees": {
+      "title": "Crew fees",
+      "cardTitle": "Crew fees",
+      "actions": {
+        "recordPayment": "Record payment",
+        "newFee": "New fee"
+      },
+      "summary": {
+        "pending": "Pending",
+        "approvedToPay": "Approved to pay",
+        "paidThisMonth": "Paid this month",
+        "withBalance": "With balance"
+      },
+      "filters": {
+        "status": "Status",
+        "project": "Project",
+        "crew": "Collaborator",
+        "allProjects": "All",
+        "allCrew": "All"
+      },
+      "statuses": {
+        "all": "All",
+        "draft": "Draft",
+        "approved": "Approved",
+        "scheduled": "Scheduled",
+        "partially_paid": "Partially paid",
+        "paid": "Paid",
+        "cancelled": "Cancelled"
+      },
+      "sort": {
+        "expectedDate": "Expected date",
+        "crew": "Collaborator",
+        "project": "Project",
+        "feeType": "Type",
+        "amount": "Amount",
+        "outstanding": "Outstanding",
+        "status": "Status"
+      },
+      "columns": {
+        "crew": "Collaborator",
+        "project": "Project",
+        "feeType": "Type",
+        "date": "Date",
+        "amount": "Amount",
+        "outstanding": "Outstanding",
+        "status": "Status"
+      },
+      "toolbar": {
+        "searchPlaceholder": "Search by collaborator, project or type…",
+        "resultLabel": "fees"
+      },
+      "empty": {
+        "kicker": "No fees",
+        "title": "No fees yet",
+        "body": "Create a manual fee or use a suggestion from crew assignments.",
+        "filteredTitle": "Nothing matches these filters",
+        "filteredBody": "Try another term or clear the filters to see all fees."
+      },
+      "editor": {
+        "newTitle": "New fee",
+        "editTitle": "Edit fee",
+        "crew": "Collaborator",
+        "chooseCrew": "Choose collaborator",
+        "project": "Project",
+        "noProject": "No project",
+        "type": "Type",
+        "typePlaceholder": "e.g. Crew fee",
+        "amount": "Amount",
+        "currency": "Currency",
+        "expectedDate": "Expected date",
+        "description": "Description",
+        "notes": "Notes",
+        "prefillNote": "Prefilled from a crew assignment. Nothing is created until you save.",
+        "save": "Save fee"
+      },
+      "payment": {
+        "title": "Record payment",
+        "selectionSummary_one": "{{count}} fee · {{amount}} selected",
+        "selectionSummary_other": "{{count}} fees · {{amount}} selected",
+        "amount": "Amount to pay",
+        "date": "Date",
+        "method": "Method",
+        "reference": "Reference",
+        "notes": "Notes",
+        "submit": "Record payment"
+      },
+      "suggestions": {
+        "title": "Suggestions from crew assignments",
+        "subtitle": "You can turn an assignment into a fee without automating payments.",
+        "use": "Use"
+      },
+      "rowActions": {
+        "edit": "Edit",
+        "approve": "Approve",
+        "cancel": "Cancel"
+      },
+      "toasts": {
+        "feeCreated": "Fee created",
+        "feeUpdated": "Fee updated",
+        "feeApproved": "Fee approved",
+        "feeCancelled": "Fee cancelled",
+        "paymentRecorded": "Payment recorded",
+        "approveFailed": "Couldn't approve",
+        "cancelFailed": "Couldn't cancel",
+        "saveFailed": "Couldn't save the fee.",
+        "paymentFailed": "Couldn't record the payment.",
+        "retry": "Try again."
+      },
+      "validation": {
+        "feeRequired": "Choose a collaborator, type and a positive amount.",
+        "paymentRange": "The amount must be positive and can't exceed the selected balance."
+      },
+      "confirmDuplicate": {
+        "title": "Duplicate fee?",
+        "body": "A fee with the same collaborator, type, amount and project already exists. Create it anyway?",
+        "action": "Create anyway"
+      },
+      "cancelReason": "Cancelled from Finance > Crew fees."
+    },
     "entries": {
       "title": "Entries",
       "newEntry": "New entry",
