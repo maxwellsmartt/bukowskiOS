@@ -46,6 +46,8 @@ export const userSettingKeys = {
   tablePreferences: "tablePreferences",
   /** Cross-device project timeline ordering and visibility per workspace. */
   projectTimelinePreferences: "projectTimelinePreferences",
+  /** Cross-device sort preference for the project list in the app sidebar. */
+  projectSidebarSort: "projectSidebarSort",
 } as const;
 
 export type UserSettingKey = (typeof userSettingKeys)[keyof typeof userSettingKeys];
@@ -58,6 +60,9 @@ export type DateFormatMode = (typeof DATE_FORMAT_MODES)[number];
 export const SUPPORTED_LANGUAGES = ["en", "es"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
+export const PROJECT_SIDEBAR_SORT_VALUES = ["name", "code", "startDate", "createdAt", "updatedAt", "incidents"] as const;
+export type ProjectSidebarSortPreference = (typeof PROJECT_SIDEBAR_SORT_VALUES)[number];
+
 export type UserSettingsMap = {
   [userSettingKeys.autoLogoutInactivityMinutes]?: number;
   [userSettingKeys.language]?: SupportedLanguage;
@@ -68,6 +73,7 @@ export type UserSettingsMap = {
   [userSettingKeys.chartAnimations]?: boolean;
   [userSettingKeys.tablePreferences]?: TablePreferencesMap;
   [userSettingKeys.projectTimelinePreferences]?: ProjectTimelinePreferencesMap;
+  [userSettingKeys.projectSidebarSort]?: ProjectSidebarSortPreference;
 };
 
 export type TablePreference = {
@@ -135,6 +141,9 @@ const isDateFormatMode = (value: unknown): value is DateFormatMode =>
 
 const isCurrencyCode = (value: unknown): value is string =>
   typeof value === "string" && /^[A-Z]{3}$/.test(value);
+
+const isProjectSidebarSortPreference = (value: unknown): value is ProjectSidebarSortPreference =>
+  typeof value === "string" && (PROJECT_SIDEBAR_SORT_VALUES as readonly string[]).includes(value);
 
 const isSafePreferenceId = (value: unknown): value is string =>
   typeof value === "string" && /^[a-zA-Z0-9:_-]{1,128}$/.test(value);
@@ -306,6 +315,10 @@ const sanitizeRemoteSettings = (raw: unknown): UserSettingsMap => {
   const projectTimelinePreferences = sanitizeProjectTimelinePreferences(source[userSettingKeys.projectTimelinePreferences]);
   if (projectTimelinePreferences) {
     next[userSettingKeys.projectTimelinePreferences] = projectTimelinePreferences;
+  }
+
+  if (isProjectSidebarSortPreference(source[userSettingKeys.projectSidebarSort])) {
+    next[userSettingKeys.projectSidebarSort] = source[userSettingKeys.projectSidebarSort] as ProjectSidebarSortPreference;
   }
 
   return next;

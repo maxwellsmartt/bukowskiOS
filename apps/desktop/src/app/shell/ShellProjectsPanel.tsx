@@ -1,5 +1,5 @@
 import { Archive, ArchiveRestore, Eye, EyeOff, ListFilter, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -11,18 +11,18 @@ import {
 import { useProjectTimelinePreferences } from "@features/projects/useProjectTimelinePreferences";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { useUserSetting } from "@shared/hooks/useUserSetting";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
+import { PROJECT_SIDEBAR_SORT_VALUES, userSettingKeys, type ProjectSidebarSortPreference } from "@shared/lib/userSettings";
 import type { ProjectCardRow, ProjectDeletePreview } from "@contracts";
 
 type LinkedItem = { labelKey: string; count: number };
-type ProjectSidebarSort = "name" | "code" | "startDate" | "createdAt" | "updatedAt" | "incidents";
-
-const projectSortValues: ProjectSidebarSort[] = ["name", "code", "startDate", "createdAt", "updatedAt", "incidents"];
+type ProjectSidebarSort = ProjectSidebarSortPreference;
 
 const readStoredProjectSort = (): ProjectSidebarSort => {
   const stored = readStringPreference(uiPreferenceKeys.shellProjectsSort);
-  return projectSortValues.includes(stored as ProjectSidebarSort) ? (stored as ProjectSidebarSort) : "name";
+  return (PROJECT_SIDEBAR_SORT_VALUES as readonly string[]).includes(stored ?? "") ? (stored as ProjectSidebarSort) : "name";
 };
 
 const buildLinkedItems = (preview: ProjectDeletePreview): LinkedItem[] => {
@@ -66,10 +66,21 @@ export const ShellProjectsPanel = () => {
   const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
   const [projectSearch, setProjectSearch] = useState("");
   const [projectSort, setProjectSort] = useState<ProjectSidebarSort>(readStoredProjectSort);
+  const [syncedProjectSort, setSyncedProjectSort] = useUserSetting(userSettingKeys.projectSidebarSort);
+
+  useEffect(() => {
+    if (!syncedProjectSort || syncedProjectSort === projectSort) {
+      return;
+    }
+
+    setProjectSort(syncedProjectSort);
+    writePreference(uiPreferenceKeys.shellProjectsSort, syncedProjectSort);
+  }, [projectSort, syncedProjectSort]);
 
   const handleProjectSortChange = (next: ProjectSidebarSort) => {
     setProjectSort(next);
     writePreference(uiPreferenceKeys.shellProjectsSort, next);
+    void setSyncedProjectSort(next).catch(() => undefined);
   };
 
   const visibleProjects = useMemo(() => {

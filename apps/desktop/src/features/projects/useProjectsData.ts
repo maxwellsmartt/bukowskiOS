@@ -112,6 +112,7 @@ export const notifyCatalogChanged = () => {
 
 export const useProjectsRegistry = (query: ProjectListQuery = defaultProjectListQuery) => {
   const refreshVersion = useWorkspaceDataRefreshVersion();
+  const { projectDataVersion } = useShellContext();
 
   return useAsyncValue(
     async () => {
@@ -122,7 +123,7 @@ export const useProjectsRegistry = (query: ProjectListQuery = defaultProjectList
       return window.bukowskiProjects.getList(query);
     },
     emptyProjects,
-    [query.includeArchived, query.search, query.sortBy, query.sortDirection, query.workspaceId, refreshVersion],
+    [query.includeArchived, query.search, query.sortBy, query.sortDirection, query.workspaceId, refreshVersion, projectDataVersion],
   );
 };
 
@@ -151,6 +152,7 @@ export const useCatalogData = (query: CatalogListQuery = defaultCatalogListQuery
 
 export const useProjectDetail = (projectId: string | null) => {
   const refreshVersion = useWorkspaceDataRefreshVersion();
+  const { projectDataVersion } = useShellContext();
 
   return useAsyncValue(
     async () => {
@@ -161,7 +163,7 @@ export const useProjectDetail = (projectId: string | null) => {
       return window.bukowskiProjects.getDetail(projectId);
     },
     emptyProjectDetail,
-    [projectId, refreshVersion],
+    [projectId, refreshVersion, projectDataVersion],
   );
 };
 

@@ -1,14 +1,16 @@
 import { useEffect, type ReactNode } from "react";
 
 import i18n from "../../i18n";
-import { readNumberPreference, uiPreferenceKeys } from "@shared/lib/preferences";
+import { readNumberPreference, readStringPreference, uiPreferenceKeys } from "@shared/lib/preferences";
 import {
   applyRemoteSettings,
   getUserSetting,
   hydrateUserSettings,
+  PROJECT_SIDEBAR_SORT_VALUES,
   resetUserSettings,
   subscribeToUserSettings,
   userSettingKeys,
+  type ProjectSidebarSortPreference,
   type SupportedLanguage,
   type UserSettingsMap,
 } from "@shared/lib/userSettings";
@@ -65,6 +67,10 @@ export const UserSettingsProvider = ({ children }: { children: ReactNode }) => {
     );
     if (Number.isFinite(legacyAutoLogout)) {
       legacy[userSettingKeys.autoLogoutInactivityMinutes] = legacyAutoLogout;
+    }
+    const legacyProjectSidebarSort = readStringPreference(uiPreferenceKeys.shellProjectsSort);
+    if ((PROJECT_SIDEBAR_SORT_VALUES as readonly string[]).includes(legacyProjectSidebarSort ?? "")) {
+      legacy[userSettingKeys.projectSidebarSort] = legacyProjectSidebarSort as ProjectSidebarSortPreference;
     }
 
     let cancelled = false;

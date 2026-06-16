@@ -5,6 +5,22 @@ import type { CatalogListQuery, CatalogSnapshot } from "@contracts";
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 const activeProjectStatuses = new Set(["Prep", "Active", "On hold"]);
 
+const compareCatalogLabel = (first: string, second: string) =>
+  first.localeCompare(second, undefined, { sensitivity: "base", numeric: true });
+
+const compareCatalogRows =
+  <T>(getLabel: (row: T) => string, getIsActive?: (row: T) => boolean) =>
+  (first: T, second: T) => {
+    if (getIsActive) {
+      const activityDiff = Number(getIsActive(second)) - Number(getIsActive(first));
+      if (activityDiff !== 0) {
+        return activityDiff;
+      }
+    }
+
+    return compareCatalogLabel(getLabel(first), getLabel(second));
+  };
+
 const mapAssetStatus = (
   operationalStatus: string,
   custodyStatus: string,
@@ -581,18 +597,18 @@ export const createCatalogReadService = (db: DatabaseSync, _deps: CatalogReadDep
         type: row.type,
         description: row.description,
         isActive: Boolean(row.is_active),
-      })),
+      })).sort(compareCatalogRows((row) => row.name, (row) => row.isActive)),
       departments: departments.map((row) => ({
         id: row.id,
         code: row.code,
         name: row.name,
         description: row.description,
         isActive: Boolean(row.is_active),
-      })),
+      })).sort(compareCatalogRows((row) => row.name, (row) => row.isActive)),
       users: users.map((row) => ({
         id: row.id,
         fullName: row.full_name,
-      })),
+      })).sort(compareCatalogRows((row) => row.fullName)),
       crewMembers: crewMembers.map((row) => ({
         id: row.id,
         fullName: row.full_name,
@@ -612,7 +628,7 @@ export const createCatalogReadService = (db: DatabaseSync, _deps: CatalogReadDep
         documents: crewDocumentsByMember.get(row.id) ?? [],
         bankAccounts: crewBankAccountsByMember.get(row.id) ?? [],
         activeAssignments: crewAssignmentsByMember.get(row.id) ?? [],
-      })),
+      })).sort(compareCatalogRows((row) => row.fullName, (row) => row.isActive)),
       clients: clients.map((row) => ({
         id: row.id,
         name: row.name,
@@ -622,7 +638,7 @@ export const createCatalogReadService = (db: DatabaseSync, _deps: CatalogReadDep
         notes: row.notes,
         isActive: Boolean(row.is_active),
         rnc: row.rnc ?? null,
-      })),
+      })).sort(compareCatalogRows((row) => row.name, (row) => row.isActive)),
       productionCompanies: productionCompanies.map((row) => ({
         id: row.id,
         name: row.name,
@@ -632,7 +648,7 @@ export const createCatalogReadService = (db: DatabaseSync, _deps: CatalogReadDep
         notes: row.notes,
         isActive: Boolean(row.is_active),
         pur: row.pur ?? null,
-      })),
+      })).sort(compareCatalogRows((row) => row.name, (row) => row.isActive)),
       manufacturers: manufacturers.map((row) => ({
         id: row.id,
         name: row.name,
@@ -641,14 +657,14 @@ export const createCatalogReadService = (db: DatabaseSync, _deps: CatalogReadDep
         phone: row.phone,
         notes: row.notes,
         isActive: Boolean(row.is_active),
-      })),
+      })).sort(compareCatalogRows((row) => row.name, (row) => row.isActive)),
       categories: categories.map((row) => ({
         id: row.id,
         code: row.code,
         name: row.name,
         description: row.description,
         isActive: Boolean(row.is_active),
-      })),
+      })).sort(compareCatalogRows((row) => row.name, (row) => row.isActive)),
       kits: kits.map((row) => ({
         id: row.id,
         code: row.code,
@@ -660,7 +676,7 @@ export const createCatalogReadService = (db: DatabaseSync, _deps: CatalogReadDep
         assetIds: row.asset_ids ? row.asset_ids.split(",").filter(Boolean) : [],
         assetSelections: kitSelectionsById.get(row.id) ?? [],
         primaryCodeValue: row.primary_code_value,
-      })),
+      })).sort(compareCatalogRows((row) => row.name, (row) => row.isActive)),
       assetOptions: assetOptions.map((row) => ({
         id: row.id,
         name: row.name,
@@ -688,7 +704,7 @@ export const createCatalogReadService = (db: DatabaseSync, _deps: CatalogReadDep
         linkedKitCount: row.linked_kit_count,
         linkedKitCodes: row.linked_kit_codes ? row.linked_kit_codes.split(",").filter(Boolean) : [],
         linkedKitNames: row.linked_kit_names ? row.linked_kit_names.split(",").filter(Boolean) : [],
-      })),
+      })).sort(compareCatalogRows((row) => row.name)),
     };
   },
   };
