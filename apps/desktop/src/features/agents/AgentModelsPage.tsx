@@ -29,6 +29,9 @@ const providerStatusIndicatorToneMap: Record<AgentModelRow["status"], "green" | 
 
 const providerDisplayOrder = ["openai", "anthropic", "openclaw", "custom"] as const;
 
+const canAssignProvider = (provider: AgentModelRow | undefined) =>
+  Boolean(provider?.supportsLiveRequests && provider.enabled && (provider.status === "configured" || provider.status === "healthy"));
+
 type ProviderDraft = {
   enabled: boolean;
   apiKey: string;
@@ -69,7 +72,7 @@ export const AgentModelsPage = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId: workspaceId } = useWorkspace();
   const toast = useToast();
-  const { data, error } = useAgentModels();
+  const { data, error } = useAgentModels({ workspaceId });
   const [selectedProviderKey, setSelectedProviderKey] = useState<string | null>(null);
   const [providerDraft, setProviderDraft] = useState<ProviderDraft>(buildProviderDraft(null));
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, AssignmentDraft>>({});
@@ -600,6 +603,8 @@ export const AgentModelsPage = () => {
               modelKey: assignment.modelKey,
               modelLabel: assignment.modelLabel,
             };
+            const draftProvider = data.providers.find((provider) => provider.providerKey === draft.providerKey);
+            const assignmentReady = canAssignProvider(draftProvider);
 
             return (
               <div key={assignment.agentId} className="models-assignment-row">
@@ -615,18 +620,24 @@ export const AgentModelsPage = () => {
                     value={draft.providerKey}
                   >
                     {data.providers.map((provider) => (
-                      <option key={provider.providerKey} value={provider.providerKey}>
+                      <option
+                        disabled={!canAssignProvider(provider)}
+                        key={provider.providerKey}
+                        value={provider.providerKey}
+                      >
                         {provider.label}
+                        {canAssignProvider(provider) ? "" : ` · ${providerStatusLabel(provider.status)}`}
                       </option>
                     ))}
                   </select>
 
                   <select
                     className="field-input"
+                    disabled={!assignmentReady}
                     onChange={(event) => handleAssignmentFieldChange(assignment.agentId, "modelKey", event.target.value)}
                     value={draft.modelKey}
                   >
-                    {(data.providers.find((provider) => provider.providerKey === draft.providerKey)?.modelOptions ?? []).map((option) => (
+                    {(draftProvider?.modelOptions ?? []).map((option) => (
                       <option key={option.key} value={option.key}>
                         {option.label}
                       </option>
@@ -635,7 +646,7 @@ export const AgentModelsPage = () => {
 
                   <button
                     className="ghost-control"
-                    disabled={assignmentBusyAgentId === assignment.agentId}
+                    disabled={assignmentBusyAgentId === assignment.agentId || !assignmentReady}
                     onClick={() => handleSaveAssignment(assignment)}
                     type="button"
                   >

@@ -281,13 +281,13 @@ declare global {
       onAppAction: (listener: (action: ShellAppAction) => void) => () => void;
     };
     bukowskiAgents?: {
-      getMissionControlSnapshot: () => Promise<MissionControlSnapshot>;
-      getAgentsList: () => Promise<AgentRosterRow[]>;
-      getAgentDetail: (agentId: string) => Promise<AgentDetailSnapshot>;
-      getRunsList: () => Promise<AgentRunRow[]>;
-      getModelsSnapshot: () => Promise<AgentModelsSnapshot>;
-      getAIProviderConfigs: () => Promise<AgentModelRow[]>;
-      getConnectorsSnapshot: () => Promise<AgentConnectorRow[]>;
+      getMissionControlSnapshot: (query?: { workspaceId?: string }) => Promise<MissionControlSnapshot>;
+      getAgentsList: (query?: { workspaceId?: string }) => Promise<AgentRosterRow[]>;
+      getAgentDetail: (agentId: string, query?: { workspaceId?: string }) => Promise<AgentDetailSnapshot>;
+      getRunsList: (query?: { workspaceId?: string }) => Promise<AgentRunRow[]>;
+      getModelsSnapshot: (query?: { workspaceId?: string }) => Promise<AgentModelsSnapshot>;
+      getAIProviderConfigs: (query?: { workspaceId?: string }) => Promise<AgentModelRow[]>;
+      getConnectorsSnapshot: (query?: { workspaceId?: string }) => Promise<AgentConnectorRow[]>;
       getAssistantChatSnapshot: () => Promise<AssistantChatSnapshot>;
       create: (input: CreateAgentCommand) => Promise<AgentMutationResult>;
       update: (input: UpdateAgentCommand) => Promise<AgentMutationResult>;

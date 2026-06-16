@@ -93,7 +93,7 @@ export const createTelegramConnectorService = (
   let pollingDegraded = false;
   const pollingMode = options.pollingMode ?? "host";
 
-  const getConfig = () =>
+  const getConfig = (currentWorkspaceId = workspaceId) =>
     db
       .prepare(
         `
@@ -104,9 +104,16 @@ export const createTelegramConnectorService = (
           LIMIT 1
         `,
       )
-      .get(workspaceId) as { status: string } | undefined;
+      .get(currentWorkspaceId) as { status: string } | undefined;
 
-  const updateConnectorHealth = (input: { status?: string; botUsername?: string | null; error?: string | null; testedAt?: string | null }) => {
+  const updateConnectorHealth = (input: {
+    workspaceId?: string;
+    status?: string;
+    botUsername?: string | null;
+    error?: string | null;
+    testedAt?: string | null;
+  }) => {
+    const currentWorkspaceId = input.workspaceId ?? workspaceId;
     const now = input.testedAt ?? new Date().toISOString();
     db.prepare(
       `
@@ -119,13 +126,13 @@ export const createTelegramConnectorService = (
         WHERE workspace_id = ?
           AND connector_key = 'telegram'
       `,
-    ).run(input.status ?? null, input.botUsername ?? null, input.error ?? null, now, now, workspaceId);
+    ).run(input.status ?? null, input.botUsername ?? null, input.error ?? null, now, now, currentWorkspaceId);
   };
 
-  const getBotToken = () => options.secretStore.getConnectorSecret(workspaceId, "telegram");
+  const getBotToken = (currentWorkspaceId = workspaceId) => options.secretStore.getConnectorSecret(currentWorkspaceId, "telegram");
 
-  const callTelegram = async <T>(method: string, body?: Record<string, unknown>): Promise<T> => {
-    const token = getBotToken();
+  const callTelegram = async <T>(method: string, body?: Record<string, unknown>, currentWorkspaceId = workspaceId): Promise<T> => {
+    const token = getBotToken(currentWorkspaceId);
     if (!token) {
       throw new Error("Telegram bot token is not configured.");
     }
@@ -452,13 +459,15 @@ export const createTelegramConnectorService = (
   };
 
   return {
-    async testConnection() {
-      const response = await callTelegram<TelegramGetMeResponse>("getMe");
+    async testConnection(input?: { workspaceId?: string }) {
+      const currentWorkspaceId = input?.workspaceId ?? workspaceId;
+      const response = await callTelegram<TelegramGetMeResponse>("getMe", undefined, currentWorkspaceId);
       if (!response.ok) {
         throw new Error(response.description || "Telegram getMe failed.");
       }
 
       updateConnectorHealth({
+        workspaceId: currentWorkspaceId,
         status: "configured",
         botUsername: response.result?.username ?? null,
         error: null,
@@ -470,18 +479,20 @@ export const createTelegramConnectorService = (
       };
     },
 
-    async saveConfig(input: { enabled: boolean; botToken?: string; clearStoredSecret?: boolean }) {
+    async saveConfig(input: { workspaceId?: string; enabled: boolean; botToken?: string; clearStoredSecret?: boolean }) {
+      const currentWorkspaceId = input.workspaceId ?? workspaceId;
       if (input.clearStoredSecret) {
-        options.secretStore.clearConnectorSecret(workspaceId, "telegram");
+        options.secretStore.clearConnectorSecret(currentWorkspaceId, "telegram");
       }
 
       if (input.botToken?.trim()) {
-        options.secretStore.setConnectorSecret(workspaceId, "telegram", input.botToken);
+        options.secretStore.setConnectorSecret(currentWorkspaceId, "telegram", input.botToken);
       }
 
-      const hasSecret = options.secretStore.hasConnectorSecret(workspaceId, "telegram");
+      const hasSecret = options.secretStore.hasConnectorSecret(currentWorkspaceId, "telegram");
       const nextStatus = input.enabled ? (hasSecret ? "configured" : "not_configured") : "disabled";
       updateConnectorHealth({
+        workspaceId: currentWorkspaceId,
         status: nextStatus,
         error: nextStatus === "not_configured" ? "Telegram needs a bot token before it can start." : null,
         testedAt: new Date().toISOString(),

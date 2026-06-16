@@ -394,14 +394,20 @@ const bukowskiOverview = {
 };
 
 const bukowskiAgents = {
-  getMissionControlSnapshot: () =>
-    ipcRenderer.invoke(ipcChannels.agents.getMissionControlSnapshot) as Promise<MissionControlSnapshot>,
-  getAgentsList: () => ipcRenderer.invoke(ipcChannels.agents.getAgentsList) as Promise<AgentRosterRow[]>,
-  getAgentDetail: (agentId: string) => ipcRenderer.invoke(ipcChannels.agents.getAgentDetail, agentId) as Promise<AgentDetailSnapshot>,
-  getRunsList: () => ipcRenderer.invoke(ipcChannels.agents.getRunsList) as Promise<AgentRunRow[]>,
-  getModelsSnapshot: () => ipcRenderer.invoke(ipcChannels.agents.getModelsSnapshot) as Promise<AgentModelsSnapshot>,
-  getAIProviderConfigs: () => ipcRenderer.invoke(ipcChannels.agents.getAIProviderConfigs) as Promise<AgentModelRow[]>,
-  getConnectorsSnapshot: () => ipcRenderer.invoke(ipcChannels.agents.getConnectorsSnapshot) as Promise<AgentConnectorRow[]>,
+  getMissionControlSnapshot: (query?: { workspaceId?: string }) =>
+    ipcRenderer.invoke(ipcChannels.agents.getMissionControlSnapshot, query) as Promise<MissionControlSnapshot>,
+  getAgentsList: (query?: { workspaceId?: string }) =>
+    ipcRenderer.invoke(ipcChannels.agents.getAgentsList, query) as Promise<AgentRosterRow[]>,
+  getAgentDetail: (agentId: string, query?: { workspaceId?: string }) =>
+    ipcRenderer.invoke(ipcChannels.agents.getAgentDetail, agentId, query) as Promise<AgentDetailSnapshot>,
+  getRunsList: (query?: { workspaceId?: string }) =>
+    ipcRenderer.invoke(ipcChannels.agents.getRunsList, query) as Promise<AgentRunRow[]>,
+  getModelsSnapshot: (query?: { workspaceId?: string }) =>
+    ipcRenderer.invoke(ipcChannels.agents.getModelsSnapshot, query) as Promise<AgentModelsSnapshot>,
+  getAIProviderConfigs: (query?: { workspaceId?: string }) =>
+    ipcRenderer.invoke(ipcChannels.agents.getAIProviderConfigs, query) as Promise<AgentModelRow[]>,
+  getConnectorsSnapshot: (query?: { workspaceId?: string }) =>
+    ipcRenderer.invoke(ipcChannels.agents.getConnectorsSnapshot, query) as Promise<AgentConnectorRow[]>,
   getAssistantChatSnapshot: () => ipcRenderer.invoke(ipcChannels.agents.getAssistantChatSnapshot) as Promise<AssistantChatSnapshot>,
   create: (input: CreateAgentCommand) => ipcRenderer.invoke(ipcChannels.agents.create, input) as Promise<AgentMutationResult>,
   update: (input: UpdateAgentCommand) => ipcRenderer.invoke(ipcChannels.agents.update, input) as Promise<AgentMutationResult>,

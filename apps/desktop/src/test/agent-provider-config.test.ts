@@ -159,6 +159,100 @@ describe("agent provider config", () => {
     cleanup();
   });
 
+  it("scopes provider settings to the requested workspace and rejects unavailable assignments", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-provider-workspace-scope");
+    const secondaryWorkspaceId = "workspace-secondary-agents";
+    const now = new Date().toISOString();
+    database
+      .prepare(
+        `
+          INSERT INTO workspaces (id, slug, name, base_currency, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, 'USD', 1, ?, ?)
+        `,
+      )
+      .run(secondaryWorkspaceId, "secondary-agents", "Secondary Agents", now, now);
+    bootstrapAIGatewayFoundation(database);
+
+    const secrets = new Map<string, string>();
+    const secretStore = {
+      hasProviderSecret: (workspaceId: string, providerKey: string) => secrets.has(`${workspaceId}:${providerKey}`),
+      getProviderSecret: (workspaceId: string, providerKey: string) => secrets.get(`${workspaceId}:${providerKey}`) ?? null,
+      setProviderSecret: (workspaceId: string, providerKey: string, secret: string) => {
+        secrets.set(`${workspaceId}:${providerKey}`, secret);
+      },
+      clearProviderSecret: (workspaceId: string, providerKey: string) => {
+        secrets.delete(`${workspaceId}:${providerKey}`);
+      },
+    };
+    const mutations = createAgentMutationService(database, {
+      secretStore,
+      openaiProviderService: {
+        createResponse: async () => ({
+          ok: true as const,
+          responseId: "resp-test",
+          status: "completed",
+          outputText: "{}",
+          functionCalls: [],
+        }),
+        testConnection: async () => ({
+          ok: true as const,
+          status: "healthy" as const,
+          summary: "OpenAI responded successfully.",
+        }),
+      },
+      assistantGatewayService: {
+        sendMessage: async () => {
+          throw new Error("Not used in this test.");
+        },
+        continueApprovedRun: async () => {
+          throw new Error("Not used in this test.");
+        },
+      },
+    });
+    const reads = createAgentReadService(database, secretStore);
+
+    mutations.saveAIProviderConfig({
+      commandId: "cmd-provider-secondary-save",
+      workspaceId: secondaryWorkspaceId,
+      providerKey: "openai",
+      enabled: true,
+      apiKey: "sk-secondary",
+      baseUrl: "",
+      defaultModelKey: "openai:gpt-5.4-secondary",
+      timeoutMs: 45000,
+      retryCount: 2,
+    });
+
+    const defaultSnapshot = reads.getModelsSnapshot({ workspaceId: "workspace-metadata" });
+    const secondarySnapshot = reads.getModelsSnapshot({ workspaceId: secondaryWorkspaceId });
+    expect(defaultSnapshot.providers.find((provider) => provider.providerKey === "openai")?.defaultModelKey).not.toBe(
+      "openai:gpt-5.4-secondary",
+    );
+    expect(secondarySnapshot.providers.find((provider) => provider.providerKey === "openai")?.defaultModelKey).toBe(
+      "openai:gpt-5.4-secondary",
+    );
+    expect(secretStore.hasProviderSecret(secondaryWorkspaceId, "openai")).toBe(true);
+    expect(secretStore.hasProviderSecret("workspace-metadata", "openai")).toBe(false);
+
+    const secondaryAgent = database
+      .prepare("SELECT id FROM agents WHERE workspace_id = ? AND agent_key = 'assets-agent' LIMIT 1")
+      .get(secondaryWorkspaceId) as { id: string } | undefined;
+    expect(secondaryAgent?.id).toBeTruthy();
+
+    expect(() =>
+      mutations.assignAgentModel({
+        commandId: "cmd-assign-disabled-provider",
+        workspaceId: secondaryWorkspaceId,
+        agentId: secondaryAgent?.id ?? "",
+        providerKey: "anthropic",
+        modelKey: "anthropic:claude-sonnet-4-20250514",
+        modelLabel: "Claude Sonnet 4",
+      }),
+    ).toThrow(/configured AI provider/u);
+
+    cleanup();
+  });
+
   it("persists provider config, stores the secret locally and updates agent assignments", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-provider-config");
     const secrets = new Map<string, string>();

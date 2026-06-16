@@ -16,7 +16,11 @@ import type {
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
+type AgentWorkspaceQuery = {
+  workspaceId?: string | null;
+};
+
+const resolveWorkspaceId = (query?: AgentWorkspaceQuery) => query?.workspaceId?.trim() || DEFAULT_WORKSPACE_ID;
 const recentConnectorBusyWindowSeconds = 15;
 
 const relativeFormatter = new Intl.RelativeTimeFormat("en-US", { numeric: "auto" });
@@ -150,7 +154,7 @@ const shouldShowInternalAgents = () => process.env.BUKOWSKI_SHOW_INTERNAL_AGENTS
 
 const isVisibleAgent = (row: AgentRow) => shouldShowInternalAgents() || row.visibility !== "internal";
 
-const loadAgentRows = (db: DatabaseSync) =>
+const loadAgentRows = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID) =>
   db
     .prepare(
       `
@@ -222,7 +226,7 @@ const toRosterRow = (
   };
 };
 
-const loadBusyAgentIds = (db: DatabaseSync) => {
+const loadBusyAgentIds = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID) => {
   const runRows = db
     .prepare(
       `
@@ -268,8 +272,8 @@ const loadBusyAgentIds = (db: DatabaseSync) => {
   ]);
 };
 
-const loadNotWorkingAgentIds = (db: DatabaseSync) => {
-  const providerRows = loadProviderRows(db);
+const loadNotWorkingAgentIds = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID) => {
+  const providerRows = loadProviderRows(db, workspaceId);
   const unhealthyProviders = new Set(
     providerRows
       .filter((row) => row.enabled !== 1 || !["healthy", "configured"].includes(row.status))
@@ -342,7 +346,7 @@ type ProviderConfigRow = {
   notes: string;
 };
 
-const loadProviderRows = (db: DatabaseSync) =>
+const loadProviderRows = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID) =>
   db
     .prepare(
       `
@@ -369,7 +373,7 @@ const loadProviderRows = (db: DatabaseSync) =>
     )
     .all(workspaceId) as ProviderConfigRow[];
 
-const loadRuns = (db: DatabaseSync, limit?: number, agentId?: string) => {
+const loadRuns = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID, limit?: number, agentId?: string) => {
   const clauses = ["agent_runs.workspace_id = ?"];
   const params: Array<string | number> = [workspaceId];
 
@@ -453,7 +457,7 @@ const toRunRow = (row: ReturnType<typeof loadRuns>[number]): AgentRunRow => {
   };
 };
 
-const loadActivity = (db: DatabaseSync, limit = 6) =>
+const loadActivity = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID, limit = 6) =>
   db
     .prepare(
       `
@@ -516,7 +520,7 @@ const getDefaultProviderModelOptions = (providerKey: string) => {
   return defaults[providerKey] ?? defaults.custom ?? [];
 };
 
-const loadProviderModelOptions = (db: DatabaseSync, providerKey: string) => {
+const loadProviderModelOptions = (db: DatabaseSync, workspaceId: string, providerKey: string) => {
   try {
     return db
       .prepare(
@@ -536,7 +540,7 @@ const loadProviderModelOptions = (db: DatabaseSync, providerKey: string) => {
   }
 };
 
-const loadProviderModelOptionsLastSyncedAt = (db: DatabaseSync, providerKey: string) => {
+const loadProviderModelOptionsLastSyncedAt = (db: DatabaseSync, workspaceId: string, providerKey: string) => {
   try {
     const row = db
       .prepare(
@@ -557,9 +561,10 @@ const loadProviderModelOptionsLastSyncedAt = (db: DatabaseSync, providerKey: str
 
 const buildProviderRows = (
   db: DatabaseSync,
+  workspaceId: string,
   secretStore?: { hasProviderSecret: (workspaceId: string, providerKey: string) => boolean },
 ) => {
-  const agentRows = loadAgentRows(db);
+  const agentRows = loadAgentRows(db, workspaceId);
   const assignedByProvider = new Map<
     string,
     Array<{
@@ -578,12 +583,12 @@ const buildProviderRows = (
     assignedByProvider.set(providerKey, current);
   });
 
-  return loadProviderRows(db).map((row) => {
+  return loadProviderRows(db, workspaceId).map((row) => {
     const assignedRows = assignedByProvider.get(row.provider_key) ?? [];
     const assignedModels = Array.from(new Set(assignedRows.map((agent) => agent.modelLabel).filter(Boolean)));
     const hasStoredSecret = secretStore?.hasProviderSecret(workspaceId, row.provider_key) ?? false;
     const isActiveProvider = row.enabled === 1 && assignedRows.length > 0;
-    const modelOptions = loadProviderModelOptions(db, row.provider_key).map((model) => ({
+    const modelOptions = loadProviderModelOptions(db, workspaceId, row.provider_key).map((model) => ({
       key: model.model_key,
       label: model.display_name,
       source: model.source === "api" ? ("api" as const) : ("default" as const),
@@ -603,7 +608,7 @@ const buildProviderRows = (
         }
       });
     const modelsLastSyncedAtLabel = formatOptionalTimestampLabel(
-      loadProviderModelOptionsLastSyncedAt(db, row.provider_key),
+      loadProviderModelOptionsLastSyncedAt(db, workspaceId, row.provider_key),
     );
 
     return {
@@ -639,13 +644,14 @@ export const createAgentReadService = (
     hasConnectorSecret?: (workspaceId: string, connectorKey: string) => boolean;
   },
 ) => ({
-  getMissionControlSnapshot(): MissionControlSnapshot {
-    const agentRows = loadAgentRows(db);
+  getMissionControlSnapshot(query?: AgentWorkspaceQuery): MissionControlSnapshot {
+    const workspaceId = resolveWorkspaceId(query);
+    const agentRows = loadAgentRows(db, workspaceId);
     const supervisor = agentRows.find((row) => row.is_supervisor === 1) ?? null;
     const subagents = agentRows.filter((row) => row.is_supervisor !== 1);
-    const busyAgentIds = loadBusyAgentIds(db);
-    const attentionContext = loadNotWorkingAgentIds(db);
-    const modelSummary = buildProviderRows(db, secretStore);
+    const busyAgentIds = loadBusyAgentIds(db, workspaceId);
+    const attentionContext = loadNotWorkingAgentIds(db, workspaceId);
+    const modelSummary = buildProviderRows(db, workspaceId, secretStore);
     const connectorSummary = db
       .prepare(
         `
@@ -686,12 +692,12 @@ export const createAgentReadService = (
             unhealthyProviderKeys: attentionContext.providerKeys,
           }),
       ),
-      queue: loadRuns(db, 5).filter(isVisibleRunRow).map(toRunRow),
-      activity: loadActivity(db, 6).filter(isVisibleActivityRow).map(toActivityRow),
+      queue: loadRuns(db, workspaceId, 5).filter(isVisibleRunRow).map(toRunRow),
+      activity: loadActivity(db, workspaceId, 6).filter(isVisibleActivityRow).map(toActivityRow),
       health: {
         activeAgents: String(activeCount),
         pausedAgents: String(pausedCount),
-        recentRuns: String(loadRuns(db, 12).length),
+        recentRuns: String(loadRuns(db, workspaceId, 12).length),
         connectorsConfigured: String(effectiveConfiguredConnectors),
         modelsAssigned: String(assignedModels),
       },
@@ -720,11 +726,12 @@ export const createAgentReadService = (
     };
   },
 
-  getAgentsList(): AgentRosterRow[] {
-    const busyAgentIds = loadBusyAgentIds(db);
-    const attentionContext = loadNotWorkingAgentIds(db);
+  getAgentsList(query?: AgentWorkspaceQuery): AgentRosterRow[] {
+    const workspaceId = resolveWorkspaceId(query);
+    const busyAgentIds = loadBusyAgentIds(db, workspaceId);
+    const attentionContext = loadNotWorkingAgentIds(db, workspaceId);
 
-    return loadAgentRows(db).map((row) =>
+    return loadAgentRows(db, workspaceId).map((row) =>
       toRosterRow(row, {
         busyAgentIds,
         notWorkingAgentIds: attentionContext.runAgentIds,
@@ -733,8 +740,9 @@ export const createAgentReadService = (
     );
   },
 
-  getAgentDetail(agentId: string): AgentDetailSnapshot {
-    const row = loadAgentRows(db).find((candidate) => candidate.id === agentId) ?? null;
+  getAgentDetail(agentId: string, query?: AgentWorkspaceQuery): AgentDetailSnapshot {
+    const workspaceId = resolveWorkspaceId(query);
+    const row = loadAgentRows(db, workspaceId).find((candidate) => candidate.id === agentId) ?? null;
 
     if (!row) {
       return {
@@ -745,8 +753,8 @@ export const createAgentReadService = (
       };
     }
 
-    const busyAgentIds = loadBusyAgentIds(db);
-    const attentionContext = loadNotWorkingAgentIds(db);
+    const busyAgentIds = loadBusyAgentIds(db, workspaceId);
+    const attentionContext = loadNotWorkingAgentIds(db, workspaceId);
 
     return {
       agent: toRosterRow(row, {
@@ -756,17 +764,19 @@ export const createAgentReadService = (
       }),
       tools: parseJsonArray(row.allowed_tools_json),
       domains: parseJsonArray(row.allowed_domains_json),
-      recentRuns: loadRuns(db, 4, row.id).map(toRunRow),
+      recentRuns: loadRuns(db, workspaceId, 4, row.id).map(toRunRow),
     };
   },
 
-  getRunsList(): AgentRunRow[] {
-    return loadRuns(db).filter(isVisibleRunRow).map(toRunRow);
+  getRunsList(query?: AgentWorkspaceQuery): AgentRunRow[] {
+    const workspaceId = resolveWorkspaceId(query);
+    return loadRuns(db, workspaceId).filter(isVisibleRunRow).map(toRunRow);
   },
 
-  getModelsSnapshot(): AgentModelsSnapshot {
-    const providers = buildProviderRows(db, secretStore);
-    const agents = loadAgentRows(db);
+  getModelsSnapshot(query?: AgentWorkspaceQuery): AgentModelsSnapshot {
+    const workspaceId = resolveWorkspaceId(query);
+    const providers = buildProviderRows(db, workspaceId, secretStore);
+    const agents = loadAgentRows(db, workspaceId);
     const providerLabelByKey = new Map(providers.map((provider) => [provider.providerKey, provider.label]));
 
     return {
@@ -792,11 +802,13 @@ export const createAgentReadService = (
     };
   },
 
-  getAIProviderConfigs(): AgentModelRow[] {
-    return buildProviderRows(db, secretStore);
+  getAIProviderConfigs(query?: AgentWorkspaceQuery): AgentModelRow[] {
+    const workspaceId = resolveWorkspaceId(query);
+    return buildProviderRows(db, workspaceId, secretStore);
   },
 
-  getConnectorsSnapshot(): AgentConnectorRow[] {
+  getConnectorsSnapshot(query?: AgentWorkspaceQuery): AgentConnectorRow[] {
+    const workspaceId = resolveWorkspaceId(query);
     const rows = db
       .prepare(
         `

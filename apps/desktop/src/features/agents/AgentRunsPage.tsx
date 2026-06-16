@@ -17,7 +17,7 @@ export const AgentRunsPage = () => {
   const navigate = useNavigate();
   const { activeWorkspaceId: workspaceId, isWorkspaceReady } = useWorkspace();
   const { selectSession } = useAssistantChat();
-  const { data, error } = useAgentRuns();
+  const { data, error } = useAgentRuns({ workspaceId });
   const [processingRunId, setProcessingRunId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "needs_attention" | "needs_approval" | "queued" | "running" | "done">("all");

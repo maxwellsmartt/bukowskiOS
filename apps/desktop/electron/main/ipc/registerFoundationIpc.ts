@@ -8,6 +8,7 @@ import {
   archiveProjectSchema,
   archiveAssetSchema,
   assignAgentModelSchema,
+  agentWorkspaceReadArgsSchema,
   assignCrewToProjectUnitSchema,
   assignMoveAssetsSchema,
   createAgentSchema,
@@ -272,13 +273,13 @@ import {
 type RegisterFoundationIpcOptions = {
   foundationReads: FoundationReadService;
   agentReads: {
-    getMissionControlSnapshot: () => unknown;
-    getAgentsList: () => unknown;
-    getAgentDetail: (agentId: string) => unknown;
-    getRunsList: () => unknown;
-    getModelsSnapshot: () => unknown;
-    getAIProviderConfigs: () => unknown;
-    getConnectorsSnapshot: () => unknown;
+    getMissionControlSnapshot: (query?: { workspaceId?: string }) => unknown;
+    getAgentsList: (query?: { workspaceId?: string }) => unknown;
+    getAgentDetail: (agentId: string, query?: { workspaceId?: string }) => unknown;
+    getRunsList: (query?: { workspaceId?: string }) => unknown;
+    getModelsSnapshot: (query?: { workspaceId?: string }) => unknown;
+    getAIProviderConfigs: (query?: { workspaceId?: string }) => unknown;
+    getConnectorsSnapshot: (query?: { workspaceId?: string }) => unknown;
   };
   projectMutations: {
     addDepartmentToProjectUnit: (input: AddDepartmentToProjectUnitInput) => void;
@@ -695,6 +696,11 @@ const workspaceQueryReadArgsSchema = z.tuple([
   z.object({ workspaceId: z.string().trim().min(1) }).strict(),
 ]);
 
+const agentDetailReadArgsSchema = z.tuple([
+  z.string().trim().min(1),
+  z.object({ workspaceId: z.string().trim().min(1) }).strict().optional(),
+]);
+
 const requireWorkspaceId = (query: { workspaceId?: string | null } | undefined, action: string) => {
   const workspaceId = query?.workspaceId?.trim();
   if (!workspaceId) {
@@ -702,6 +708,11 @@ const requireWorkspaceId = (query: { workspaceId?: string | null } | undefined, 
   }
   return workspaceId;
 };
+
+type AgentWorkspaceReadQuery = { workspaceId?: string };
+
+const normalizeAgentWorkspaceReadQuery = (query: unknown): AgentWorkspaceReadQuery | undefined =>
+  query && typeof query === "object" ? (query as AgentWorkspaceReadQuery) : undefined;
 
 export const registerFoundationIpc = ({
   foundationReads,
@@ -820,6 +831,13 @@ export const registerFoundationIpc = ({
     // remote and local role seeds, then switch these checks to that key.
     assertAgentWorkspaceAccess(input, action, "users.invite");
 
+  const assertAgentReadAccess = (workspaceId: string | undefined, action: string) =>
+    workspaceAccess.assertWorkspaceAccess({
+      workspaceId: workspaceId ?? DEFAULT_WORKSPACE_ID,
+      action,
+      accessLevel: "read",
+    });
+
   safeHandleReadWithSchema(
     ipcChannels.shell.getBootstrap,
     emptyReadArgsSchema,
@@ -844,31 +862,74 @@ export const registerFoundationIpc = ({
     },
     "The app could not complete that search.",
   );
-  safeHandleRead(
+  safeHandleReadWithSchema(
     ipcChannels.agents.getMissionControlSnapshot,
-    () => agentReads.getMissionControlSnapshot(),
+    agentWorkspaceReadArgsSchema,
+    async (_event, query) => {
+      const safeQuery = normalizeAgentWorkspaceReadQuery(query);
+      await assertAgentReadAccess(safeQuery?.workspaceId, "load Mission Control");
+      return agentReads.getMissionControlSnapshot(safeQuery);
+    },
     "The app could not load Mission Control.",
   );
-  safeHandleRead(ipcChannels.agents.getAgentsList, () => agentReads.getAgentsList(), "The app could not load the agents list.");
-  safeHandleRead(
+  safeHandleReadWithSchema(
+    ipcChannels.agents.getAgentsList,
+    agentWorkspaceReadArgsSchema,
+    async (_event, query) => {
+      const safeQuery = normalizeAgentWorkspaceReadQuery(query);
+      await assertAgentReadAccess(safeQuery?.workspaceId, "load the agents list");
+      return agentReads.getAgentsList(safeQuery);
+    },
+    "The app could not load the agents list.",
+  );
+  safeHandleReadWithSchema(
     ipcChannels.agents.getAgentDetail,
-    (_event, agentId: string) => agentReads.getAgentDetail(agentId),
+    agentDetailReadArgsSchema,
+    async (_event, agentId, query) => {
+      const safeQuery = normalizeAgentWorkspaceReadQuery(query);
+      await assertAgentReadAccess(safeQuery?.workspaceId, "load that agent");
+      return agentReads.getAgentDetail(String(agentId), safeQuery);
+    },
     "The app could not load that agent.",
   );
-  safeHandleRead(ipcChannels.agents.getRunsList, () => agentReads.getRunsList(), "The app could not load the run history.");
-  safeHandleRead(
+  safeHandleReadWithSchema(
+    ipcChannels.agents.getRunsList,
+    agentWorkspaceReadArgsSchema,
+    async (_event, query) => {
+      const safeQuery = normalizeAgentWorkspaceReadQuery(query);
+      await assertAgentReadAccess(safeQuery?.workspaceId, "load the run history");
+      return agentReads.getRunsList(safeQuery);
+    },
+    "The app could not load the run history.",
+  );
+  safeHandleReadWithSchema(
     ipcChannels.agents.getModelsSnapshot,
-    () => agentReads.getModelsSnapshot(),
+    agentWorkspaceReadArgsSchema,
+    async (_event, query) => {
+      const safeQuery = normalizeAgentWorkspaceReadQuery(query);
+      await assertAgentReadAccess(safeQuery?.workspaceId, "load the models snapshot");
+      return agentReads.getModelsSnapshot(safeQuery);
+    },
     "The app could not load the models snapshot.",
   );
-  safeHandleRead(
+  safeHandleReadWithSchema(
     ipcChannels.agents.getAIProviderConfigs,
-    () => agentReads.getAIProviderConfigs(),
+    agentWorkspaceReadArgsSchema,
+    async (_event, query) => {
+      const safeQuery = normalizeAgentWorkspaceReadQuery(query);
+      await assertAgentReadAccess(safeQuery?.workspaceId, "load AI provider settings");
+      return agentReads.getAIProviderConfigs(safeQuery);
+    },
     "The app could not load AI provider settings.",
   );
-  safeHandleRead(
+  safeHandleReadWithSchema(
     ipcChannels.agents.getConnectorsSnapshot,
-    () => agentReads.getConnectorsSnapshot(),
+    agentWorkspaceReadArgsSchema,
+    async (_event, query) => {
+      const safeQuery = normalizeAgentWorkspaceReadQuery(query);
+      await assertAgentReadAccess(safeQuery?.workspaceId, "load the connectors snapshot");
+      return agentReads.getConnectorsSnapshot(safeQuery);
+    },
     "The app could not load the connectors snapshot.",
   );
   safeHandleRead(

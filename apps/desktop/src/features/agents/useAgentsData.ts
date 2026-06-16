@@ -97,8 +97,13 @@ export const notifyAgentsChanged = () => {
   window.dispatchEvent(new Event(agentsRefreshEvent));
 };
 
-export const useMissionControlSnapshot = () => {
+type AgentWorkspaceQuery = {
+  workspaceId?: string;
+};
+
+export const useMissionControlSnapshot = (query?: AgentWorkspaceQuery) => {
   const refreshVersion = useAgentsRefreshVersion();
+  const workspaceId = query?.workspaceId;
 
   return useAsyncValue(
     async () => {
@@ -106,15 +111,16 @@ export const useMissionControlSnapshot = () => {
         return emptyMissionControlSnapshot;
       }
 
-      return window.bukowskiAgents.getMissionControlSnapshot();
+      return window.bukowskiAgents.getMissionControlSnapshot(query);
     },
     emptyMissionControlSnapshot,
-    [refreshVersion],
+    [refreshVersion, workspaceId],
   );
 };
 
-export const useAgentsList = () => {
+export const useAgentsList = (query?: AgentWorkspaceQuery) => {
   const refreshVersion = useAgentsRefreshVersion();
+  const workspaceId = query?.workspaceId;
 
   return useAsyncValue(
     async () => {
@@ -122,15 +128,16 @@ export const useAgentsList = () => {
         return [] as AgentRosterRow[];
       }
 
-      return window.bukowskiAgents.getAgentsList();
+      return window.bukowskiAgents.getAgentsList(query);
     },
     [] as AgentRosterRow[],
-    [refreshVersion],
+    [refreshVersion, workspaceId],
   );
 };
 
-export const useAgentDetail = (agentId: string | null) => {
+export const useAgentDetail = (agentId: string | null, query?: AgentWorkspaceQuery) => {
   const refreshVersion = useAgentsRefreshVersion();
+  const workspaceId = query?.workspaceId;
 
   return useAsyncValue(
     async () => {
@@ -138,15 +145,16 @@ export const useAgentDetail = (agentId: string | null) => {
         return emptyAgentDetailSnapshot;
       }
 
-      return window.bukowskiAgents.getAgentDetail(agentId);
+      return window.bukowskiAgents.getAgentDetail(agentId, query);
     },
     emptyAgentDetailSnapshot,
-    [agentId, refreshVersion],
+    [agentId, refreshVersion, workspaceId],
   );
 };
 
-export const useAgentRuns = () => {
+export const useAgentRuns = (query?: AgentWorkspaceQuery) => {
   const refreshVersion = useAgentsRefreshVersion();
+  const workspaceId = query?.workspaceId;
 
   return useAsyncValue(
     async () => {
@@ -154,15 +162,16 @@ export const useAgentRuns = () => {
         return [] as AgentRunRow[];
       }
 
-      return window.bukowskiAgents.getRunsList();
+      return window.bukowskiAgents.getRunsList(query);
     },
     [] as AgentRunRow[],
-    [refreshVersion],
+    [refreshVersion, workspaceId],
   );
 };
 
-export const useAgentModels = () => {
+export const useAgentModels = (query?: AgentWorkspaceQuery) => {
   const refreshVersion = useAgentsRefreshVersion();
+  const workspaceId = query?.workspaceId;
 
   return useAsyncValue(
     async () => {
@@ -170,15 +179,16 @@ export const useAgentModels = () => {
         return emptyAgentModelsSnapshot;
       }
 
-      return window.bukowskiAgents.getModelsSnapshot();
+      return window.bukowskiAgents.getModelsSnapshot(query);
     },
     emptyAgentModelsSnapshot,
-    [refreshVersion],
+    [refreshVersion, workspaceId],
   );
 };
 
-export const useAIProviderConfigs = () => {
+export const useAIProviderConfigs = (query?: AgentWorkspaceQuery) => {
   const refreshVersion = useAgentsRefreshVersion();
+  const workspaceId = query?.workspaceId;
 
   return useAsyncValue(
     async () => {
@@ -186,15 +196,16 @@ export const useAIProviderConfigs = () => {
         return [] as AgentModelRow[];
       }
 
-      return window.bukowskiAgents.getAIProviderConfigs();
+      return window.bukowskiAgents.getAIProviderConfigs(query);
     },
     [] as AgentModelRow[],
-    [refreshVersion],
+    [refreshVersion, workspaceId],
   );
 };
 
-export const useAgentConnectors = () => {
+export const useAgentConnectors = (query?: AgentWorkspaceQuery) => {
   const refreshVersion = useAgentsRefreshVersion();
+  const workspaceId = query?.workspaceId;
 
   return useAsyncValue(
     async () => {
@@ -202,10 +213,10 @@ export const useAgentConnectors = () => {
         return [] as AgentConnectorRow[];
       }
 
-      return window.bukowskiAgents.getConnectorsSnapshot();
+      return window.bukowskiAgents.getConnectorsSnapshot(query);
     },
     [] as AgentConnectorRow[],
-    [refreshVersion],
+    [refreshVersion, workspaceId],
   );
 };
 

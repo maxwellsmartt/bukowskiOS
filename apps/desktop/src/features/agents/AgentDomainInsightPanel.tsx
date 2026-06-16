@@ -69,7 +69,7 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
     sortDirection: "asc",
   });
   const { data: rmaSnapshot } = useRmaSnapshot({ workspaceId: activeWorkspaceId });
-  const { data: connectors } = useAgentConnectors();
+  const { data: connectors } = useAgentConnectors({ workspaceId: activeWorkspaceId });
 
   let title = "";
   let insights: string[] = [];

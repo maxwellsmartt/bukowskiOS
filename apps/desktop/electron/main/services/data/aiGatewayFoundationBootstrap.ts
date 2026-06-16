@@ -135,6 +135,9 @@ const buildSystemAgentRecord = (agent: AgentConfigRecord) => ({
   sortOrder: agent.sort_order,
 });
 
+const buildWorkspaceAgentId = (agentId: string, workspaceId: string) =>
+  workspaceId === "workspace-metadata" ? agentId : `${agentId}-${workspaceId}`;
+
 export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
   ensureColumn(db, "ai_provider_configs", "fallback_model_key", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "agents", "provider_key", "TEXT");
@@ -466,8 +469,9 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
   workspaceRows.forEach((workspace) => {
     agentConfig.agents.forEach((agentConfigRow) => {
       const agent = buildSystemAgentRecord(agentConfigRow);
+      const agentId = buildWorkspaceAgentId(agent.id, workspace.id);
       insertAgent.run(
-        agent.id,
+        agentId,
         workspace.id,
         agent.agentKey,
         agent.displayName,
@@ -521,14 +525,14 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
         agent.sortOrder,
         now,
         workspace.id,
-        agent.id,
+        agentId,
       );
       updateLegacyToolAllowlist.run(
         agent.allowedToolsJson,
         agent.allowedDomainsJson,
         now,
         workspace.id,
-        agent.id,
+        agentId,
       );
     });
   });

@@ -109,7 +109,7 @@ export const AgentConnectorsPage = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
   const toast = useToast();
-  const { data, error } = useAgentConnectors();
+  const { data, error } = useAgentConnectors({ workspaceId: activeWorkspaceId });
   const { data: catalog } = useCatalogData();
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
   const [selectedConnectorKey, setSelectedConnectorKey] = useState<string | null>(null);
@@ -160,6 +160,7 @@ export const AgentConnectorsPage = () => {
     () => data.find((connector) => connector.connectorKey === selectedConnectorKey) ?? null,
     [data, selectedConnectorKey],
   );
+  const selectedConnectorIsLive = selectedConnector?.connectorKey === "telegram";
 
   useEffect(() => {
     if (!window.bukowskiApp) {
@@ -314,6 +315,10 @@ export const AgentConnectorsPage = () => {
     if (!selectedConnector) {
       return;
     }
+    if (!selectedConnectorIsLive) {
+      setErrorMessage(t("agents.connectors.setupFuture"));
+      return;
+    }
 
     setIsSaving(true);
     setErrorMessage(null);
@@ -342,6 +347,10 @@ export const AgentConnectorsPage = () => {
     if (!selectedConnector) {
       return;
     }
+    if (!selectedConnectorIsLive) {
+      setErrorMessage(t("agents.connectors.setupFuture"));
+      return;
+    }
 
     setIsSaving(true);
     setErrorMessage(null);
@@ -363,6 +372,10 @@ export const AgentConnectorsPage = () => {
 
   const handleClearSecret = async () => {
     if (!selectedConnector) {
+      return;
+    }
+    if (!selectedConnectorIsLive) {
+      setErrorMessage(t("agents.connectors.setupFuture"));
       return;
     }
 
@@ -390,6 +403,10 @@ export const AgentConnectorsPage = () => {
     if (!selectedConnector) {
       return;
     }
+    if (!selectedConnectorIsLive) {
+      setErrorMessage(t("agents.connectors.setupFuture"));
+      return;
+    }
 
     setIsTesting(true);
     setErrorMessage(null);
@@ -408,7 +425,7 @@ export const AgentConnectorsPage = () => {
   };
 
   const handleGenerateLinkToken = async () => {
-    if (!selectedConnector || !selectedIdentity?.ready || !selectedIdentity.userId) {
+    if (!selectedConnector || !selectedConnectorIsLive || !selectedIdentity?.ready || !selectedIdentity.userId) {
       return;
     }
 
@@ -562,50 +579,54 @@ export const AgentConnectorsPage = () => {
                 </div>
               </div>
 
-              <div className="models-provider-health-grid">
-                <div className="models-provider-health-card">
-                  <span className="agent-detail-kicker">{t("agents.connectors.fields.lastTest")}</span>
-                  <strong>{selectedConnector.lastTestedAtLabel}</strong>
-                </div>
-                <div className="models-provider-health-card">
-                  <span className="agent-detail-kicker">{t("agents.connectors.fields.inbound")}</span>
-                  <strong>{selectedConnector.inboundMessages}</strong>
-                </div>
-                <div className="models-provider-health-card">
-                  <span className="agent-detail-kicker">{t("agents.connectors.fields.pending")}</span>
-                  <strong>{selectedConnector.pendingDeliveries}</strong>
-                </div>
-                <div className="models-provider-health-card">
-                  <span className="agent-detail-kicker">{t("agents.connectors.fields.lastOutbound")}</span>
-                  <strong>{selectedConnector.lastOutboundAtLabel}</strong>
-                </div>
-              </div>
+              {selectedConnectorIsLive ? (
+                <>
+                  <div className="models-provider-health-grid">
+                    <div className="models-provider-health-card">
+                      <span className="agent-detail-kicker">{t("agents.connectors.fields.lastTest")}</span>
+                      <strong>{selectedConnector.lastTestedAtLabel}</strong>
+                    </div>
+                    <div className="models-provider-health-card">
+                      <span className="agent-detail-kicker">{t("agents.connectors.fields.inbound")}</span>
+                      <strong>{selectedConnector.inboundMessages}</strong>
+                    </div>
+                    <div className="models-provider-health-card">
+                      <span className="agent-detail-kicker">{t("agents.connectors.fields.pending")}</span>
+                      <strong>{selectedConnector.pendingDeliveries}</strong>
+                    </div>
+                    <div className="models-provider-health-card">
+                      <span className="agent-detail-kicker">{t("agents.connectors.fields.lastOutbound")}</span>
+                      <strong>{selectedConnector.lastOutboundAtLabel}</strong>
+                    </div>
+                  </div>
 
-              <div className="agent-form-grid">
-                <label className="field-block field-block-span-2">
-                  <span className="field-label">{t("agents.connectors.fields.accessToken")}</span>
-                  <input
-                    className="field-input"
-                    onChange={(event) => setDraft((current) => ({ ...current, botToken: event.target.value }))}
-                    placeholder={selectedConnector.hasStoredSecret ? t("agents.connectors.placeholders.keepToken") : t("agents.connectors.placeholders.pasteToken")}
-                    type="password"
-                    value={draft.botToken}
-                  />
-                </label>
-                <label className="field-block">
-                  <span className="field-label">{t("agents.connectors.fields.availability")}</span>
-                  <select
-                    className="field-input"
-                    onChange={(event) => setDraft((current) => ({ ...current, enabled: event.target.value === "enabled" }))}
-                    value={draft.enabled ? "enabled" : "disabled"}
-                  >
-                    <option value="enabled">{t("agents.connectors.availability.enabled")}</option>
-                    <option value="disabled">{t("agents.connectors.availability.disabled")}</option>
-                  </select>
-                </label>
-              </div>
+                  <div className="agent-form-grid">
+                    <label className="field-block field-block-span-2">
+                      <span className="field-label">{t("agents.connectors.fields.accessToken")}</span>
+                      <input
+                        className="field-input"
+                        onChange={(event) => setDraft((current) => ({ ...current, botToken: event.target.value }))}
+                        placeholder={selectedConnector.hasStoredSecret ? t("agents.connectors.placeholders.keepToken") : t("agents.connectors.placeholders.pasteToken")}
+                        type="password"
+                        value={draft.botToken}
+                      />
+                    </label>
+                    <label className="field-block">
+                      <span className="field-label">{t("agents.connectors.fields.availability")}</span>
+                      <select
+                        className="field-input"
+                        onChange={(event) => setDraft((current) => ({ ...current, enabled: event.target.value === "enabled" }))}
+                        value={draft.enabled ? "enabled" : "disabled"}
+                      >
+                        <option value="enabled">{t("agents.connectors.availability.enabled")}</option>
+                        <option value="disabled">{t("agents.connectors.availability.disabled")}</option>
+                      </select>
+                    </label>
+                  </div>
+                </>
+              ) : null}
 
-              {selectedIdentity && !selectedIdentity.ready ? (
+              {selectedConnectorIsLive && selectedIdentity && !selectedIdentity.ready ? (
                 <div className="models-provider-diagnostic">
                   <span className="agent-detail-kicker">{t("agents.connectors.linkBlocked")}</span>
                   <p>
@@ -616,7 +637,7 @@ export const AgentConnectorsPage = () => {
                 </div>
               ) : null}
 
-              {selectedConnector.lastErrorSummary ? (
+              {selectedConnectorIsLive && selectedConnector.lastErrorSummary ? (
                 <div className="models-provider-diagnostic">
                   <span className="agent-detail-kicker">{t("agents.connectors.lastError")}</span>
                   <p>{selectedConnector.lastErrorSummary}</p>
@@ -627,7 +648,7 @@ export const AgentConnectorsPage = () => {
                 <ChannelProviderShellPreview connectorKey={selectedConnector.connectorKey} />
               ) : null}
 
-              {selectedConnector.connectorKey === "telegram" ? (
+              {selectedConnectorIsLive ? (
                 <details className="detail-disclosure" open>
                   <summary className="detail-disclosure-summary">{t("agents.connectors.linkUserToTelegram")}</summary>
                   <div className="detail-disclosure-content">
@@ -713,7 +734,7 @@ export const AgentConnectorsPage = () => {
                 <span className="summary-value">{selectedConnector.deliverySummary}</span>
               </div>
 
-              {generatedLinkToken ? (
+              {selectedConnectorIsLive && generatedLinkToken ? (
                 <div className="models-provider-feedback models-provider-feedback-success">
                   <div className="telegram-link-feedback-header">
                     <div className="agent-detail-row">
@@ -739,42 +760,42 @@ export const AgentConnectorsPage = () => {
 
               {errorMessage ? <div className="form-inline-error">{errorMessage}</div> : null}
 
-              <div className="agent-detail-actions">
-                <button className="primary-control" disabled={isSaving} onClick={() => void handleSave()} type="button">
-                  <RadioTower size={16} />
-                  <span>{isSaving ? t("common.saving") : t("common.save")}</span>
-                </button>
-                <button
-                  className="ghost-control"
-                  disabled={isTesting || selectedConnector.connectorKey !== "telegram"}
-                  onClick={() => void handleTest()}
-                  type="button"
-                >
-                  <ShieldCheck size={16} />
-                  <span>{isTesting ? t("agents.connectors.testing") : t("agents.connectors.testConnection")}</span>
-                </button>
-                <button
-                  className="ghost-control"
-                  disabled={
-                    isGeneratingToken || !selectedUserId || !selectedIdentity?.ready || selectedConnector.connectorKey !== "telegram"
-                  }
-                  onClick={() => void handleGenerateLinkToken()}
-                  type="button"
-                >
-                  <Link2 size={16} />
-                  <span>{isGeneratingToken ? t("agents.connectors.generating") : t("agents.connectors.generateLink")}</span>
-                </button>
-                <button className="ghost-control" disabled={isSaving} onClick={() => void handleDisable()} type="button">
-                  <RotateCcw size={16} />
-                  <span>{t("agents.connectors.disable")}</span>
-                </button>
-                {selectedConnector.hasStoredSecret ? (
-                  <button className="ghost-control" disabled={isSaving} onClick={() => void handleClearSecret()} type="button">
-                    <KeyRound size={16} />
-                    <span>{t("agents.connectors.clearToken")}</span>
+              {selectedConnectorIsLive ? (
+                <div className="agent-detail-actions">
+                  <button className="primary-control" disabled={isSaving} onClick={() => void handleSave()} type="button">
+                    <RadioTower size={16} />
+                    <span>{isSaving ? t("common.saving") : t("common.save")}</span>
                   </button>
-                ) : null}
-              </div>
+                  <button
+                    className="ghost-control"
+                    disabled={isTesting}
+                    onClick={() => void handleTest()}
+                    type="button"
+                  >
+                    <ShieldCheck size={16} />
+                    <span>{isTesting ? t("agents.connectors.testing") : t("agents.connectors.testConnection")}</span>
+                  </button>
+                  <button
+                    className="ghost-control"
+                    disabled={isGeneratingToken || !selectedUserId || !selectedIdentity?.ready}
+                    onClick={() => void handleGenerateLinkToken()}
+                    type="button"
+                  >
+                    <Link2 size={16} />
+                    <span>{isGeneratingToken ? t("agents.connectors.generating") : t("agents.connectors.generateLink")}</span>
+                  </button>
+                  <button className="ghost-control" disabled={isSaving} onClick={() => void handleDisable()} type="button">
+                    <RotateCcw size={16} />
+                    <span>{t("agents.connectors.disable")}</span>
+                  </button>
+                  {selectedConnector.hasStoredSecret ? (
+                    <button className="ghost-control" disabled={isSaving} onClick={() => void handleClearSecret()} type="button">
+                      <KeyRound size={16} />
+                      <span>{t("agents.connectors.clearToken")}</span>
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="empty-state">{t("agents.connectors.selectChannel")}</div>

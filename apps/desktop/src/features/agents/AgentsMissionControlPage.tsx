@@ -94,7 +94,7 @@ const CollapsibleMissionCard = ({
 export const AgentsMissionControlPage = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId: workspaceId } = useWorkspace();
-  const { data, error, reload } = useMissionControlSnapshot();
+  const { data, error, reload } = useMissionControlSnapshot({ workspaceId });
   const [searchParams] = useSearchParams();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -107,7 +107,7 @@ export const AgentsMissionControlPage = () => {
     models: true,
     connectors: true,
   });
-  const { data: detail, reload: reloadDetail } = useAgentDetail(selectedAgentId);
+  const { data: detail, reload: reloadDetail } = useAgentDetail(selectedAgentId, { workspaceId });
 
   useVisiblePolling(
     () => {

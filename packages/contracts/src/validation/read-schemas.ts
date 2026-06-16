@@ -155,6 +155,7 @@ export const assetWorkspaceQuerySchema = z.object({
 
 export const assetListReadArgsSchema = z.tuple([assetListQuerySchema.optional()]);
 export const assetWorkspaceReadArgsSchema = z.tuple([assetWorkspaceQuerySchema.optional()]);
+export const agentWorkspaceReadArgsSchema = z.tuple([workspaceQuerySchema.optional()]);
 export const appUsersSnapshotReadArgsSchema = z.tuple([workspaceQuerySchema.optional()]);
 
 export const packingSlipListQuerySchema = z.object({

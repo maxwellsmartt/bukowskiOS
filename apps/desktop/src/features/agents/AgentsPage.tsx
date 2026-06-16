@@ -44,13 +44,13 @@ const getAgentIndicatorLabel = (
 export const AgentsPage = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId: workspaceId } = useWorkspace();
-  const { data, error } = useAgentsList();
-  const { data: missionControl } = useMissionControlSnapshot();
+  const { data, error } = useAgentsList({ workspaceId });
+  const { data: missionControl } = useMissionControlSnapshot({ workspaceId });
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editAgent, setEditAgent] = useState<AgentRosterRow | null>(null);
   const [duplicateAgent, setDuplicateAgent] = useState<AgentRosterRow | null>(null);
-  const { data: detail } = useAgentDetail(selectedAgentId);
+  const { data: detail } = useAgentDetail(selectedAgentId, { workspaceId });
 
   const duplicateSeed = useMemo(() => {
     if (!duplicateAgent) {

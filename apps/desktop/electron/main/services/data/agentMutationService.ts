@@ -41,7 +41,8 @@ import type { TelegramConnectorService } from "../connectors/telegramConnectorSe
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
+const resolveCommandWorkspaceId = (input: { workspaceId?: string }) =>
+  ensureValue(input.workspaceId ?? DEFAULT_WORKSPACE_ID, "Workspace");
 type AIModelListingService = {
   listModels?: OpenAIProviderService["listModels"];
   testConnection: OpenAIProviderService["testConnection"];
@@ -119,6 +120,7 @@ const normalizeTokenList = (values: string[]) =>
 
 const persistProviderModelOptions = (
   db: DatabaseSync,
+  workspaceId: string,
   providerKey: string,
   models: Array<{ key: string; label: string; raw?: Record<string, unknown> }>,
 ) => {
@@ -178,7 +180,7 @@ const persistProviderModelOptions = (
   }
 };
 
-const loadAgent = (db: DatabaseSync, id: string) =>
+const loadAgent = (db: DatabaseSync, workspaceId: string, id: string) =>
   db
     .prepare(
       `
@@ -200,6 +202,7 @@ const loadAgent = (db: DatabaseSync, id: string) =>
 
 const createActivityEvent = (
   db: DatabaseSync,
+  workspaceId: string,
   event: {
     id: string;
     agentId: string | null;
@@ -398,6 +401,7 @@ export const createAgentMutationService = (
 ) => ({
   createAgent(input: CreateAgentCommand): AgentMutationResult {
     const now = new Date().toISOString();
+    const workspaceId = resolveCommandWorkspaceId(input);
     const agentId = ensureValue(input.agentId, "Agent ID").toLowerCase();
     const displayName = ensureValue(input.displayName, "Display name");
     const role = ensureValue(input.role, "Role");
@@ -471,7 +475,7 @@ export const createAgentMutationService = (
       now,
     );
 
-    createActivityEvent(db, {
+    createActivityEvent(db, workspaceId, {
       id: createActivityEventId(),
       agentId: id,
       runId: null,
@@ -490,6 +494,7 @@ export const createAgentMutationService = (
 
   updateAgent(input: UpdateAgentCommand): AgentMutationResult {
     const now = new Date().toISOString();
+    const workspaceId = resolveCommandWorkspaceId(input);
     const displayName = ensureValue(input.displayName, "Display name");
     const role = ensureValue(input.role, "Role");
     const mission = ensureValue(input.mission, "Mission");
@@ -562,7 +567,7 @@ export const createAgentMutationService = (
       throw new Error("Agent not found.");
     }
 
-    createActivityEvent(db, {
+    createActivityEvent(db, workspaceId, {
       id: createActivityEventId(),
       agentId: input.id,
       runId: null,
@@ -581,7 +586,8 @@ export const createAgentMutationService = (
 
   setAgentStatus(input: SetAgentStatusCommand): AgentMutationResult {
     const now = new Date().toISOString();
-    const current = loadAgent(db, input.id);
+    const workspaceId = resolveCommandWorkspaceId(input);
+    const current = loadAgent(db, workspaceId, input.id);
 
     if (!current) {
       throw new Error("Agent not found.");
@@ -594,7 +600,7 @@ export const createAgentMutationService = (
       input.id,
     );
 
-    createActivityEvent(db, {
+    createActivityEvent(db, workspaceId, {
       id: createActivityEventId(),
       agentId: input.id,
       runId: null,
@@ -613,7 +619,8 @@ export const createAgentMutationService = (
 
   setAgentApprovalMode(input: SetAgentApprovalModeCommand): AgentMutationResult {
     const now = new Date().toISOString();
-    const current = loadAgent(db, input.id);
+    const workspaceId = resolveCommandWorkspaceId(input);
+    const current = loadAgent(db, workspaceId, input.id);
 
     if (!current) {
       throw new Error("Agent not found.");
@@ -626,7 +633,7 @@ export const createAgentMutationService = (
       input.id,
     );
 
-    createActivityEvent(db, {
+    createActivityEvent(db, workspaceId, {
       id: createActivityEventId(),
       agentId: input.id,
       runId: null,
@@ -645,7 +652,8 @@ export const createAgentMutationService = (
 
   saveAIProviderConfig(input: SaveAIProviderConfigCommand): AIProviderMutationResult {
     const now = new Date().toISOString();
-  const providerKey = ensureValue(input.providerKey, "Provider key").toLowerCase();
+    const workspaceId = resolveCommandWorkspaceId(input);
+    const providerKey = ensureValue(input.providerKey, "Provider key").toLowerCase();
     const supportsLiveRequests = providerKey === "openai" || providerKey === "anthropic";
     const defaultModelKey = ensureValue(input.defaultModelKey, "Default model");
     const fallbackModelKey = optionalValue(input.fallbackModelKey) ?? "";
@@ -734,7 +742,7 @@ export const createAgentMutationService = (
       now,
     );
 
-    createActivityEvent(db, {
+    createActivityEvent(db, workspaceId, {
       id: createActivityEventId(),
       agentId: null,
       runId: null,
@@ -756,6 +764,7 @@ export const createAgentMutationService = (
 
   async testAIProviderConnection(input: TestAIProviderConnectionCommand): Promise<AIProviderMutationResult> {
     const now = new Date().toISOString();
+    const workspaceId = resolveCommandWorkspaceId(input);
     const providerKey = ensureValue(input.providerKey, "Provider key").toLowerCase();
     const config = db
       .prepare(
@@ -848,7 +857,7 @@ export const createAgentMutationService = (
       providerKey,
     );
 
-    createActivityEvent(db, {
+    createActivityEvent(db, workspaceId, {
       id: createActivityEventId(),
       agentId: null,
       runId: null,
@@ -871,11 +880,12 @@ export const createAgentMutationService = (
 
   async refreshAIProviderModels(input: RefreshAIProviderModelsCommand): Promise<AIProviderMutationResult> {
     const now = new Date().toISOString();
+    const workspaceId = resolveCommandWorkspaceId(input);
     const providerKey = ensureValue(input.providerKey, "Provider key").toLowerCase();
     const config = db
       .prepare(
         `
-          SELECT display_name, supports_live_requests, default_model_key, base_url, timeout_ms
+          SELECT display_name, supports_live_requests, status, default_model_key, base_url, timeout_ms
           FROM ai_provider_configs
           WHERE workspace_id = ?
             AND provider_key = ?
@@ -886,6 +896,7 @@ export const createAgentMutationService = (
       | {
           display_name: string;
           supports_live_requests: number;
+          status: AIProviderMutationResult["status"];
           default_model_key: string;
           base_url: string;
           timeout_ms: number;
@@ -925,12 +936,16 @@ export const createAgentMutationService = (
         defaultModelKey: config.default_model_key,
         timeoutMs: config.timeout_ms,
       });
-      persistProviderModelOptions(db, providerKey, models);
+      persistProviderModelOptions(db, workspaceId, providerKey, models);
 
       db.prepare(
         `
           UPDATE ai_provider_configs
-          SET last_error_summary = NULL,
+          SET status = CASE
+                WHEN status IN ('healthy', 'configured') THEN status
+                ELSE 'configured'
+              END,
+              last_error_summary = NULL,
               updated_at = ?
           WHERE workspace_id = ?
             AND provider_key = ?
@@ -939,7 +954,7 @@ export const createAgentMutationService = (
 
       return {
         providerKey,
-        status: "configured",
+        status: config.status === "healthy" ? "healthy" : "configured",
         summary: `${config.display_name} model list refreshed (${models.length} models).`,
       };
     } catch (error) {
@@ -947,7 +962,8 @@ export const createAgentMutationService = (
       db.prepare(
         `
           UPDATE ai_provider_configs
-          SET last_error_summary = ?,
+          SET status = 'unavailable',
+              last_error_summary = ?,
               updated_at = ?
           WHERE workspace_id = ?
             AND provider_key = ?
@@ -963,6 +979,7 @@ export const createAgentMutationService = (
   },
 
   async saveConnectorConfig(input: SaveConnectorConfigCommand): Promise<ConnectorMutationResult> {
+    const workspaceId = resolveCommandWorkspaceId(input);
     const connectorKey = ensureValue(input.connectorKey, "Connector key").toLowerCase();
 
     if (connectorKey !== "telegram") {
@@ -974,6 +991,7 @@ export const createAgentMutationService = (
     }
 
     const status = await options.telegramConnectorService.saveConfig({
+      workspaceId,
       enabled: input.enabled,
       botToken: input.botToken,
       clearStoredSecret: input.clearStoredSecret,
@@ -992,6 +1010,7 @@ export const createAgentMutationService = (
   },
 
   async testConnectorConnection(input: TestConnectorConnectionCommand): Promise<ConnectorMutationResult> {
+    const workspaceId = resolveCommandWorkspaceId(input);
     const connectorKey = ensureValue(input.connectorKey, "Connector key").toLowerCase();
 
     if (connectorKey !== "telegram") {
@@ -1002,7 +1021,7 @@ export const createAgentMutationService = (
       throw new Error("Telegram connector service unavailable.");
     }
 
-    const result = await options.telegramConnectorService.testConnection();
+    const result = await options.telegramConnectorService.testConnection({ workspaceId });
     return {
       connectorKey,
       status: "configured",
@@ -1012,13 +1031,17 @@ export const createAgentMutationService = (
   },
 
   createConnectorLinkToken(input: CreateConnectorLinkTokenCommand): ConnectorMutationResult {
+    const workspaceId = resolveCommandWorkspaceId(input);
     const connectorKey = ensureValue(input.connectorKey, "Connector key").toLowerCase();
+    if (connectorKey !== "telegram") {
+      throw new Error("Only Telegram link tokens are supported right now.");
+    }
     if (!options.connectorBridgeService) {
       throw new Error("Connector bridge service unavailable.");
     }
     const result = options.connectorBridgeService.createLinkToken({
       connectorKey,
-      workspaceId: input.workspaceId,
+      workspaceId,
       userId: input.userId,
       expiresInMinutes: input.expiresInMinutes,
     });
@@ -1033,10 +1056,11 @@ export const createAgentMutationService = (
 
   assignAgentModel(input: AssignAgentModelCommand): AgentMutationResult {
     const now = new Date().toISOString();
+    const workspaceId = resolveCommandWorkspaceId(input);
     const providerKey = ensureValue(input.providerKey, "Provider");
     const modelKey = ensureValue(input.modelKey, "Model");
     const modelLabel = ensureValue(input.modelLabel, "Model label");
-    const current = loadAgent(db, input.agentId);
+    const current = loadAgent(db, workspaceId, input.agentId);
 
     if (!current) {
       throw new Error("Agent not found.");
@@ -1045,17 +1069,32 @@ export const createAgentMutationService = (
     const provider = db
       .prepare(
         `
-          SELECT display_name
+          SELECT display_name, enabled, status, supports_live_requests
           FROM ai_provider_configs
           WHERE workspace_id = ?
             AND provider_key = ?
           LIMIT 1
         `,
       )
-      .get(workspaceId, providerKey) as { display_name: string } | undefined;
+      .get(workspaceId, providerKey) as
+      | {
+          display_name: string;
+          enabled: number;
+          status: AIProviderMutationResult["status"];
+          supports_live_requests: number;
+        }
+      | undefined;
 
     if (!provider) {
       throw new Error("Provider not found.");
+    }
+
+    if (
+      provider.supports_live_requests !== 1 ||
+      provider.enabled !== 1 ||
+      !["configured", "healthy"].includes(provider.status)
+    ) {
+      throw new Error("Choose a configured AI provider before assigning it to an agent.");
     }
 
     db.prepare(
@@ -1070,7 +1109,7 @@ export const createAgentMutationService = (
       `,
     ).run(providerKey, modelKey, modelLabel, now, workspaceId, input.agentId);
 
-    createActivityEvent(db, {
+    createActivityEvent(db, workspaceId, {
       id: createActivityEventId(),
       agentId: input.agentId,
       runId: null,
@@ -1149,6 +1188,7 @@ export const createAgentMutationService = (
 
   async reviewRun(input: ReviewAgentRunCommand): Promise<AgentRunReviewResult> {
     const now = new Date().toISOString();
+    const workspaceId = resolveCommandWorkspaceId(input);
     const run = db
       .prepare(
         `
@@ -1262,7 +1302,7 @@ export const createAgentMutationService = (
             ? `${run.title} was approved for this session. Similar follow-ups in this thread can continue without another approval step.`
             : `${run.title} was approved for supervised follow-up.`;
 
-      createActivityEvent(db, {
+      createActivityEvent(db, workspaceId, {
         id: createActivityEventId(),
         agentId: run.agent_id,
         runId: run.id,
@@ -1290,7 +1330,7 @@ export const createAgentMutationService = (
             decision: input.decision,
           });
         } catch (continuationError) {
-          createActivityEvent(db, {
+          createActivityEvent(db, workspaceId, {
             id: createActivityEventId(),
             agentId: run.agent_id,
             runId: run.id,
@@ -1315,6 +1355,7 @@ export const createAgentMutationService = (
 
   createDraftRunFromChat(input: CreateDraftRunFromChatCommand): DraftRunFromChatResult {
     const now = new Date().toISOString();
+    const workspaceId = resolveCommandWorkspaceId(input);
     const message = ensureValue(input.message, "Message");
     const routedAgentKey = input.routeHint?.trim() || inferRoute(message);
     const routedAgent = db
@@ -1392,7 +1433,7 @@ export const createAgentMutationService = (
         now,
       );
 
-      createActivityEvent(db, {
+      createActivityEvent(db, workspaceId, {
         id: createActivityEventId(),
         agentId: routedAgent?.id ?? null,
         runId,
