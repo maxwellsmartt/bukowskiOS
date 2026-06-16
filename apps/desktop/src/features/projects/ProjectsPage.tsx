@@ -1,4 +1,4 @@
-import { AlertTriangle, Archive, CheckCircle2, ExternalLink, GitCompareArrows, Pencil, PanelRightOpen, X } from "lucide-react";
+import { AlertTriangle, Archive, CheckCircle2, CircleDot, ExternalLink, GitCompareArrows, Pencil, PanelRightOpen, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -11,7 +11,7 @@ import { reportIncident } from "@features/incidents/useIncidentsData";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
-import { ListToolbar } from "@shared/components/ListToolbar";
+import { ListSortMenuButton, ListToolbar } from "@shared/components/ListToolbar";
 import { ModalShell } from "@shared/components/ModalShell";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
@@ -43,6 +43,8 @@ const projectSortOptions: Array<ListSortOption<ProjectSortField> & { labelKey: s
   { value: "updatedAt", label: "Updated", labelKey: "projects.registry.sort.updatedAt" },
   { value: "createdAt", label: "Created", labelKey: "projects.registry.sort.createdAt" },
 ];
+
+const projectStatusOptions = ["Prep", "Active", "Wrapped", "On hold"] as const;
 
 export const ProjectsPage = () => {
   const { t } = useTranslation();
@@ -153,6 +155,28 @@ export const ProjectsPage = () => {
     }
 
     setCloseProjectTargets(closableProjects);
+  };
+
+  const handleChangeProjectStatus = async (project: ProjectCardRow, status: ProjectCardRow["status"]) => {
+    if (project.status === status) {
+      return;
+    }
+
+    try {
+      await updateProject(buildProjectUpdateInput(project, status));
+      toast.success(
+        t("projects.registry.statusChangedToast.title"),
+        t("projects.registry.statusChangedToast.body", {
+          name: project.name,
+          status: t(`projects.statuses.${status}`, { defaultValue: status }),
+        }),
+      );
+    } catch (nextError) {
+      toast.error(
+        t("projects.registry.statusChangedToast.failed"),
+        getUserFacingErrorMessage(nextError, t("projects.registry.statusChangedToast.failed")),
+      );
+    }
   };
 
   const closeSelectedProjectTargets = async () => {
@@ -274,6 +298,7 @@ export const ProjectsPage = () => {
               ...option,
               label: t(option.labelKey, { defaultValue: option.label }),
             }))}
+            showSortControl={false}
           />
           {isLoading && data.length === 0 ? (
             <TableSkeleton body={t("projects.registry.loading")} columns={6} />
@@ -404,11 +429,16 @@ export const ProjectsPage = () => {
                 onSelect: () => openProjectIncidentReport(row),
               },
               {
-                key: "close-project",
-                label: t("projects.registry.rowActions.closeProject"),
-                icon: <CheckCircle2 size={14} />,
-                disabled: row.status === "Wrapped",
-                onSelect: () => openCloseProjectConfirm([row]),
+                key: "change-status",
+                label: t("projects.registry.rowActions.changeStatus"),
+                icon: <CircleDot size={14} />,
+                children: projectStatusOptions.map((status) => ({
+                  key: `change-status-${status}`,
+                  label: t(`projects.statuses.${status}`, { defaultValue: status }),
+                  icon: row.status === status ? <CheckCircle2 size={14} /> : <CircleDot size={14} />,
+                  disabled: row.status === status,
+                  onSelect: (target) => void handleChangeProjectStatus(target, status),
+                })),
               },
               {
                 key: "open-detail",
@@ -444,6 +474,28 @@ export const ProjectsPage = () => {
               >
                 <Archive size={14} />
               </button>
+            }
+            controlsTrailingAddon={
+              <ListSortMenuButton
+                activeSortLabel={
+                  projectControls.activeSortOption
+                    ? t(
+                        (projectControls.activeSortOption as ListSortOption<ProjectSortField> & { labelKey?: string }).labelKey ??
+                          projectControls.activeSortOption.label,
+                        { defaultValue: projectControls.activeSortOption.label },
+                      )
+                    : undefined
+                }
+                className="data-table-sort-trigger"
+                onSortByChange={projectControls.setSortField}
+                onToggleSortDirection={projectControls.toggleSortDirection}
+                sortBy={projectControls.sortBy}
+                sortDirection={projectControls.sortDirection}
+                sortOptions={availableProjectSortOptions.map((option) => ({
+                  ...option,
+                  label: t(option.labelKey, { defaultValue: option.label }),
+                }))}
+              />
             }
             sortState={
               projectControls.activeColumnKey

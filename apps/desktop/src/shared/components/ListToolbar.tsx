@@ -35,6 +35,7 @@ type ListToolbarProps<TSort extends string> = {
   resultLabel?: string;
   activeSortLabel?: string | null;
   rightActions?: ReactNode;
+  showSortControl?: boolean;
 };
 
 const resolveSortOptionIcon = (value: string, label: string) => {
@@ -63,20 +64,25 @@ const resolveSortOptionIcon = (value: string, label: string) => {
   return TextCursorInput;
 };
 
-export const ListToolbar = <TSort extends string,>({
-  searchValue,
-  onSearchValueChange,
-  searchPlaceholder,
+type ListSortMenuButtonProps<TSort extends string> = {
+  sortOptions: Array<ListToolbarOption<TSort>>;
+  sortBy: TSort;
+  sortDirection: ListSortDirection;
+  onSortByChange: (value: TSort) => void;
+  onToggleSortDirection: () => void;
+  activeSortLabel?: string | null;
+  className?: string;
+};
+
+export const ListSortMenuButton = <TSort extends string,>({
   sortOptions,
   sortBy,
   sortDirection,
   onSortByChange,
   onToggleSortDirection,
-  resultCount,
-  resultLabel = "results",
   activeSortLabel,
-  rightActions,
-}: ListToolbarProps<TSort>) => {
+  className = "",
+}: ListSortMenuButtonProps<TSort>) => {
   const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<{ top: number; left: number; placement: "bottom" | "top" } | null>(null);
@@ -84,10 +90,6 @@ export const ListToolbar = <TSort extends string,>({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   const activeOption = useMemo(() => sortOptions.find((option) => option.value === sortBy) ?? sortOptions[0], [sortBy, sortOptions]);
-  const resultLabelSingular = resultLabel.replace(/s$/, "");
-  const searchPlaceholderWithCount =
-    typeof resultCount === "number" ? `${searchPlaceholder} (${resultCount} ${resultCount === 1 ? resultLabelSingular : resultLabel})` : searchPlaceholder;
-
   useEffect(() => {
     if (!menuOpen) {
       return;
@@ -134,35 +136,21 @@ export const ListToolbar = <TSort extends string,>({
   }, [menuOpen]);
 
   return (
-    <div className="list-toolbar">
-      <label className="list-toolbar-search" aria-label={t("common.listToolbar.searchAria")}>
-        <Search aria-hidden size={14} />
-        <input
-          className="list-toolbar-search-input"
-          onChange={(event) => onSearchValueChange(event.target.value)}
-          placeholder={searchPlaceholderWithCount}
-          type="search"
-          value={searchValue}
-        />
-      </label>
-
-      <div className="list-toolbar-controls">
-        {rightActions ? <div className="list-toolbar-actions">{rightActions}</div> : null}
-        <div className="list-toolbar-menu-shell" ref={menuRef}>
-          <button
-            aria-expanded={menuOpen}
-            aria-haspopup="menu"
-            aria-label={t("common.listToolbar.sortByAria", {
-              label: activeSortLabel ?? activeOption?.label ?? t("common.listToolbar.selectedOption"),
-            })}
-            className={`ghost-control list-toolbar-menu-trigger${menuOpen ? " is-open" : ""}`}
-            data-tooltip={t("common.listToolbar.sort")}
-            onClick={() => setMenuOpen((current) => !current)}
-            ref={triggerRef}
-            type="button"
-          >
-            <ListFilter aria-hidden size={14} />
-          </button>
+    <div className="list-toolbar-menu-shell" ref={menuRef}>
+      <button
+        aria-expanded={menuOpen}
+        aria-haspopup="menu"
+        aria-label={t("common.listToolbar.sortByAria", {
+          label: activeSortLabel ?? activeOption?.label ?? t("common.listToolbar.selectedOption"),
+        })}
+        className={`ghost-control list-toolbar-menu-trigger${menuOpen ? " is-open" : ""}${className ? ` ${className}` : ""}`}
+        data-tooltip={t("common.listToolbar.sort")}
+        onClick={() => setMenuOpen((current) => !current)}
+        ref={triggerRef}
+        type="button"
+      >
+        <ListFilter aria-hidden size={14} />
+      </button>
 
           {menuOpen && menuStyle
             ? createPortal(
@@ -242,8 +230,55 @@ export const ListToolbar = <TSort extends string,>({
                 document.body,
               )
             : null}
-        </div>
+    </div>
+  );
+};
 
+export const ListToolbar = <TSort extends string,>({
+  searchValue,
+  onSearchValueChange,
+  searchPlaceholder,
+  sortOptions,
+  sortBy,
+  sortDirection,
+  onSortByChange,
+  onToggleSortDirection,
+  resultCount,
+  resultLabel = "results",
+  activeSortLabel,
+  rightActions,
+  showSortControl = true,
+}: ListToolbarProps<TSort>) => {
+  const { t } = useTranslation();
+  const resultLabelSingular = resultLabel.replace(/s$/, "");
+  const searchPlaceholderWithCount =
+    typeof resultCount === "number" ? `${searchPlaceholder} (${resultCount} ${resultCount === 1 ? resultLabelSingular : resultLabel})` : searchPlaceholder;
+
+  return (
+    <div className="list-toolbar">
+      <label className="list-toolbar-search" aria-label={t("common.listToolbar.searchAria")}>
+        <Search aria-hidden size={14} />
+        <input
+          className="list-toolbar-search-input"
+          onChange={(event) => onSearchValueChange(event.target.value)}
+          placeholder={searchPlaceholderWithCount}
+          type="search"
+          value={searchValue}
+        />
+      </label>
+
+      <div className="list-toolbar-controls">
+        {rightActions ? <div className="list-toolbar-actions">{rightActions}</div> : null}
+        {showSortControl ? (
+          <ListSortMenuButton
+            activeSortLabel={activeSortLabel}
+            onSortByChange={onSortByChange}
+            onToggleSortDirection={onToggleSortDirection}
+            sortBy={sortBy}
+            sortDirection={sortDirection}
+            sortOptions={sortOptions}
+          />
+        ) : null}
         <div className="list-toolbar-meta" />
       </div>
     </div>

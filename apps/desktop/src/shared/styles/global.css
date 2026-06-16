@@ -4185,6 +4185,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .list-toolbar-meta {
@@ -8756,6 +8757,14 @@ body.is-resizing-side-rail {
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: nowrap;
+}
+
+.project-detail-actions-menu {
+  align-self: flex-start;
+}
+
+.project-detail-actions-popover {
+  min-width: 204px;
 }
 
 .project-detail-header-actions .action-row-button {
@@ -25289,6 +25298,45 @@ input[type="number"] {
   max-width: 280px;
   z-index: 60;
 }
+
+.data-table-context-menu-item-wrap {
+  position: relative;
+}
+
+.data-table-context-menu .list-toolbar-menu-item.has-submenu {
+  cursor: default;
+}
+
+.data-table-context-submenu {
+  position: absolute;
+  top: -8px;
+  left: calc(100% + 8px);
+  display: none;
+  min-width: 164px;
+  max-width: 240px;
+}
+
+.data-table-context-menu-item-wrap:hover > .data-table-context-submenu,
+.data-table-context-menu-item-wrap:focus-within > .data-table-context-submenu {
+  display: block;
+}
+
+.data-table-sort-trigger {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+}
+
+.data-table-columns-trigger-shell .list-toolbar-menu-shell {
+  display: inline-flex;
+}
+
+.data-table-columns-trigger-shell .list-toolbar-menu-trigger {
+  min-width: 30px;
+  min-height: 30px;
+  border-radius: 8px;
+}
+
 .list-toolbar-menu-item.is-danger {
   color: var(--danger, #f87171);
 }

@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { Check, Columns3, RotateCcw, X } from "lucide-react";
+import { Check, ChevronRight, Columns3, RotateCcw, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { ListSortDirection } from "@contracts";
@@ -38,9 +38,10 @@ export type DataTableRowAction<T> = {
   icon?: ReactNode;
   tone?: "default" | "danger";
   disabled?: boolean;
+  children?: DataTableRowAction<T>[];
   /** Render a divider above this item. */
   separatorBefore?: boolean;
-  onSelect: (row: T) => void;
+  onSelect?: (row: T) => void;
 };
 
 type DataTableProps<T = unknown> = {
@@ -67,6 +68,7 @@ type DataTableProps<T = unknown> = {
   onSortRequest?: (columnKey: string) => void;
   autoScrollToActiveRow?: boolean;
   controlsAddon?: ReactNode;
+  controlsTrailingAddon?: ReactNode;
   pruneSelectionOnRowsChange?: boolean;
   fitToColumnWidths?: boolean;
   fillRemainingColumnKey?: string;
@@ -121,6 +123,7 @@ export const DataTable = <T = unknown,>({
   onSortRequest,
   autoScrollToActiveRow = false,
   controlsAddon,
+  controlsTrailingAddon,
   pruneSelectionOnRowsChange = true,
   fillRemainingColumnKey,
   fillParent = false,
@@ -480,10 +483,11 @@ export const DataTable = <T = unknown,>({
       }
       const rect = menu.getBoundingClientRect();
       const margin = 8;
+      const submenuWidth = menu.querySelector(".data-table-context-submenu") ? 248 : 0;
       let nextX = contextMenu.x;
       let nextY = contextMenu.y;
-      if (rect.right > window.innerWidth - margin) {
-        nextX = Math.max(margin, window.innerWidth - rect.width - margin);
+      if (rect.right + submenuWidth > window.innerWidth - margin) {
+        nextX = Math.max(margin, window.innerWidth - rect.width - submenuWidth - margin);
       }
       if (rect.bottom > window.innerHeight - margin) {
         nextY = Math.max(margin, window.innerHeight - rect.height - margin);
@@ -939,6 +943,7 @@ export const DataTable = <T = unknown,>({
           >
             <Columns3 size={14} />
           </button>
+          {controlsTrailingAddon ? <div className="data-table-columns-extra-controls">{controlsTrailingAddon}</div> : null}
         </div>
       ) : null}
       <div
@@ -1211,12 +1216,15 @@ export const DataTable = <T = unknown,>({
             >
               <div className="list-toolbar-menu-section">
                 {buildContextMenuActions(contextMenu.row, contextMenu.rowId).map((action) => (
-                  <div key={action.key}>
+                  <div key={action.key} className="data-table-context-menu-item-wrap">
                     {action.separatorBefore ? <div className="list-toolbar-menu-divider" /> : null}
                     <button
-                      className={`list-toolbar-menu-item${action.tone === "danger" ? " is-danger" : ""}`}
+                      className={`list-toolbar-menu-item${action.tone === "danger" ? " is-danger" : ""}${action.children?.length ? " has-submenu" : ""}`}
                       disabled={action.disabled}
                       onClick={() => {
+                        if (action.children?.length || !action.onSelect) {
+                          return;
+                        }
                         const { row } = contextMenu;
                         setContextMenu(null);
                         action.onSelect(row);
@@ -1228,7 +1236,36 @@ export const DataTable = <T = unknown,>({
                         {action.icon ? <span aria-hidden>{action.icon}</span> : null}
                         <span>{action.label}</span>
                       </span>
+                      {action.children?.length ? <ChevronRight aria-hidden size={14} /> : null}
                     </button>
+                    {action.children?.length ? (
+                      <div className="list-toolbar-menu data-table-context-submenu" role="menu">
+                        <div className="list-toolbar-menu-section">
+                          {action.children.map((childAction) => (
+                            <button
+                              key={childAction.key}
+                              className={`list-toolbar-menu-item${childAction.tone === "danger" ? " is-danger" : ""}`}
+                              disabled={childAction.disabled}
+                              onClick={() => {
+                                if (!childAction.onSelect) {
+                                  return;
+                                }
+                                const { row } = contextMenu;
+                                setContextMenu(null);
+                                childAction.onSelect(row);
+                              }}
+                              role="menuitem"
+                              type="button"
+                            >
+                              <span className="list-toolbar-menu-item-copy">
+                                {childAction.icon ? <span aria-hidden>{childAction.icon}</span> : null}
+                                <span>{childAction.label}</span>
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>

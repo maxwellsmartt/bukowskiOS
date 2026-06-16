@@ -4254,6 +4254,11 @@
         "failed": "Could not close the project.",
         "title": "Project closed"
       },
+      "statusChangedToast": {
+        "body": "{{name}} is now {{status}}.",
+        "failed": "Could not change the project status.",
+        "title": "Status updated"
+      },
       "clearSelection": "Clear selection",
       "editProject": "Edit project",
       "reportIncident": "Report incident",
@@ -4263,6 +4268,7 @@
       "hideArchived": "Hide archived projects",
       "rowActions": {
         "addToCompare": "Add to compare",
+        "changeStatus": "Change status",
         "closeProject": "Close project",
         "editProject": "Edit project",
         "openDetail": "Open detail",
@@ -4319,6 +4325,7 @@
       "title": "Project Overview",
       "unavailable": "Project detail unavailable: {{message}}",
       "loading": "Loading the latest project details.",
+      "actionsMenu": "Project actions",
       "closeProject": "Close project",
       "closeProjectDialog": {
         "body": "This will mark the project as Wrapped. It does not archive or delete data; you can change the status from Details if you need to reopen it.",

@@ -4258,6 +4258,11 @@
         "failed": "No se pudo cerrar el proyecto.",
         "title": "Proyecto cerrado"
       },
+      "statusChangedToast": {
+        "body": "{{name}} ahora está en estado {{status}}.",
+        "failed": "No se pudo cambiar el estado del proyecto.",
+        "title": "Estado actualizado"
+      },
       "clearSelection": "Limpiar selección",
       "editProject": "Editar proyecto",
       "reportIncident": "Reportar incidente",
@@ -4267,6 +4272,7 @@
       "hideArchived": "Ocultar proyectos archivados",
       "rowActions": {
         "addToCompare": "Agregar a comparar",
+        "changeStatus": "Cambiar estado",
         "closeProject": "Cerrar proyecto",
         "editProject": "Editar proyecto",
         "openDetail": "Abrir detalle",
@@ -4323,6 +4329,7 @@
       "title": "Resumen del proyecto",
       "unavailable": "Detalle del proyecto no disponible: {{message}}",
       "loading": "Cargando los detalles más recientes del proyecto.",
+      "actionsMenu": "Acciones del proyecto",
       "closeProject": "Cerrar proyecto",
       "closeProjectDialog": {
         "body": "Esto marcará el proyecto como Cerrado. No archiva ni elimina datos; podrás cambiar el estado desde Detalles si necesitas reabrirlo.",

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { AlertTriangle, CheckCircle2, MoreVertical, Pencil } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
@@ -43,7 +44,26 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
   const [closeProjectError, setCloseProjectError] = useState<string | null>(null);
   const [isClosingProject, setIsClosingProject] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement | null>(null);
   const toast = useToast();
+
+  useEffect(() => {
+    if (!actionsOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!actionsRef.current?.contains(event.target as Node)) {
+        setActionsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [actionsOpen]);
 
   if (error) {
     return <div className="empty-state">{t("projects.detail.unavailable", { message: error })}</div>;
@@ -178,35 +198,56 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
         subtitle={displayProjectDescription}
         aside={
           <div className="project-detail-header-actions">
-            <button
-              className="ghost-control action-row-button"
-              onClick={() => navigate(`/projects/${project.id}/info`)}
-              type="button"
-            >
-              {t("projects.detail.editProject")}
-            </button>
-            {canCloseProject ? (
+            <div className="packing-detail-actions-menu project-detail-actions-menu" ref={actionsRef}>
               <button
-                className="ghost-control action-row-button"
-                onClick={() => {
-                  setCloseProjectOpen(true);
-                  setCloseProjectError(null);
-                }}
+                aria-expanded={actionsOpen}
+                aria-label={t("projects.detail.actionsMenu")}
+                className="icon-ghost-control packing-detail-actions-trigger"
+                onClick={() => setActionsOpen((value) => !value)}
                 type="button"
               >
-                {t("projects.detail.closeProject")}
+                <MoreVertical size={17} />
               </button>
-            ) : null}
-            <button
-              className="action-primary-button action-row-button"
-              onClick={() => {
-                setReportOpen(true);
-                setReportError(null);
-              }}
-              type="button"
-            >
-              {t("projects.detail.reportIncident")}
-            </button>
+              {actionsOpen ? (
+                <div className="packing-detail-actions-popover project-detail-actions-popover" role="menu">
+                  <button
+                    onClick={() => {
+                      setActionsOpen(false);
+                      navigate(`/projects/${project.id}/info`);
+                    }}
+                    type="button"
+                  >
+                    <Pencil size={14} />
+                    <span>{t("projects.detail.editProject")}</span>
+                  </button>
+                  {canCloseProject ? (
+                    <button
+                      onClick={() => {
+                        setActionsOpen(false);
+                        setCloseProjectOpen(true);
+                        setCloseProjectError(null);
+                      }}
+                      type="button"
+                    >
+                      <CheckCircle2 size={14} />
+                      <span>{t("projects.detail.closeProject")}</span>
+                    </button>
+                  ) : null}
+                  <button
+                    className="is-primary"
+                    onClick={() => {
+                      setActionsOpen(false);
+                      setReportOpen(true);
+                      setReportError(null);
+                    }}
+                    type="button"
+                  >
+                    <AlertTriangle size={14} />
+                    <span>{t("projects.detail.reportIncident")}</span>
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         }
         className="project-overview-card"
