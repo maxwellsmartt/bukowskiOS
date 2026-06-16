@@ -3867,8 +3867,11 @@
     "closeDialog": {
       "body": "This setup has unsaved work. You can keep the draft for later, discard it now, or continue editing.",
       "continue": "Continue editing",
+      "continueHint": "Return to the wizard",
       "discard": "Discard draft",
+      "discardHint": "Close without saving changes",
       "keep": "Keep draft for later",
+      "keepHint": "Resume this setup later",
       "title": "Keep this draft?"
     }
   },
@@ -4586,7 +4589,7 @@
       }
     },
     "units": {
-      "title": "Units",
+      "title": "Units & Crew",
       "newUnit": "New unit",
       "addDepartment": "Add department",
       "primaryBadge": "Base unit",
@@ -4609,10 +4612,11 @@
       "linkCrew": "Assign crew",
       "empty": "No units defined yet. Create the first operational unit for this project.",
       "departmentDialog": {
-        "title": "Add department",
-        "body": "Choose where this department will operate.",
+        "title": "Add departments",
+        "body": "Choose a unit and select every department that will operate there.",
         "noDepartments": "No departments remain available for this unit",
-        "confirm": "Add department"
+        "confirm_one": "Add {{count}} department",
+        "confirm_other": "Add {{count}} departments"
       },
       "crewDialog": {
         "title": "Assign crew to {{department}}",
@@ -4651,6 +4655,12 @@
         "name": "Name",
         "startDate": "Start date",
         "endDate": "End date",
+        "windows": "Operation windows",
+        "windowsHelp": "Add one or more windows when this unit works non-consecutive dates in the project.",
+        "addWindow": "Add window",
+        "windowNumber": "Window {{number}}",
+        "windowLabel": "Label",
+        "removeWindowAria": "Remove window {{number}}",
         "order": "Order",
         "color": "Color",
         "useProjectColor": "Use project color"
@@ -4683,7 +4693,8 @@
         "updatedLiveBody": "Changes are now live for the project crew.",
         "updateFailed": "Unable to update unit.",
         "departmentAddedTitle": "Department added",
-        "departmentAddedBody": "This unit can now receive crew in that department.",
+        "departmentAddedBody_one": "This unit can now receive crew in that department.",
+        "departmentAddedBody_other": "This unit can now receive crew in those {{count}} departments.",
         "departmentAddFailed": "Unable to add department.",
         "departmentRemovedTitle": "Department removed",
         "departmentRemovedBody": "This department no longer appears in the unit.",

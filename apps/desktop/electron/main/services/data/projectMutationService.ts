@@ -176,6 +176,52 @@ const normalizeUnitWindows = (
   });
 };
 
+const unitWindowsFromInput = (
+  input: { startDate?: string; endDate?: string; windows?: Array<{ id?: string; startDate?: string; endDate?: string; sortOrder?: number; label?: string }> },
+  label: string,
+) => {
+  if (input.windows?.length) {
+    return normalizeUnitWindows(input.windows, label);
+  }
+
+  if (input.startDate || input.endDate) {
+    return normalizeUnitWindows([{ startDate: input.startDate, endDate: input.endDate, sortOrder: 0 }], label);
+  }
+
+  return [];
+};
+
+const insertProjectUnitWindows = (db: DatabaseSync, unitId: string, windows: NormalizedUnitWindow[], now: string) => {
+  const insertWindow = db.prepare(
+    `
+      INSERT INTO project_unit_windows (
+        id,
+        project_unit_id,
+        start_date,
+        end_date,
+        sort_order,
+        label,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+  );
+
+  windows.forEach((window, index) => {
+    insertWindow.run(
+      window.id || `unit-window-${unitId}-${index}`,
+      unitId,
+      window.startDate,
+      window.endDate,
+      index,
+      window.label,
+      now,
+      now,
+    );
+  });
+};
+
 const normalizeDepartmentIds = (departmentIds: string[] | undefined) => uniqueValues(departmentIds ?? []);
 
 const ensureDepartmentIdsExist = (db: DatabaseSync, departmentIds: string[], label: string) => {
@@ -2027,8 +2073,10 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
     const workspaceId = project.workspace_id;
     const code = ensureValue(input.code, "Unit code").toUpperCase();
     const name = ensureValue(input.name, "Unit name");
-    const startDate = normalizeDateOnly(input.startDate);
-    const endDate = normalizeDateOnly(input.endDate);
+    const unitWindows = unitWindowsFromInput(input, "Project unit");
+    const unitBounds = deriveUnitBoundsFromWindows(unitWindows);
+    const startDate = unitBounds.startDate;
+    const endDate = unitBounds.endDate;
     const colorKey = normalizeColorKey(input.colorKey);
     const now = new Date().toISOString();
     const currentSortOrder =
@@ -2041,6 +2089,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
     assertProjectUnitCodeAvailability(db, input.projectId, code);
     assertDateWindow(startDate, endDate, "Project unit");
     assertUnitWithinProjectWindow(project.start_date, project.end_date, startDate, endDate);
+    assertUnitWindowsWithinProjectWindow(project.start_date, project.end_date, unitWindows, "Project unit");
 
     const derived = resolveDerivedStatusRow(startDate, endDate, null, null);
 
@@ -2083,23 +2132,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
       now,
     );
 
-    if (startDate && endDate) {
-      db.prepare(
-        `
-          INSERT INTO project_unit_windows (
-            id,
-            project_unit_id,
-            start_date,
-            end_date,
-            sort_order,
-            label,
-            created_at,
-            updated_at
-          )
-          VALUES (?, ?, ?, ?, 0, NULL, ?, ?)
-        `,
-      ).run(`unit-window-${unitId}-primary`, unitId, startDate, endDate, now, now);
-    }
+    insertProjectUnitWindows(db, unitId, unitWindows, now);
 
     enqueueOperationalSnapshotOutbox(db, {
       workspaceId,
@@ -2119,14 +2152,17 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
 
     assertProjectUnitCodeAvailability(db, input.projectId, code, input.unitId);
 
-    let startDate = normalizeDateOnly(input.startDate);
-    let endDate = normalizeDateOnly(input.endDate);
+    let unitWindows = unitWindowsFromInput(input, "Project unit");
+    let unitBounds = deriveUnitBoundsFromWindows(unitWindows);
+    let startDate = unitBounds.startDate;
+    let endDate = unitBounds.endDate;
     const colorKey = normalizeColorKey(input.colorKey);
     let nextStoredStatus = currentUnit.status;
     let nextStoredStatusSource = currentUnit.status_source;
 
     assertDateWindow(startDate, endDate, "Project unit");
     assertUnitWithinProjectWindow(project.start_date, project.end_date, startDate, endDate);
+    assertUnitWindowsWithinProjectWindow(project.start_date, project.end_date, unitWindows, "Project unit");
 
     if (input.statusAction === "cancel") {
       nextStoredStatus = "cancelled";
@@ -2137,6 +2173,10 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
       nextStoredStatusSource = derived.statusSource;
     } else if (input.statusAction === "mark_wrapped") {
       endDate = todayDateOnly();
+      unitWindows = normalizeUnitWindows([{ startDate: startDate ?? endDate, endDate, sortOrder: 0 }], "Project unit");
+      unitBounds = deriveUnitBoundsFromWindows(unitWindows);
+      startDate = unitBounds.startDate;
+      endDate = unitBounds.endDate;
       assertDateWindow(startDate, endDate, "Project unit");
       const derived = resolveDerivedStatusRow(startDate, endDate, null, null);
       nextStoredStatus = derived.status;
@@ -2181,23 +2221,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
 
     db.prepare("DELETE FROM project_unit_windows WHERE project_unit_id = ?").run(input.unitId);
 
-    if (startDate && endDate) {
-      db.prepare(
-        `
-          INSERT INTO project_unit_windows (
-            id,
-            project_unit_id,
-            start_date,
-            end_date,
-            sort_order,
-            label,
-            created_at,
-            updated_at
-          )
-          VALUES (?, ?, ?, ?, 0, NULL, ?, ?)
-        `,
-      ).run(`unit-window-${input.unitId}-primary`, input.unitId, startDate, endDate, now, now);
-    }
+    insertProjectUnitWindows(db, input.unitId, unitWindows, now);
 
     enqueueOperationalSnapshotOutbox(db, {
       workspaceId: project.workspace_id,

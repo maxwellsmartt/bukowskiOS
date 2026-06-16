@@ -641,6 +641,16 @@ export const unarchiveProjectSchema = z
   })
   .strict();
 
+const projectUnitWindowSchema = z
+  .object({
+    id: optionalTrimmedString,
+    startDate: optionalTrimmedString,
+    endDate: optionalTrimmedString,
+    sortOrder: z.number().int().optional(),
+    label: optionalTrimmedString,
+  })
+  .strict();
+
 const projectUnitSchema = z
   .object({
     projectId: nonEmptyString,
@@ -650,6 +660,7 @@ const projectUnitSchema = z
     colorKey: optionalTrimmedString,
     startDate: optionalTrimmedString,
     endDate: optionalTrimmedString,
+    windows: z.array(projectUnitWindowSchema).optional(),
     notes: optionalTrimmedString,
   })
   .strict();
@@ -734,15 +745,7 @@ const projectBlueprintPackingSeedSchema = z.discriminatedUnion("mode", [
     .strict(),
 ]);
 
-const projectBlueprintUnitWindowSchema = z
-  .object({
-    id: optionalTrimmedString,
-    startDate: optionalTrimmedString,
-    endDate: optionalTrimmedString,
-    sortOrder: z.number().int().optional(),
-    label: optionalTrimmedString,
-  })
-  .strict();
+const projectBlueprintUnitWindowSchema = projectUnitWindowSchema;
 
 const projectBlueprintUnitDepartmentSchema = z
   .object({

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
-import type { ProjectColorKey } from "@contracts";
+import type { ProjectColorKey, ProjectDetailSnapshot } from "@contracts";
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { SelectField } from "@shared/components/SelectField";
@@ -35,6 +35,7 @@ export const ProjectInfoPage = () => {
   const { data, error, isLoading, reload } = useProjectDetail(projectId);
   const { data: catalog } = useCatalogData();
   const { refreshProjects, updateProject } = useShellContext();
+  const [visibleData, setVisibleData] = useState<ProjectDetailSnapshot | null>(null);
 
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -57,6 +58,7 @@ export const ProjectInfoPage = () => {
       return;
     }
 
+    setVisibleData(data);
     setCode(data.project.code);
     setName(data.project.name);
     setStatus(data.project.status);
@@ -103,28 +105,30 @@ export const ProjectInfoPage = () => {
     return errors;
   }, [endDate, hasPreproduction, name, preproductionEndDate, preproductionStartDate, startDate, status, t]);
 
-  if (error) {
+  const displayData = visibleData?.project?.id === projectId ? visibleData : data;
+
+  if (error && !displayData.project) {
     return <div className="empty-state">{t("projects.info.unavailable", { message: error })}</div>;
   }
 
-  if (isLoading) {
+  if (isLoading && !displayData.project) {
     return <div className="empty-state">{t("projects.info.loading")}</div>;
   }
 
-  if (!data.project) {
+  if (!displayData.project) {
     return <div className="empty-state">{t("projects.info.empty")}</div>;
   }
 
-  const currentProject = data.project;
-  const activeUnits = data.timelineSummary?.activeUnits ?? 0;
-  const plannedUnits = data.timelineSummary?.plannedUnits ?? 0;
-  const wrappedUnits = data.timelineSummary?.wrappedUnits ?? 0;
-  const cancelledUnits = data.timelineSummary?.cancelledUnits ?? 0;
+  const currentProject = displayData.project;
+  const activeUnits = displayData.timelineSummary?.activeUnits ?? 0;
+  const plannedUnits = displayData.timelineSummary?.plannedUnits ?? 0;
+  const wrappedUnits = displayData.timelineSummary?.wrappedUnits ?? 0;
+  const cancelledUnits = displayData.timelineSummary?.cancelledUnits ?? 0;
   const totalScheduledUnits = activeUnits + plannedUnits + wrappedUnits + cancelledUnits;
   const wrappedRatio = totalScheduledUnits ? Math.round((wrappedUnits / totalScheduledUnits) * 100) : 0;
-  const scheduleWindow = data.schedule?.windowLabel ?? t("projects.fallbacks.unscheduled");
-  const scheduleStart = data.schedule?.startDate ?? t("projects.info.schedule.noStartDate");
-  const scheduleEnd = data.schedule?.endDate ?? t("projects.info.schedule.openEnded");
+  const scheduleWindow = displayData.schedule?.windowLabel ?? t("projects.fallbacks.unscheduled");
+  const scheduleStart = displayData.schedule?.startDate ?? t("projects.info.schedule.noStartDate");
+  const scheduleEnd = displayData.schedule?.endDate ?? t("projects.info.schedule.openEnded");
   const scheduleStats = [
     { label: t("projects.info.schedule.activeUnits"), value: activeUnits },
     { label: t("projects.info.schedule.plannedUnits"), value: plannedUnits },
@@ -366,11 +370,12 @@ export const ProjectInfoPage = () => {
               crewMembers={catalog.crewMembers}
               departments={catalog.departments}
               focusedUnitId={focusedUnitId}
-              onChanged={async () => {
-                await Promise.all([reload(), refreshProjects()]);
+              onChanged={(snapshot) => {
+                setVisibleData(snapshot);
+                void refreshProjects();
               }}
               projectId={currentProject.id}
-              units={data.units}
+              units={displayData.units}
             />
           </div>
         </div>

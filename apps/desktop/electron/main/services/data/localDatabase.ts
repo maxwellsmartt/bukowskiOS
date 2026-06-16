@@ -46,6 +46,7 @@ import { createCatalogPullService } from "./catalogPullService";
 import { createFinancialDomainPullService } from "./financialDomainPullService";
 import { applyConnectorFoundationMigration, bootstrapConnectorFoundation } from "./connectorFoundationBootstrap";
 import { applyCrewCatalogFoundationMigration } from "./crewCatalogFoundationBootstrap";
+import { deduplicateCrewCatalog } from "./crewCatalogDeduplicationBackfill";
 import { backfillCrewDepartmentSyncOutbox, cleanupSeedCrewDepartmentOutbox } from "./crewDepartmentSyncBackfill";
 import { createDataRetentionService, summarizeDataRetention } from "./dataRetentionService";
 import { createCurrencyMutationService } from "./currencyMutationService";
@@ -688,6 +689,9 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   );
   runStartupStep("clean up seed-workspace crew/department outbox", () =>
     applyTrackedStep(database, "runtime_crew_department_seed_outbox_cleanup_v1", () => cleanupSeedCrewDepartmentOutbox(database)),
+  );
+  runStartupStep("deduplicate crew catalog", () =>
+    applyTrackedStep(database, "runtime_crew_catalog_deduplication_v1", () => deduplicateCrewCatalog(database)),
   );
   runStartupStep("apply AI gateway foundation migration", () =>
     applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database)),
@@ -1605,6 +1609,10 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         return [{ table: "manufacturers", column: "id", value: row.entity_id }];
       case "production_company":
         return [{ table: "production_companies", column: "id", value: row.entity_id }];
+      case "crew":
+        return [{ table: "crew_members", column: "id", value: row.entity_id }];
+      case "department":
+        return [{ table: "departments", column: "id", value: row.entity_id }];
       default:
         return null;
     }

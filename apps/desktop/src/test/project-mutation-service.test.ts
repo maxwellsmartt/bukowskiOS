@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { createCatalogMutationService } from "../../electron/main/services/data/catalogMutationService";
+import { deduplicateCrewCatalog } from "../../electron/main/services/data/crewCatalogDeduplicationBackfill";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
@@ -193,6 +194,100 @@ describe("project mutation service", () => {
         departmentId: "dept-video",
       }),
     ).toThrow("linked crew or equipment");
+
+    cleanup();
+  });
+
+  it("persists multiple date windows when units are created or edited from project details", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-unit-window-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createProjectMutationService(database);
+
+    mutations.createProjectUnit({
+      projectId: "project-studio",
+      code: "SPLIT",
+      name: "Split Unit",
+      windows: [
+        { startDate: "2026-04-10", endDate: "2026-04-11", sortOrder: 0, label: "Weekend 1" },
+        { startDate: "2026-04-14", endDate: "2026-04-15", sortOrder: 1, label: "Weekend 2" },
+      ],
+    });
+
+    let detail = reads.getProjectDetail("project-studio");
+    let unit = detail.units.find((row) => row.code === "SPLIT");
+    expect(unit).toBeTruthy();
+    expect(unit?.startDate).toBe("2026-04-10");
+    expect(unit?.endDate).toBe("2026-04-15");
+    expect(unit?.windows.map((window) => window.label)).toEqual(["Weekend 1", "Weekend 2"]);
+
+    mutations.updateProjectUnit({
+      projectId: "project-studio",
+      unitId: unit!.id,
+      code: "SPLIT",
+      name: "Split Unit",
+      sortOrder: unit!.sortOrder,
+      windows: [
+        { startDate: "2026-04-12", endDate: "2026-04-12", sortOrder: 0, label: "Pickup" },
+        { startDate: "2026-04-14", endDate: "2026-04-15", sortOrder: 1, label: "Shoot" },
+      ],
+      statusAction: "none",
+    });
+
+    detail = reads.getProjectDetail("project-studio");
+    unit = detail.units.find((row) => row.code === "SPLIT");
+    expect(unit?.startDate).toBe("2026-04-12");
+    expect(unit?.endDate).toBe("2026-04-15");
+    expect(unit?.windows).toMatchObject([
+      { startDate: "2026-04-12", endDate: "2026-04-12", label: "Pickup" },
+      { startDate: "2026-04-14", endDate: "2026-04-15", label: "Shoot" },
+    ]);
+
+    cleanup();
+  });
+
+  it("deduplicates synced crew names and preserves project assignments", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-crew-dedupe-test");
+    const now = new Date().toISOString();
+
+    database
+      .prepare(
+        `
+          INSERT INTO crew_members (
+            id, workspace_id, full_name, role_label, email, phone, notes, is_active,
+            primary_department_id, document_id, linked_user_id,
+            default_daily_rate, default_weekly_rate, default_overtime_rate, rate_currency,
+            created_at, updated_at
+          ) VALUES (?, ?, ?, ?, NULL, NULL, NULL, 1, ?, NULL, NULL, NULL, NULL, NULL, 'DOP', ?, ?)
+        `,
+      )
+      .run("crew-user-paola-copy", DEFAULT_WORKSPACE_ID, "Paola Rivas", "Camera Operator", "dept-camera", now, now);
+
+    database
+      .prepare(
+        `
+          INSERT INTO project_unit_crew_assignments (
+            id, workspace_id, project_unit_id, crew_member_id, role_label, start_date, end_date, notes, created_at, updated_at, department_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+        `,
+      )
+      .run(
+        "assignment-duplicate-crew",
+        DEFAULT_WORKSPACE_ID,
+        "unit-aurora-main",
+        "crew-user-paola-copy",
+        "Camera Operator",
+        "2026-04-10",
+        "2026-04-12",
+        now,
+        now,
+        "dept-camera",
+      );
+
+    expect(deduplicateCrewCatalog(database)).toBe(1);
+    expect(database.prepare("SELECT COUNT(*) AS count FROM crew_members WHERE id = ?").get("crew-user-paola-copy")).toEqual({ count: 0 });
+    expect(
+      database.prepare("SELECT crew_member_id FROM project_unit_crew_assignments WHERE id = ?").get("assignment-duplicate-crew"),
+    ).toEqual({ crew_member_id: "crew-user-paola" });
 
     cleanup();
   });

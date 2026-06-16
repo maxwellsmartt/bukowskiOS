@@ -57,6 +57,7 @@ export type CreateProjectUnitInput = {
   colorKey?: string;
   startDate?: string;
   endDate?: string;
+  windows?: ProjectBlueprintUnitWindowInput[];
   notes?: string;
 };
 
@@ -69,6 +70,7 @@ export type UpdateProjectUnitInput = {
   colorKey?: string;
   startDate?: string;
   endDate?: string;
+  windows?: ProjectBlueprintUnitWindowInput[];
   notes?: string;
   statusAction?: "none" | "mark_wrapped" | "cancel" | "reactivate";
 };

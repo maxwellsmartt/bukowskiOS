@@ -302,6 +302,118 @@ describe("operational snapshot service", () => {
     }
   });
 
+  it("merges equivalent project crew assignments from remote snapshots when ids differ", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-crew-dedupe");
+
+    try {
+      const service = createOperationalSnapshotService(database);
+      const projectId = "project-remote-crew-dedupe";
+      const unitId = "unit-remote-crew-dedupe-main";
+      const timestamp = "2026-05-06T12:24:00.000Z";
+
+      const result = service.applyRemoteSnapshots("workspace-metadata", "project", [
+        {
+          workspace_id: "workspace-metadata",
+          entity_type: "project",
+          entity_id: projectId,
+          updated_at: timestamp,
+          deleted_at: null,
+          snapshot_json: {
+            project: {
+              id: projectId,
+              workspace_id: "workspace-metadata",
+              code: "RCD",
+              name: "Remote Crew Dedupe",
+              client_name: null,
+              status: "Prep",
+              start_date: "2026-06-01",
+              end_date: "2026-06-10",
+              description: null,
+              created_at: timestamp,
+              updated_at: timestamp,
+              client_id: null,
+              color_key: null,
+              production_company_id: null,
+              production_company_name: null,
+              has_preproduction: 0,
+              preproduction_start_date: null,
+              preproduction_end_date: null,
+              archived_at: null,
+            },
+            units: [
+              {
+                id: unitId,
+                workspace_id: "workspace-metadata",
+                project_id: projectId,
+                code: "MAIN",
+                name: "Main Unit",
+                sort_order: 0,
+                status: "planned",
+                status_source: "derived",
+                color_key: null,
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                notes: null,
+                created_at: timestamp,
+                updated_at: timestamp,
+              },
+            ],
+            unitWindows: [],
+            projectDepartments: [{ project_id: projectId, department_id: "dept-video", created_at: timestamp }],
+            unitDepartments: [{ project_unit_id: unitId, department_id: "dept-video", created_at: timestamp }],
+            crewAssignments: [
+              {
+                id: "assignment-remote-crew-dedupe-a",
+                workspace_id: "workspace-metadata",
+                project_unit_id: unitId,
+                department_id: "dept-video",
+                crew_member_id: "crew-user-paola",
+                role_label: "Video Assist",
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                notes: null,
+                created_at: timestamp,
+                updated_at: timestamp,
+              },
+              {
+                id: "assignment-remote-crew-dedupe-b",
+                workspace_id: "workspace-metadata",
+                project_unit_id: unitId,
+                department_id: "dept-video",
+                crew_member_id: "crew-user-paola",
+                role_label: "Video Assist Lead",
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                notes: "latest remote copy",
+                created_at: timestamp,
+                updated_at: "2026-05-06T12:25:00.000Z",
+              },
+            ],
+          },
+        },
+      ]);
+
+      expect(result.errors).toEqual([]);
+      expect(result.appliedCount).toBe(1);
+
+      const assignment = database
+        .prepare(
+          `
+            SELECT COUNT(*) AS count, MAX(role_label) AS role_label, MAX(notes) AS notes
+            FROM project_unit_crew_assignments
+            WHERE project_unit_id = ?
+              AND department_id = 'dept-video'
+              AND crew_member_id = 'crew-user-paola'
+          `,
+        )
+        .get(unitId) as { count: number; role_label: string | null; notes: string | null };
+
+      expect(assignment).toEqual({ count: 1, role_label: "Video Assist Lead", notes: "latest remote copy" });
+    } finally {
+      cleanup();
+    }
+  });
+
   it("rejects project snapshots that do not match the synced entity", () => {
     const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-scope");
 

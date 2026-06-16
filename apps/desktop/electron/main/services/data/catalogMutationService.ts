@@ -433,6 +433,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
         if (!result.changes) {
           throw new Error("Department not found.");
         }
+        enqueueCatalogOutbox(input.workspaceId, "department", input.id, "delete");
         break;
       }
       case "crew": {
@@ -440,6 +441,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
         if (!result.changes) {
           throw new Error("Crew member not found.");
         }
+        enqueueCatalogOutbox(input.workspaceId, "crew", input.id, "delete");
         break;
       }
       case "client": {

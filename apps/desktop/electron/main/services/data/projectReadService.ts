@@ -1419,7 +1419,24 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             project_unit_crew_assignments.end_date AS assignment_end_date,
             COALESCE(project_unit_crew_assignments.notes, '') AS assignment_notes
           FROM project_units
-          LEFT JOIN project_unit_crew_assignments ON project_unit_crew_assignments.project_unit_id = project_units.id
+          LEFT JOIN (
+            SELECT *
+            FROM (
+              SELECT
+                project_unit_crew_assignments.*,
+                ROW_NUMBER() OVER (
+                  PARTITION BY
+                    project_unit_id,
+                    COALESCE(department_id, ''),
+                    crew_member_id,
+                    COALESCE(start_date, ''),
+                    COALESCE(end_date, '')
+                  ORDER BY updated_at DESC, id DESC
+                ) AS duplicate_rank
+              FROM project_unit_crew_assignments
+            )
+            WHERE duplicate_rank = 1
+          ) AS project_unit_crew_assignments ON project_unit_crew_assignments.project_unit_id = project_units.id
           LEFT JOIN departments assignment_departments ON assignment_departments.id = project_unit_crew_assignments.department_id
           LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
           WHERE project_units.project_id = ?

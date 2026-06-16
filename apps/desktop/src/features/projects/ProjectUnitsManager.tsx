@@ -27,7 +27,7 @@ type ProjectUnitsManagerProps = {
   crewMembers: CatalogSnapshot["crewMembers"];
   departments: CatalogSnapshot["departments"];
   focusedUnitId?: string | null;
-  onChanged: () => Promise<void> | void;
+  onChanged: (snapshot: ProjectDetailSnapshot) => Promise<void> | void;
   projectId: string;
   units: ProjectDetailSnapshot["units"];
 };
@@ -37,9 +37,16 @@ type UnitDraft = {
   name: string;
   sortOrder: string;
   colorKey: string;
+  windows: UnitWindowDraft[];
+  notes: string;
+};
+
+type UnitWindowDraft = {
+  localId: string;
+  id?: string;
   startDate: string;
   endDate: string;
-  notes: string;
+  label: string;
 };
 
 type CrewAssignmentDraft = {
@@ -56,10 +63,19 @@ const emptyUnitDraft: UnitDraft = {
   name: "",
   sortOrder: "",
   colorKey: "",
-  startDate: "",
-  endDate: "",
+  windows: [],
   notes: "",
 };
+
+const createUnitWindowDraft = (
+  window?: Partial<ProjectDetailSnapshot["units"][number]["windows"][number]>,
+): UnitWindowDraft => ({
+  localId: `unit-window-draft-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+  id: window?.id,
+  startDate: window?.startDate ?? "",
+  endDate: window?.endDate ?? "",
+  label: window?.label ?? "",
+});
 
 const createCrewDraft = (unit?: ProjectDetailSnapshot["units"][number]): CrewAssignmentDraft => ({
   localId: `crew-draft-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
@@ -75,14 +91,36 @@ const toDraft = (unit: ProjectDetailSnapshot["units"][number]): UnitDraft => ({
   name: unit.name,
   sortOrder: String(unit.sortOrder),
   colorKey: unit.colorKey ?? "",
-  startDate: unit.startDate ?? "",
-  endDate: unit.endDate ?? "",
+  windows: unit.windows.length
+    ? unit.windows.map((window) => createUnitWindowDraft(window))
+    : [createUnitWindowDraft({ startDate: unit.startDate ?? "", endDate: unit.endDate ?? "" })],
   notes: unit.notes,
 });
 
 const normalizeOptional = (value: string) => {
   const trimmedValue = value.trim();
   return trimmedValue ? trimmedValue : undefined;
+};
+
+const normalizeCrewNameKey = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+const deriveWindowBounds = (windows: UnitWindowDraft[]) => {
+  const completeWindows = windows.filter((window) => window.startDate && window.endDate);
+
+  if (!completeWindows.length) {
+    return { startDate: undefined, endDate: undefined };
+  }
+
+  return {
+    startDate: completeWindows.reduce((current, window) => (window.startDate < current ? window.startDate : current), completeWindows[0]!.startDate),
+    endDate: completeWindows.reduce((current, window) => (window.endDate > current ? window.endDate : current), completeWindows[0]!.endDate),
+  };
 };
 
 const statusToneMap = {
@@ -99,7 +137,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
   const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
   const [unitDraft, setUnitDraft] = useState<UnitDraft>(emptyUnitDraft);
   const [departmentDialogOpen, setDepartmentDialogOpen] = useState(false);
-  const [departmentDraft, setDepartmentDraft] = useState({ unitId: "", departmentId: "" });
+  const [departmentDraft, setDepartmentDraft] = useState<{ unitId: string; departmentIds: string[] }>({ unitId: "", departmentIds: [] });
   const [crewDialogTarget, setCrewDialogTarget] = useState<{
     unit: ProjectDetailSnapshot["units"][number];
     department: ProjectDetailSnapshot["units"][number]["unitDepartments"][number];
@@ -129,6 +167,32 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
     [departmentDraft.unitId, units],
   );
 
+  const uniqueCrewMembers = useMemo(() => {
+    const byName = new Map<string, CatalogSnapshot["crewMembers"][number]>();
+
+    for (const crewMember of crewMembers) {
+      const key = normalizeCrewNameKey(crewMember.fullName);
+      if (!key) {
+        byName.set(crewMember.id, crewMember);
+        continue;
+      }
+
+      const current = byName.get(key);
+      if (!current) {
+        byName.set(key, crewMember);
+        continue;
+      }
+
+      const currentScore = (current.linkedUserId ? 2 : 0) + (current.primaryDepartmentId ? 1 : 0);
+      const nextScore = (crewMember.linkedUserId ? 2 : 0) + (crewMember.primaryDepartmentId ? 1 : 0);
+      if (nextScore > currentScore || (nextScore === currentScore && crewMember.id < current.id)) {
+        byName.set(key, crewMember);
+      }
+    }
+
+    return [...byName.values()];
+  }, [crewMembers]);
+
   const availableDepartmentsForSelectedUnit = useMemo(() => {
     if (!selectedDepartmentUnit) {
       return [];
@@ -156,7 +220,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
 
     setDepartmentDraft({
       unitId: fallbackUnit?.id ?? "",
-      departmentId: fallbackDepartment?.id ?? "",
+      departmentIds: fallbackDepartment ? [fallbackDepartment.id] : [],
     });
     setError(null);
     setDepartmentDialogOpen(true);
@@ -186,6 +250,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
     setUnitDraft({
       ...emptyUnitDraft,
       sortOrder: String(units.length + 1),
+      windows: [createUnitWindowDraft()],
     });
     setError(null);
 
@@ -213,34 +278,49 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
   const handleSave = async () => {
     try {
       setIsSubmitting(true);
+      let nextSnapshot: ProjectDetailSnapshot | null = null;
+      const windows = unitDraft.windows
+        .map((window, index) => ({
+          id: window.id,
+          startDate: normalizeOptional(window.startDate),
+          endDate: normalizeOptional(window.endDate),
+          sortOrder: index,
+          label: normalizeOptional(window.label),
+        }))
+        .filter((window) => window.startDate || window.endDate || window.label);
+      const bounds = deriveWindowBounds(unitDraft.windows);
 
       if (editorMode === "create") {
-        await createProjectUnit({
+        nextSnapshot = await createProjectUnit({
           projectId,
           code: unitDraft.code,
           name: unitDraft.name,
           sortOrder: Number(unitDraft.sortOrder) || units.length + 1,
           colorKey: normalizeOptional(unitDraft.colorKey),
-          startDate: normalizeOptional(unitDraft.startDate),
-          endDate: normalizeOptional(unitDraft.endDate),
+          startDate: bounds.startDate,
+          endDate: bounds.endDate,
+          windows,
           notes: normalizeOptional(unitDraft.notes),
         });
       } else if (editorMode === "edit" && editingUnit) {
-        await updateProjectUnit({
+        nextSnapshot = await updateProjectUnit({
           projectId,
           unitId: editingUnit.id,
           code: unitDraft.code,
           name: unitDraft.name,
           sortOrder: Number(unitDraft.sortOrder) || editingUnit.sortOrder,
           colorKey: normalizeOptional(unitDraft.colorKey),
-          startDate: normalizeOptional(unitDraft.startDate),
-          endDate: normalizeOptional(unitDraft.endDate),
+          startDate: bounds.startDate,
+          endDate: bounds.endDate,
+          windows,
           notes: normalizeOptional(unitDraft.notes),
           statusAction: "none",
         });
       }
 
-      await Promise.resolve(onChanged());
+      if (nextSnapshot) {
+        await Promise.resolve(onChanged(nextSnapshot));
+      }
       const nextFeedback = editorMode === "create" ? t("projects.units.toasts.createdBody") : t("projects.units.toasts.updatedBody");
       const notificationAction = editorMode === "create" ? "created" : "updated";
       await createNotification({
@@ -275,9 +355,10 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
       setIsSubmitting(true);
 
       if (action === "delete") {
-        await deleteProjectUnit({ projectId, unitId: unit.id });
+        const nextSnapshot = await deleteProjectUnit({ projectId, unitId: unit.id });
+        await Promise.resolve(onChanged(nextSnapshot));
       } else {
-        await updateProjectUnit({
+        const nextSnapshot = await updateProjectUnit({
           projectId,
           unitId: unit.id,
           code: unit.code,
@@ -286,12 +367,18 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
           colorKey: unit.colorKey ?? undefined,
           startDate: unit.startDate ?? undefined,
           endDate: unit.endDate ?? undefined,
+          windows: unit.windows.map((window, index) => ({
+            id: window.id,
+            startDate: window.startDate ?? undefined,
+            endDate: window.endDate ?? undefined,
+            sortOrder: index,
+            label: window.label ?? undefined,
+          })),
           notes: unit.notes || undefined,
           statusAction: action,
         });
+        await Promise.resolve(onChanged(nextSnapshot));
       }
-
-      await Promise.resolve(onChanged());
 
       if (editingUnitId === unit.id && action === "delete") {
         resetEditor();
@@ -311,7 +398,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
   };
 
   const getCrewOptionsForDepartment = (departmentId: string) =>
-    [...crewMembers].sort((left, right) => {
+    [...uniqueCrewMembers].sort((left, right) => {
       const leftMatches = left.primaryDepartmentId === departmentId ? 0 : 1;
       const rightMatches = right.primaryDepartmentId === departmentId ? 0 : 1;
       if (leftMatches !== rightMatches) {
@@ -321,19 +408,45 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
       return left.fullName.localeCompare(right.fullName);
     });
 
+  const addUnitWindow = () => {
+    setUnitDraft((current) => ({ ...current, windows: [...current.windows, createUnitWindowDraft()] }));
+  };
+
+  const updateUnitWindow = (localId: string, patch: Partial<UnitWindowDraft>) => {
+    setUnitDraft((current) => ({
+      ...current,
+      windows: current.windows.map((window) => (window.localId === localId ? { ...window, ...patch } : window)),
+    }));
+  };
+
+  const removeUnitWindow = (localId: string) => {
+    setUnitDraft((current) => ({
+      ...current,
+      windows: current.windows.length > 1 ? current.windows.filter((window) => window.localId !== localId) : current.windows,
+    }));
+  };
+
   const handleAddDepartment = async () => {
     try {
       setIsSubmitting(true);
-      await addDepartmentToProjectUnit({
-        projectId,
-        unitId: departmentDraft.unitId,
-        departmentId: departmentDraft.departmentId,
-      });
-      await Promise.resolve(onChanged());
+      let nextSnapshot: ProjectDetailSnapshot | null = null;
+      for (const departmentId of departmentDraft.departmentIds) {
+        nextSnapshot = await addDepartmentToProjectUnit({
+          projectId,
+          unitId: departmentDraft.unitId,
+          departmentId,
+        });
+      }
+      if (nextSnapshot) {
+        await Promise.resolve(onChanged(nextSnapshot));
+      }
       setDepartmentDialogOpen(false);
-      setDepartmentDraft({ unitId: "", departmentId: "" });
+      setDepartmentDraft({ unitId: "", departmentIds: [] });
       setError(null);
-      toast.success(t("projects.units.toasts.departmentAddedTitle"), t("projects.units.toasts.departmentAddedBody"));
+      toast.success(
+        t("projects.units.toasts.departmentAddedTitle"),
+        t("projects.units.toasts.departmentAddedBody", { count: departmentDraft.departmentIds.length }),
+      );
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, t("projects.units.toasts.departmentAddFailed")));
     } finally {
@@ -351,12 +464,12 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
 
     try {
       setIsSubmitting(true);
-      await removeDepartmentFromProjectUnit({
+      const nextSnapshot = await removeDepartmentFromProjectUnit({
         projectId,
         unitId: unit.id,
         departmentId: department.departmentId,
       });
-      await Promise.resolve(onChanged());
+      await Promise.resolve(onChanged(nextSnapshot));
       setError(null);
       toast.success(t("projects.units.toasts.departmentRemovedTitle"), t("projects.units.toasts.departmentRemovedBody"));
     } catch (nextError) {
@@ -377,6 +490,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
       setIsSubmitting(true);
 
       let nextConflictSummary: string | null = null;
+      let nextProjectSnapshot: ProjectDetailSnapshot | null = null;
       for (const draft of draftsToSave) {
         const nextSnapshot = await assignCrewToProjectUnit({
           projectId,
@@ -388,10 +502,13 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
           endDate: normalizeOptional(draft.endDate),
           notes: normalizeOptional(draft.notes),
         });
+        nextProjectSnapshot = nextSnapshot;
         nextConflictSummary = nextSnapshot.units.find((unit) => unit.id === crewDialogTarget.unit.id)?.conflictSummary ?? null;
       }
 
-      await Promise.resolve(onChanged());
+      if (nextProjectSnapshot) {
+        await Promise.resolve(onChanged(nextProjectSnapshot));
+      }
       setCrewDialogTarget(null);
       setCrewAssignmentDrafts([]);
       setError(null);
@@ -407,12 +524,12 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
   const handleRemoveCrew = async (unitId: string, assignmentId: string) => {
     try {
       setIsSubmitting(true);
-      await unassignCrewFromProjectUnit({
+      const nextSnapshot = await unassignCrewFromProjectUnit({
         projectId,
         unitId,
         assignmentId,
       });
-      await Promise.resolve(onChanged());
+      await Promise.resolve(onChanged(nextSnapshot));
       setError(null);
       toast.success(t("projects.units.toasts.crewRemovedTitle"), t("projects.units.toasts.crewRemovedBody"));
       setWarning(null);
@@ -447,7 +564,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
     });
   };
 
-  const canAddDepartment = Boolean(departmentDraft.unitId && departmentDraft.departmentId);
+  const canAddDepartment = Boolean(departmentDraft.unitId && departmentDraft.departmentIds.length);
   const canAssignCrewBatch = crewAssignmentDrafts.some((draft) => draft.crewMemberId.trim());
 
   return (
@@ -678,26 +795,64 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
                 />
               </label>
 
-              <label className="action-field">
-                <span className="action-field-label">{t("projects.units.fields.startDate")}</span>
-                <input
-                  className="action-field-control"
-                  onChange={(event) => setUnitDraft((current) => ({ ...current, startDate: event.target.value }))}
-                  type="date"
-                  value={unitDraft.startDate}
-                />
-              </label>
+              <section className="project-unit-window-editor action-field-wide">
+                <div className="project-unit-window-editor-header">
+                  <div>
+                    <span className="action-field-label">{t("projects.units.fields.windows")}</span>
+                    <p>{t("projects.units.fields.windowsHelp")}</p>
+                  </div>
+                  <button className="ghost-control project-unit-window-add" onClick={addUnitWindow} type="button">
+                    <Plus size={13} />
+                    <span>{t("projects.units.fields.addWindow")}</span>
+                  </button>
+                </div>
 
-              <label className="action-field">
-                <span className="action-field-label">{t("projects.units.fields.endDate")}</span>
-                <input
-                  className="action-field-control"
-                  min={unitDraft.startDate || undefined}
-                  onChange={(event) => setUnitDraft((current) => ({ ...current, endDate: event.target.value }))}
-                  type="date"
-                  value={unitDraft.endDate}
-                />
-              </label>
+                <div className="project-unit-window-list">
+                  {unitDraft.windows.map((window, index) => (
+                    <div key={window.localId} className="project-unit-window-row">
+                      <span className="project-unit-window-index">
+                        {t("projects.units.fields.windowNumber", { number: index + 1 })}
+                      </span>
+                      <label className="action-field">
+                        <span className="action-field-label">{t("projects.units.fields.startDate")}</span>
+                        <input
+                          className="action-field-control"
+                          onChange={(event) => updateUnitWindow(window.localId, { startDate: event.target.value })}
+                          type="date"
+                          value={window.startDate}
+                        />
+                      </label>
+                      <label className="action-field">
+                        <span className="action-field-label">{t("projects.units.fields.endDate")}</span>
+                        <input
+                          className="action-field-control"
+                          min={window.startDate || undefined}
+                          onChange={(event) => updateUnitWindow(window.localId, { endDate: event.target.value })}
+                          type="date"
+                          value={window.endDate}
+                        />
+                      </label>
+                      <label className="action-field">
+                        <span className="action-field-label">{t("projects.units.fields.windowLabel")}</span>
+                        <input
+                          className="action-field-control"
+                          onChange={(event) => updateUnitWindow(window.localId, { label: event.target.value })}
+                          value={window.label}
+                        />
+                      </label>
+                      <button
+                        aria-label={t("projects.units.fields.removeWindowAria", { number: index + 1 })}
+                        className="icon-ghost-control project-unit-window-remove"
+                        disabled={unitDraft.windows.length === 1}
+                        onClick={() => removeUnitWindow(window.localId)}
+                        type="button"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
             </div>
 
             <details className="detail-disclosure">
@@ -778,7 +933,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
                     const nextDepartment = departments.find((department) => !linkedDepartmentIds.has(department.id)) ?? null;
                     setDepartmentDraft({
                       unitId: event.target.value,
-                      departmentId: nextDepartment?.id ?? "",
+                      departmentIds: nextDepartment ? [nextDepartment.id] : [],
                     });
                   }}
                   value={departmentDraft.unitId}
@@ -791,22 +946,34 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
                 </SelectField>
               </label>
 
-              <label className="action-field">
+              <label className="action-field action-field-wide">
                 <span className="action-field-label">{t("projects.units.fields.department")}</span>
-                <SelectField
-                  onChange={(event) => setDepartmentDraft((current) => ({ ...current, departmentId: event.target.value }))}
-                  value={departmentDraft.departmentId}
-                >
-                  {availableDepartmentsForSelectedUnit.length ? (
-                    availableDepartmentsForSelectedUnit.map((department) => (
-                      <option key={department.id} value={department.id}>
-                        {department.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">{t("projects.units.departmentDialog.noDepartments")}</option>
-                  )}
-                </SelectField>
+                {availableDepartmentsForSelectedUnit.length ? (
+                  <div className="project-unit-multi-picker" role="group" aria-label={t("projects.units.fields.department")}>
+                    {availableDepartmentsForSelectedUnit.map((department) => {
+                      const isSelected = departmentDraft.departmentIds.includes(department.id);
+                      return (
+                        <label key={department.id} className={`project-unit-multi-option${isSelected ? " is-selected" : ""}`}>
+                          <input
+                            checked={isSelected}
+                            onChange={(event) =>
+                              setDepartmentDraft((current) => ({
+                                ...current,
+                                departmentIds: event.target.checked
+                                  ? [...current.departmentIds, department.id]
+                                  : current.departmentIds.filter((departmentId) => departmentId !== department.id),
+                              }))
+                            }
+                            type="checkbox"
+                          />
+                          <span>{department.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="empty-state project-unit-multi-empty">{t("projects.units.departmentDialog.noDepartments")}</div>
+                )}
               </label>
             </div>
           </div>
@@ -817,7 +984,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
             </button>
             <button className="action-primary-button" disabled={!canAddDepartment || isSubmitting} onClick={() => void handleAddDepartment()} type="button">
               <Plus size={14} />
-              <span>{t("projects.units.departmentDialog.confirm")}</span>
+              <span>{t("projects.units.departmentDialog.confirm", { count: departmentDraft.departmentIds.length })}</span>
             </button>
           </div>
         </div>

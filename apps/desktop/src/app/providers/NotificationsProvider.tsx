@@ -71,6 +71,7 @@ type NotificationsContextValue = {
   todos: TodoRow[];
   reminders: ReminderRow[];
   unreadCount: number;
+  agentUnreadCount: number;
   isLoading: boolean;
   isTrayOpen: boolean;
   trayAnchor: DOMRect | null;
@@ -153,6 +154,9 @@ const toNotificationRow = (row: {
   readAt: row.read_at,
   createdAt: row.created_at,
 });
+
+const isAgentNotification = (row: Pick<NotificationRow, "kind" | "sourceType">) =>
+  row.sourceType === "agent" || row.kind === "agent_completion" || row.kind === "agent_approval";
 
 const toTodoRow = (row: {
   id: string;
@@ -323,6 +327,10 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   const canUseRemote = Boolean(supabase && activeUserId && activeWorkspaceId && isWorkspaceReady && status === "authenticated");
 
   const unreadCount = useMemo(() => items.filter((item) => !item.readAt).length, [items]);
+  const agentUnreadCount = useMemo(
+    () => items.filter((item) => !item.readAt && isAgentNotification(item)).length,
+    [items],
+  );
 
   const nativeActionLabels = useCallback(
     (actions: NativeNotificationAction[]): Partial<Record<NativeNotificationAction, string>> =>
@@ -1136,6 +1144,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       todos,
       reminders,
       unreadCount,
+      agentUnreadCount,
       isLoading,
       isTrayOpen,
       trayAnchor,
@@ -1163,6 +1172,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     }),
     [
       applyAgentNotificationIntents,
+      agentUnreadCount,
       createNotification,
       createReminder,
       createTodo,

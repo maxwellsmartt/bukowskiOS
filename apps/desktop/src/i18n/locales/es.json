@@ -3871,8 +3871,11 @@
     "closeDialog": {
       "body": "Este setup tiene trabajo sin guardar. Puedes conservar el borrador para luego, descartarlo ahora o seguir editando.",
       "continue": "Seguir editando",
+      "continueHint": "Volver al wizard",
       "discard": "Descartar borrador",
+      "discardHint": "Cerrar sin guardar cambios",
       "keep": "Conservar borrador para luego",
+      "keepHint": "Retomar este setup luego",
       "title": "¿Conservar este borrador?"
     }
   },
@@ -4590,7 +4593,7 @@
       }
     },
     "units": {
-      "title": "Unidades",
+      "title": "Unidades y Crew",
       "newUnit": "Nueva unidad",
       "addDepartment": "Añadir departamento",
       "primaryBadge": "Unidad base",
@@ -4613,10 +4616,11 @@
       "linkCrew": "Asignar crew",
       "empty": "Aún no hay unidades definidas. Crea la primera unidad operativa de este proyecto.",
       "departmentDialog": {
-        "title": "Añadir departamento",
-        "body": "Elige en qué unidad operará este departamento.",
+        "title": "Añadir departamentos",
+        "body": "Elige una unidad y marca todos los departamentos que operarán ahí.",
         "noDepartments": "No quedan departamentos disponibles para esta unidad",
-        "confirm": "Añadir departamento"
+        "confirm_one": "Añadir {{count}} departamento",
+        "confirm_other": "Añadir {{count}} departamentos"
       },
       "crewDialog": {
         "title": "Asignar crew a {{department}}",
@@ -4655,6 +4659,12 @@
         "name": "Nombre",
         "startDate": "Fecha de inicio",
         "endDate": "Fecha de cierre",
+        "windows": "Ventanas de operación",
+        "windowsHelp": "Añade una o varias ventanas si la unidad trabaja en fechas saltadas dentro del proyecto.",
+        "addWindow": "Añadir ventana",
+        "windowNumber": "Ventana {{number}}",
+        "windowLabel": "Etiqueta",
+        "removeWindowAria": "Quitar ventana {{number}}",
         "order": "Orden",
         "color": "Color",
         "useProjectColor": "Usar color del proyecto"
@@ -4687,7 +4697,8 @@
         "updatedLiveBody": "Los cambios ya están activos para el crew del proyecto.",
         "updateFailed": "No se pudo actualizar la unidad.",
         "departmentAddedTitle": "Departamento añadido",
-        "departmentAddedBody": "La unidad ya puede recibir crew en ese departamento.",
+        "departmentAddedBody_one": "La unidad ya puede recibir crew en ese departamento.",
+        "departmentAddedBody_other": "La unidad ya puede recibir crew en esos {{count}} departamentos.",
         "departmentAddFailed": "No pudimos añadir el departamento.",
         "departmentRemovedTitle": "Departamento eliminado",
         "departmentRemovedBody": "El departamento ya no aparece en esta unidad.",

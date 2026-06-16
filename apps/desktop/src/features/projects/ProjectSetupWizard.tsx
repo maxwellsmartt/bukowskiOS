@@ -2431,10 +2431,10 @@ export const ProjectSetupWizard = ({
         <div aria-modal="true" className="project-setup-close-dialog-backdrop" role="dialog">
           <div className="project-setup-close-dialog">
             <div className="project-setup-close-dialog-header">
-              <span className="confirm-dialog-icon confirm-dialog-icon-default">
+              <span className="project-setup-close-dialog-icon">
                 <AlertTriangle size={16} />
               </span>
-              <div className="confirm-dialog-copy">
+              <div className="project-setup-close-dialog-copy">
                 <strong>{t("projectSetup.closeDialog.title")}</strong>
                 <p>{t("projectSetup.closeDialog.body")}</p>
               </div>
@@ -2442,16 +2442,17 @@ export const ProjectSetupWizard = ({
 
             <div className="project-setup-close-dialog-actions">
               <button
-                className="ghost-control"
+                className="project-setup-close-dialog-action is-keep"
                 onClick={() => {
                   handleSaveDraft();
                 }}
                 type="button"
               >
-                {t("projectSetup.closeDialog.keep")}
+                <span>{t("projectSetup.closeDialog.keep")}</span>
+                <small>{t("projectSetup.closeDialog.keepHint", { defaultValue: "Retomar este setup luego" })}</small>
               </button>
               <button
-                className="ghost-control"
+                className="project-setup-close-dialog-action is-discard"
                 onClick={() => {
                   setCloseConfirmOpen(false);
                   onDiscardDraft();
@@ -2459,10 +2460,12 @@ export const ProjectSetupWizard = ({
                 }}
                 type="button"
               >
-                {t("projectSetup.closeDialog.discard")}
+                <span>{t("projectSetup.closeDialog.discard")}</span>
+                <small>{t("projectSetup.closeDialog.discardHint", { defaultValue: "Cerrar sin guardar cambios" })}</small>
               </button>
-              <button className="action-primary-button" onClick={() => setCloseConfirmOpen(false)} type="button">
-                {t("projectSetup.closeDialog.continue")}
+              <button className="project-setup-close-dialog-action is-continue" onClick={() => setCloseConfirmOpen(false)} type="button">
+                <span>{t("projectSetup.closeDialog.continue")}</span>
+                <small>{t("projectSetup.closeDialog.continueHint", { defaultValue: "Volver al wizard" })}</small>
               </button>
             </div>
           </div>

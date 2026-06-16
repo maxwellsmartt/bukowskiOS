@@ -145,6 +145,47 @@ const rowExists = (db: DatabaseSync, table: string, id: unknown) => {
   return Boolean(row);
 };
 
+const findEquivalentCrewAssignmentId = (db: DatabaseSync, row: Record<string, unknown>) => {
+  if (!row.id || !row.project_unit_id || !row.crew_member_id) return null;
+  const existing = db
+    .prepare(
+      `
+        SELECT id
+        FROM project_unit_crew_assignments
+        WHERE id <> ?
+          AND project_unit_id = ?
+          AND COALESCE(department_id, '') = COALESCE(?, '')
+          AND crew_member_id = ?
+          AND COALESCE(start_date, '') = COALESCE(?, '')
+          AND COALESCE(end_date, '') = COALESCE(?, '')
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 1
+      `,
+    )
+    .get(
+      toSqlInputValue(row.id),
+      toSqlInputValue(row.project_unit_id),
+      toSqlInputValue(row.department_id),
+      toSqlInputValue(row.crew_member_id),
+      toSqlInputValue(row.start_date),
+      toSqlInputValue(row.end_date),
+    ) as { id: string } | undefined;
+  return existing?.id ?? null;
+};
+
+const upsertCrewAssignmentRow = (db: DatabaseSync, row: Record<string, unknown>) => {
+  const equivalentId = findEquivalentCrewAssignmentId(db, row);
+  if (!equivalentId) {
+    upsertRow(db, "project_unit_crew_assignments", row);
+    return;
+  }
+
+  upsertRow(db, "project_unit_crew_assignments", { ...row, id: equivalentId });
+  if (row.id && row.id !== equivalentId) {
+    db.prepare("DELETE FROM project_unit_crew_assignments WHERE id = ?").run(toSqlInputValue(row.id));
+  }
+};
+
 const filterRowToTable = (db: DatabaseSync, table: string, row: Record<string, unknown>) => {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   const columnNames = new Set(columns.map((column) => column.name));
@@ -699,7 +740,7 @@ const applyProjectSnapshot = (
   }
   for (const row of crewAssignments) {
     try {
-      upsertRow(db, "project_unit_crew_assignments", row);
+      upsertCrewAssignmentRow(db, row);
     } catch {
       logger.warn("Skipped remote project crew assignment because related crew is unavailable.", { id: row.id });
     }

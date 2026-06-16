@@ -583,7 +583,7 @@ export const GlobalAssistantChat = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { compatibleItems } = useCompareTray();
-  const { applyAgentNotificationIntents, createNotification, unreadCount } = useNotifications();
+  const { agentUnreadCount, applyAgentNotificationIntents, createNotification } = useNotifications();
   const {
     activeSession,
     compareTrayVisible,
@@ -675,19 +675,19 @@ export const GlobalAssistantChat = () => {
   );
   const receiptViewerState = useMemo(() => findLatestOperationalReceiptState(receiptSession), [receiptSession]);
   const receiptViewerRows = useMemo(() => buildOperationalReceiptRows(receiptViewerState), [receiptViewerState]);
-  const assistantFabUnreadCount = Math.max(0, unreadCount - dismissedFabUnreadCount);
+  const assistantFabUnreadCount = Math.max(0, agentUnreadCount - dismissedFabUnreadCount);
 
   useEffect(() => {
     if (isOpen) {
-      setDismissedFabUnreadCount(unreadCount);
+      setDismissedFabUnreadCount(agentUnreadCount);
     }
-  }, [isOpen, unreadCount]);
+  }, [agentUnreadCount, isOpen]);
 
   useEffect(() => {
-    if (unreadCount === 0) {
+    if (agentUnreadCount === 0) {
       setDismissedFabUnreadCount(0);
     }
-  }, [unreadCount]);
+  }, [agentUnreadCount]);
 
   useEffect(() => {
     setCompareTrayVisible(compatibleItems.length >= 2);
