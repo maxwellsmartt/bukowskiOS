@@ -338,6 +338,25 @@ describe("agent provider config", () => {
     expect(assetsAssignment?.providerKey).toBe("openai");
     expect(assetsAssignment?.modelKey).toBe("openai:gpt-5.4");
 
+    const outboxRows = database
+      .prepare(
+        `
+          SELECT entity_type, entity_id, operation_type
+          FROM sync_outbox
+          WHERE workspace_id = ?
+            AND entity_type IN ('ai_provider_config', 'agent')
+          ORDER BY created_at ASC
+        `,
+      )
+      .all("workspace-metadata") as Array<{ entity_type: string; entity_id: string; operation_type: string }>;
+
+    expect(outboxRows.some((row) => row.entity_type === "ai_provider_config" && row.operation_type === "upsert")).toBe(true);
+    expect(
+      outboxRows.some(
+        (row) => row.entity_type === "agent" && row.entity_id === "agent-assets" && row.operation_type === "upsert",
+      ),
+    ).toBe(true);
+
     cleanup();
   });
 

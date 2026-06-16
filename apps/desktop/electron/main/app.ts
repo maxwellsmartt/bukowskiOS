@@ -559,6 +559,7 @@ app.whenReady().then(async () => {
     applyRemoteTreasuryRows: localDatabase.applyRemoteTreasuryRows,
     applyRemoteCollaboratorPaymentRows: localDatabase.applyRemoteCollaboratorPaymentRows,
     applyRemoteFinanceBusinessRows: localDatabase.applyRemoteFinanceBusinessRows,
+    applyRemoteAutomationControlPlaneRows: localDatabase.applyRemoteAutomationControlPlaneRows,
   });
   registerFoundationIpc({
     foundationReads: localDatabase.foundationReads,

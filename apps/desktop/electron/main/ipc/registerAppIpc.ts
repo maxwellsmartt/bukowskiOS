@@ -81,6 +81,9 @@ type RegisterAppIpcOptions = {
   applyRemoteFinanceBusinessRows: (
     input: import("@contracts").AppApplyRemoteFinanceBusinessRowsCommand,
   ) => import("@contracts").AppApplyRemoteFinanceBusinessRowsResult;
+  applyRemoteAutomationControlPlaneRows: (
+    input: import("@contracts").AppApplyRemoteAutomationControlPlaneRowsCommand,
+  ) => import("@contracts").AppApplyRemoteAutomationControlPlaneRowsResult;
 };
 
 const remoteRecordSchema = z.record(z.string(), z.unknown());
@@ -370,6 +373,18 @@ const applyRemoteFinanceBusinessRowsSchema = z.object({
   childRows: z.array(remoteRecordSchema).optional(),
 });
 
+const applyRemoteAutomationControlPlaneRowsSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  entityType: z.enum(["agents", "ai_provider_configs", "agent_connector_configs"]),
+  rows: z.array(
+    z.object({
+      id: z.string().trim().min(1),
+      workspace_id: z.string().trim().min(1),
+      updated_at: z.string().trim().min(1),
+    }).catchall(z.unknown()),
+  ),
+});
+
 const backfillOperationalSnapshotsSchema = z.object({
   workspaceId: z.string().trim().min(1),
 });
@@ -480,6 +495,7 @@ export const registerAppIpc = ({
   applyRemoteTreasuryRows,
   applyRemoteCollaboratorPaymentRows,
   applyRemoteFinanceBusinessRows,
+  applyRemoteAutomationControlPlaneRows,
 }: RegisterAppIpcOptions) => {
   safeHandleReadWithSchema(ipcChannels.app.getInfo, emptyReadArgsSchema, () => ({
     appName: "bukowskiOS",
@@ -1079,5 +1095,12 @@ export const registerAppIpc = ({
     (_event, input) =>
       applyRemoteFinanceBusinessRows(input as import("@contracts").AppApplyRemoteFinanceBusinessRowsCommand),
     "The app could not apply remote finance business rows.",
+  );
+  safeHandle(
+    ipcChannels.app.applyRemoteAutomationControlPlaneRows,
+    applyRemoteAutomationControlPlaneRowsSchema,
+    (_event, input) =>
+      applyRemoteAutomationControlPlaneRows(input as import("@contracts").AppApplyRemoteAutomationControlPlaneRowsCommand),
+    "The app could not apply remote automation control plane rows.",
   );
 };

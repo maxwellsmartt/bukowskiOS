@@ -5,6 +5,7 @@ import { matchPath, useLocation, useNavigate } from "react-router-dom";
 import { resolveActiveRoute } from "@app/routing/route-meta";
 import { AppRoutes } from "@app/routing/routes";
 import { useAutoLogout } from "@shared/hooks/useAutoLogout";
+import { useAutomationControlPlanePull } from "@shared/hooks/useAutomationControlPlanePull";
 import { useAssetSnapshotPull } from "@shared/hooks/useAssetSnapshotPull";
 import { useCatalogPull } from "@shared/hooks/useCatalogPull";
 import { useCollaboratorPaymentPull } from "@shared/hooks/useCollaboratorPaymentPull";
@@ -56,6 +57,7 @@ export const AppShell = () => {
   const { markReminderDone, snoozeReminder } = useNotifications();
   const { activeMembership, activeWorkspaceId } = useWorkspace();
   useAutoLogout();
+  useAutomationControlPlanePull();
   useCatalogPull();
   useAssetSnapshotPull();
   useOperationalSnapshotPull();

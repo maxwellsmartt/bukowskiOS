@@ -43,6 +43,8 @@ import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
 const resolveCommandWorkspaceId = (input: { workspaceId?: string }) =>
   ensureValue(input.workspaceId ?? DEFAULT_WORKSPACE_ID, "Workspace");
+const buildWorkspaceScopedAgentId = (agentId: string, workspaceId: string) =>
+  workspaceId === DEFAULT_WORKSPACE_ID ? `agent-${agentId}` : `agent-${agentId}-${workspaceId}`;
 type AIModelListingService = {
   listModels?: OpenAIProviderService["listModels"];
   testConnection: OpenAIProviderService["testConnection"];
@@ -243,6 +245,45 @@ const createActivityEvent = (
 };
 
 const createActivityEventId = () => `agent-activity-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+const createSyncOutboxId = () => `sync-agent-domain-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const enqueueAgentDomainOutbox = (
+  db: DatabaseSync,
+  workspaceId: string,
+  entityType: "agent" | "ai_provider_config" | "agent_connector_config",
+  entityId: string,
+  operationType: "upsert" | "delete" = "upsert",
+  timestamp = new Date().toISOString(),
+) => {
+  db.prepare(
+    `
+      INSERT INTO sync_outbox (
+        id,
+        workspace_id,
+        entity_type,
+        entity_id,
+        operation_type,
+        payload_json,
+        status,
+        attempt_count,
+        last_error,
+        next_retry_at,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, NULL, ?, ?, ?)
+    `,
+  ).run(
+    createSyncOutboxId(),
+    workspaceId,
+    entityType,
+    entityId,
+    operationType,
+    JSON.stringify({ id: entityId }),
+    timestamp,
+    timestamp,
+    timestamp,
+  );
+};
 
 const buildApprovalMeta = (
   decision: ReviewAgentRunCommand["decision"],
@@ -412,7 +453,7 @@ export const createAgentMutationService = (
     const modelLabel = formatModelLabel(modelKey);
     const tools = JSON.stringify(normalizeTokenList(input.allowedTools));
     const domains = JSON.stringify(normalizeTokenList(input.allowedDomains));
-    const id = `agent-${agentId}`;
+    const id = buildWorkspaceScopedAgentId(agentId, workspaceId);
 
     const existing = db
       .prepare("SELECT id FROM agents WHERE workspace_id = ? AND agent_key = ? LIMIT 1")
@@ -485,6 +526,7 @@ export const createAgentMutationService = (
       tone: "success",
       createdAt: now,
     });
+    enqueueAgentDomainOutbox(db, workspaceId, "agent", id, "upsert", now);
 
     return {
       agentId: id,
@@ -577,6 +619,7 @@ export const createAgentMutationService = (
       tone: "info",
       createdAt: now,
     });
+    enqueueAgentDomainOutbox(db, workspaceId, "agent", input.id, "upsert", now);
 
     return {
       agentId: input.id,
@@ -610,6 +653,7 @@ export const createAgentMutationService = (
       tone: input.status === "paused" ? "warning" : "success",
       createdAt: now,
     });
+    enqueueAgentDomainOutbox(db, workspaceId, "agent", input.id, "upsert", now);
 
     return {
       agentId: input.id,
@@ -643,6 +687,7 @@ export const createAgentMutationService = (
       tone: "info",
       createdAt: now,
     });
+    enqueueAgentDomainOutbox(db, workspaceId, "agent", input.id, "upsert", now);
 
     return {
       agentId: input.id,
@@ -752,6 +797,12 @@ export const createAgentMutationService = (
       tone: "info",
       createdAt: now,
     });
+    const providerRow = db
+      .prepare("SELECT id FROM ai_provider_configs WHERE workspace_id = ? AND provider_key = ? LIMIT 1")
+      .get(workspaceId, providerKey) as { id: string } | undefined;
+    if (providerRow?.id) {
+      enqueueAgentDomainOutbox(db, workspaceId, "ai_provider_config", providerRow.id, "upsert", now);
+    }
 
     return {
       providerKey,
@@ -996,6 +1047,12 @@ export const createAgentMutationService = (
       botToken: input.botToken,
       clearStoredSecret: input.clearStoredSecret,
     });
+    const connectorRow = db
+      .prepare("SELECT id FROM agent_connector_configs WHERE workspace_id = ? AND connector_key = ? LIMIT 1")
+      .get(workspaceId, connectorKey) as { id: string } | undefined;
+    if (connectorRow?.id) {
+      enqueueAgentDomainOutbox(db, workspaceId, "agent_connector_config", connectorRow.id, "upsert");
+    }
 
     return {
       connectorKey,
@@ -1119,6 +1176,7 @@ export const createAgentMutationService = (
       tone: "info",
       createdAt: now,
     });
+    enqueueAgentDomainOutbox(db, workspaceId, "agent", input.agentId, "upsert", now);
 
     return {
       agentId: input.agentId,

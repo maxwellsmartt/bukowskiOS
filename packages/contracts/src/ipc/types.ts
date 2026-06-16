@@ -459,6 +459,30 @@ export type AppApplyRemoteFinanceBusinessRowsCommand = {
 export type AppApplyRemoteFinanceBusinessRowsResult =
   AppApplyRemoteFinancialRowsResult<FinanceBusinessPullTable>;
 
+export type AutomationControlPlanePullEntityType = "agents" | "ai_provider_configs" | "agent_connector_configs";
+
+export type AppRemoteAutomationControlPlaneRow = Record<string, unknown> & {
+  id: string;
+  workspace_id: string;
+  updated_at: string;
+};
+
+export type AppApplyRemoteAutomationControlPlaneRowsCommand = {
+  workspaceId: string;
+  entityType: AutomationControlPlanePullEntityType;
+  rows: AppRemoteAutomationControlPlaneRow[];
+};
+
+export type AppApplyRemoteAutomationControlPlaneRowsResult = {
+  workspaceId: string;
+  entityType: AutomationControlPlanePullEntityType;
+  appliedCount: number;
+  skippedDueToOutboxCount: number;
+  skippedDueToOlderCount: number;
+  errors: string[];
+  cursorAfter: string | null;
+};
+
 export type AppRemoteExchangeRateRow = {
   id: string;
   workspace_id: string;

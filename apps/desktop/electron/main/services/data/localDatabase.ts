@@ -41,6 +41,7 @@ import { createAssetSnapshotPullService } from "./assetSnapshotPullService";
 import { createOperationalSnapshotService } from "./operationalSnapshotService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
 import { createCatalogMutationService } from "./catalogMutationService";
+import { createAutomationControlPlanePullService } from "./automationControlPlanePullService";
 import { createCatalogPullService } from "./catalogPullService";
 import { createFinancialDomainPullService } from "./financialDomainPullService";
 import { applyConnectorFoundationMigration, bootstrapConnectorFoundation } from "./connectorFoundationBootstrap";
@@ -255,6 +256,9 @@ type LocalDatabaseRuntime = {
   applyRemoteFinanceBusinessRows: (
     input: import("@contracts").AppApplyRemoteFinanceBusinessRowsCommand,
   ) => import("@contracts").AppApplyRemoteFinanceBusinessRowsResult;
+  applyRemoteAutomationControlPlaneRows: (
+    input: import("@contracts").AppApplyRemoteAutomationControlPlaneRowsCommand,
+  ) => import("@contracts").AppApplyRemoteAutomationControlPlaneRowsResult;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
@@ -1534,6 +1538,18 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         const rows = selectAll("SELECT * FROM reminders WHERE id = ?", row.entity_id);
         return rows.length ? [{ table: "reminders", onConflict: "id", rows }] : [];
       }
+      case "agent": {
+        const rows = selectAll("SELECT * FROM agents WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "agents", onConflict: "id", rows }] : [];
+      }
+      case "ai_provider_config": {
+        const rows = selectAll("SELECT * FROM ai_provider_configs WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "ai_provider_configs", onConflict: "id", rows }] : [];
+      }
+      case "agent_connector_config": {
+        const rows = selectAll("SELECT * FROM agent_connector_configs WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "agent_connector_configs", onConflict: "id", rows }] : [];
+      }
       default:
         return null;
     }
@@ -2137,6 +2153,8 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         input.rows,
         input.childRows,
       ),
+    applyRemoteAutomationControlPlaneRows: (input: import("@contracts").AppApplyRemoteAutomationControlPlaneRowsCommand) =>
+      createAutomationControlPlanePullService(database).applyRemoteRows(input.workspaceId, input.entityType, input.rows),
     runtimeDiagnostics,
     supportDiagnostics,
     userAdmin,
