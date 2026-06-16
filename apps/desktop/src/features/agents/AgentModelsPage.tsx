@@ -68,6 +68,11 @@ const buildAssignmentDraftMap = (assignments: AgentModelAssignmentRow[]) =>
     return accumulator;
   }, {});
 
+const looksLikeOpenAIDashboardUrl = (value: string) => {
+  const normalized = value.trim().toLowerCase();
+  return normalized.includes("platform.openai.com") || normalized.includes("/api-keys");
+};
+
 export const AgentModelsPage = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId: workspaceId } = useWorkspace();
@@ -135,6 +140,23 @@ export const AgentModelsPage = () => {
     ],
     [data.summary, t],
   );
+  const baseUrlHelper = useMemo(() => {
+    if (!selectedProvider?.supportsLiveRequests) {
+      return null;
+    }
+
+    if (selectedProvider.providerKey === "openai") {
+      return looksLikeOpenAIDashboardUrl(providerDraft.baseUrl)
+        ? { tone: "warning" as const, text: t("agents.models.helpers.openaiDashboardUrl") }
+        : { tone: "default" as const, text: t("agents.models.helpers.openaiBaseUrl") };
+    }
+
+    if (selectedProvider.providerKey === "anthropic") {
+      return { tone: "default" as const, text: t("agents.models.helpers.anthropicBaseUrl") };
+    }
+
+    return null;
+  }, [providerDraft.baseUrl, selectedProvider, t]);
   const providerStatusLabel = (status: AgentModelRow["status"]) =>
     t(`agents.models.status.${status}`, { defaultValue: status });
 
@@ -382,6 +404,7 @@ export const AgentModelsPage = () => {
         </SurfaceCard>
 
         <SurfaceCard
+          className="detail-rail-card agent-model-detail-card"
           title={
             selectedProvider ? (
               <span className="provider-heading">
@@ -474,6 +497,9 @@ export const AgentModelsPage = () => {
                     placeholder={t("agents.models.placeholders.baseUrl")}
                     value={providerDraft.baseUrl}
                   />
+                  {baseUrlHelper ? (
+                    <small className={`field-helper${baseUrlHelper.tone === "warning" ? " is-warning" : ""}`}>{baseUrlHelper.text}</small>
+                  ) : null}
                 </label>
                 <label className="field-block">
                   <span className="field-label">{t("agents.models.fields.defaultModel")}</span>

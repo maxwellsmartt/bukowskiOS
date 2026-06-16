@@ -1,6 +1,7 @@
 import { getDesktopLogger } from "../logger";
 
 const logger = getDesktopLogger("openai-provider");
+const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com";
 
 export type OpenAIProviderConfig = {
   apiKey: string;
@@ -88,11 +89,45 @@ export type OpenAIAudioTranscriptionResult =
       summary: string;
     };
 
-const resolveBaseUrl = (baseUrl?: string) => {
-  const value = baseUrl?.trim();
-  const normalized = value ? value.replace(/\/+$/, "") : "https://api.openai.com";
-  return normalized.endsWith("/v1") ? normalized.slice(0, -3) : normalized;
+const stripVersionSuffix = (value: string) => (value.endsWith("/v1") ? value.slice(0, -3) : value);
+
+const looksLikeOpenAIDashboardUrl = (value: string) => {
+  try {
+    const parsed = new URL(value);
+    const host = parsed.hostname.toLowerCase();
+    const path = parsed.pathname.toLowerCase();
+
+    if (host !== "platform.openai.com") {
+      return false;
+    }
+
+    return (
+      path === "/api-keys" ||
+      path.startsWith("/api-keys/") ||
+      path.includes("/settings/organization/api-keys") ||
+      path.includes("/settings/project/api-keys")
+    );
+  } catch {
+    return false;
+  }
 };
+
+export const normalizeOpenAIBaseUrl = (baseUrl?: string) => {
+  const value = baseUrl?.trim() ?? "";
+  if (!value) {
+    return DEFAULT_OPENAI_BASE_URL;
+  }
+
+  const trimmed = stripVersionSuffix(value.replace(/\/+$/, ""));
+
+  if (looksLikeOpenAIDashboardUrl(trimmed)) {
+    return DEFAULT_OPENAI_BASE_URL;
+  }
+
+  return trimmed;
+};
+
+const resolveBaseUrl = (baseUrl?: string) => normalizeOpenAIBaseUrl(baseUrl);
 
 const resolveModel = (model: string) => {
   const normalized = model.trim();
@@ -162,8 +197,27 @@ const mapErrorSummary = async (response: Response) => {
   return errorSummary;
 };
 
-const toOpenAIUserFacingFailure = (summary: string, statusCode?: number) => {
+const looksLikeInvalidKeyFailure = (summary: string, statusCode?: number) => {
   const normalized = summary.toLowerCase();
+  return (
+    statusCode === 401 ||
+    normalized.includes("invalid_api_key") ||
+    normalized.includes("incorrect api key") ||
+    normalized.includes("invalid api key") ||
+    normalized.includes("unauthorized")
+  );
+};
+
+const classifyOpenAIFailureStatus = (summary: string, statusCode?: number): "invalid_key" | "unavailable" =>
+  looksLikeInvalidKeyFailure(summary, statusCode) ? "invalid_key" : "unavailable";
+
+const toOpenAIUserFacingFailure = (summary: string, statusCode?: number, baseUrl?: string) => {
+  const normalized = summary.toLowerCase();
+  const resolvedBaseUrl = resolveBaseUrl(baseUrl);
+
+  if (looksLikeOpenAIDashboardUrl(baseUrl?.trim() ?? "")) {
+    return "La Base URL de OpenAI apunta al dashboard y no al API. Usa https://api.openai.com o deja ese campo vacío para usar la ruta oficial.";
+  }
 
   if (
     normalized.includes("insufficient_quota") ||
@@ -176,6 +230,10 @@ const toOpenAIUserFacingFailure = (summary: string, statusCode?: number) => {
 
   if (statusCode === 429 || normalized.includes("rate limit")) {
     return "OpenAI está limitando temporalmente las solicitudes. Espera unos segundos y vuelve a intentarlo.";
+  }
+
+  if (statusCode === 403) {
+    return `OpenAI rechazó la solicitud (403). Revisa que la Base URL sea ${resolvedBaseUrl}, que la key pertenezca al proyecto correcto y que la cuenta tenga permisos y billing activos.`;
   }
 
   return summary;
@@ -197,7 +255,7 @@ export const createOpenAIProviderService = () => ({
 
       if (!response.ok) {
         const summary = await mapErrorSummary(response);
-        throw new Error(summary);
+        throw new Error(toOpenAIUserFacingFailure(summary, response.status, config.baseUrl));
       }
 
       const payload = (await response.json()) as { data?: Array<Record<string, unknown>> };
@@ -255,7 +313,7 @@ export const createOpenAIProviderService = () => ({
 
       if (!response.ok) {
         const summary = await mapErrorSummary(response);
-        const userFacingSummary = toOpenAIUserFacingFailure(summary, response.status);
+        const userFacingSummary = toOpenAIUserFacingFailure(summary, response.status, config.baseUrl);
         logger.warn("OpenAI request failed.", {
           status: response.status,
           baseUrl: resolveBaseUrl(config.baseUrl),
@@ -264,7 +322,7 @@ export const createOpenAIProviderService = () => ({
         });
         return {
           ok: false,
-          status: response.status === 401 || response.status === 403 ? "invalid_key" : "unavailable",
+          status: classifyOpenAIFailureStatus(summary, response.status),
           summary: userFacingSummary,
         };
       }
@@ -324,7 +382,7 @@ export const createOpenAIProviderService = () => ({
 
       if (!response.ok) {
         const summary = await mapErrorSummary(response);
-        const userFacingSummary = toOpenAIUserFacingFailure(summary, response.status);
+        const userFacingSummary = toOpenAIUserFacingFailure(summary, response.status, config.baseUrl);
         logger.warn("OpenAI transcription failed.", {
           status: response.status,
           baseUrl: resolveBaseUrl(config.baseUrl),
@@ -333,7 +391,7 @@ export const createOpenAIProviderService = () => ({
         });
         return {
           ok: false,
-          status: response.status === 401 || response.status === 403 ? "invalid_key" : "unavailable",
+          status: classifyOpenAIFailureStatus(summary, response.status),
           summary: userFacingSummary,
         };
       }

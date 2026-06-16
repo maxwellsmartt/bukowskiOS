@@ -3132,6 +3132,11 @@
         "apiKey": "Paste the API key",
         "baseUrl": "Optional custom endpoint"
       },
+      "helpers": {
+        "openaiBaseUrl": "Leave this empty or use https://api.openai.com unless you are routing through your own gateway.",
+        "openaiDashboardUrl": "That URL looks like the OpenAI dashboard. For API traffic use https://api.openai.com or leave this field empty.",
+        "anthropicBaseUrl": "Leave this empty or use https://api.anthropic.com unless you are routing through your own gateway."
+      },
       "toasts": {
         "providerSaved": "Provider saved",
         "keyCleared": "Provider key cleared",

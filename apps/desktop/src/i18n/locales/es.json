@@ -3136,6 +3136,11 @@
         "apiKey": "Pega la API key",
         "baseUrl": "Endpoint custom opcional"
       },
+      "helpers": {
+        "openaiBaseUrl": "Déjalo vacío o usa https://api.openai.com si no estás pasando por un gateway propio.",
+        "openaiDashboardUrl": "Esa URL parece del dashboard de OpenAI. Para conectar el API usa https://api.openai.com o deja el campo vacío.",
+        "anthropicBaseUrl": "Déjalo vacío o usa https://api.anthropic.com si no estás pasando por un gateway propio."
+      },
       "toasts": {
         "providerSaved": "Provider guardado",
         "keyCleared": "Key del provider borrada",

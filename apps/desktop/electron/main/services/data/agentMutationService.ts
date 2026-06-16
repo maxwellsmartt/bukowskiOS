@@ -35,7 +35,7 @@ import type {
 
 import type { AssistantChatService } from "./assistantChatService";
 import type { AssistantGatewayService } from "../ai/assistantGatewayService";
-import type { OpenAIProviderService } from "../ai/openaiProviderService";
+import { normalizeOpenAIBaseUrl, type OpenAIProviderService } from "../ai/openaiProviderService";
 import type { ConnectorBridgeService } from "../connectors/connectorBridgeService";
 import type { TelegramConnectorService } from "../connectors/telegramConnectorService";
 
@@ -74,11 +74,11 @@ const normalizeProviderBaseUrl = (providerKey: string, value: string | undefined
     return "";
   }
 
-  return providerKey === "openai" || providerKey === "anthropic"
-    ? trimmed.endsWith("/v1")
-      ? trimmed.slice(0, -3)
-      : trimmed
-    : trimmed;
+  if (providerKey === "openai") {
+    return normalizeOpenAIBaseUrl(trimmed);
+  }
+
+  return providerKey === "anthropic" && trimmed.endsWith("/v1") ? trimmed.slice(0, -3) : trimmed;
 };
 
 const resolveProviderKey = (modelKey: string) => {

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Bot, ChevronDown, CircleAlert, PauseCircle, PlayCircle, ShieldCheck, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BellDot, Bot, CircleAlert, History, PauseCircle, PlayCircle, PlugZap, ShieldCheck, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
@@ -64,33 +64,6 @@ const sortByDisplayOrder = <T extends { label: string }>(items: T[], key: (item:
     return left.label.localeCompare(right.label);
   });
 
-const CollapsibleMissionCard = ({
-  children,
-  className = "",
-  collapsed,
-  onToggle,
-  title,
-}: {
-  children: ReactNode;
-  className?: string;
-  collapsed: boolean;
-  onToggle: () => void;
-  title: string;
-}) => (
-  <SurfaceCard className={`${className}${collapsed ? " is-collapsed" : ""}`.trim()}>
-    <button
-      aria-expanded={!collapsed}
-      className="mission-card-header-button"
-      onClick={onToggle}
-      type="button"
-    >
-      <span className="surface-card-title">{title}</span>
-      <ChevronDown className={`mission-section-toggle${collapsed ? " is-collapsed" : ""}`} size={14} />
-    </button>
-    {!collapsed ? children : null}
-  </SurfaceCard>
-);
-
 export const AgentsMissionControlPage = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId: workspaceId } = useWorkspace();
@@ -101,12 +74,8 @@ export const AgentsMissionControlPage = () => {
   const [queueFilter, setQueueFilter] = useState<"all" | "needs_approval" | "running" | "done">("all");
   const [processingRunId, setProcessingRunId] = useState<string | null>(null);
   const [approvalFeedback, setApprovalFeedback] = useState<string | null>(null);
-  const [collapsedSections, setCollapsedSections] = useState({
-    queue: true,
-    activity: true,
-    models: true,
-    connectors: true,
-  });
+  const [activeMissionPanel, setActiveMissionPanel] = useState<MissionSectionKey | null>(null);
+  const missionPanelRef = useRef<HTMLDivElement | null>(null);
   const { data: detail, reload: reloadDetail } = useAgentDetail(selectedAgentId, { workspaceId });
 
   useVisiblePolling(
@@ -162,13 +131,39 @@ export const AgentsMissionControlPage = () => {
     () => sortByDisplayOrder(data.connectorSummary, (connector) => connector.connectorKey, connectorDisplayOrder),
     [data.connectorSummary],
   );
+  const missionPanelButtons = useMemo(
+    () => [
+      { key: "queue" as const, icon: History, label: t("agents.runs.recentActivity") },
+      { key: "activity" as const, icon: BellDot, label: t("agents.mission.updates") },
+      { key: "models" as const, icon: Bot, label: t("agents.models.title") },
+      { key: "connectors" as const, icon: PlugZap, label: t("agents.connectors.title") },
+    ],
+    [t],
+  );
 
-  const toggleSection = (section: MissionSectionKey) => {
-    setCollapsedSections((current) => ({
-      ...current,
-      [section]: !current[section],
-    }));
-  };
+  useEffect(() => {
+    if (!activeMissionPanel) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (missionPanelRef.current?.contains(target)) {
+        return;
+      }
+
+      setActiveMissionPanel(null);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [activeMissionPanel]);
 
   const handleToggleStatus = async () => {
     if (!selectedAgent) {
@@ -226,6 +221,147 @@ export const AgentsMissionControlPage = () => {
     }
   };
 
+  const renderMissionPanelContent = () => {
+    switch (activeMissionPanel) {
+      case "queue":
+        return (
+          <>
+            <div className="agent-detail-row mission-panel-filter-row">
+              <button className={`chip-button${queueFilter === "all" ? " is-active" : ""}`} onClick={() => setQueueFilter("all")} type="button">
+                {t("agents.runs.filters.all")}
+              </button>
+              <button
+                className={`chip-button${queueFilter === "needs_approval" ? " is-active" : ""}`}
+                onClick={() => setQueueFilter("needs_approval")}
+                type="button"
+              >
+                {t("agents.runs.summary.needsApproval")}
+              </button>
+              <button
+                className={`chip-button${queueFilter === "running" ? " is-active" : ""}`}
+                onClick={() => setQueueFilter("running")}
+                type="button"
+              >
+                {t("agents.runs.summary.running")}
+              </button>
+              <button className={`chip-button${queueFilter === "done" ? " is-active" : ""}`} onClick={() => setQueueFilter("done")} type="button">
+                {t("agents.runs.summary.done")}
+              </button>
+            </div>
+            <div className="agent-support-list agent-support-list-scroll mission-panel-scroll">
+              {filteredQueue.map((run) => (
+                <button
+                  key={run.id}
+                  className="agent-run-row agent-run-row-button"
+                  onClick={() => {
+                    setSelectedAgentId(run.agentId ?? data.supervisor?.id ?? null);
+                    setActiveMissionPanel(null);
+                  }}
+                  type="button"
+                >
+                  <div>
+                    <strong>{run.title}</strong>
+                    <p>{run.status === "needs_approval" ? run.approvalReason ?? run.agentDisplayName : run.agentDisplayName}</p>
+                  </div>
+                  <div className="agent-run-row-meta">
+                    <span className={`run-status-pill run-status-pill-${run.status}`}>
+                      {t(`agents.runs.status.${run.status}`, { defaultValue: getAgentRunStatusLabel(run.status) })}
+                    </span>
+                    <span className="agent-run-time">{run.updatedAtLabel}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
+        );
+      case "activity":
+        return (
+          <div className="agent-support-list agent-support-list-scroll mission-panel-scroll">
+            {data.activity.map((activity) => (
+              <button
+                key={activity.id}
+                className="agent-activity-row agent-activity-row-button"
+                onClick={() => {
+                  setSelectedAgentId(activity.agentId ?? data.supervisor?.id ?? null);
+                  setActiveMissionPanel(null);
+                }}
+                type="button"
+              >
+                <div className={`agent-activity-icon tone-${activity.tone}`}>
+                  {activity.tone === "success" ? <ShieldCheck size={14} /> : activity.tone === "warning" ? <CircleAlert size={14} /> : <Bot size={14} />}
+                </div>
+                <div>
+                  <strong>{activity.title}</strong>
+                  <p>{activity.body}</p>
+                  <span className="agent-activity-meta">
+                    {activity.agentDisplayName} · {activity.timestampLabel}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        );
+      case "models":
+        return (
+          <div className="agent-compact-grid mission-panel-scroll">
+            {orderedModelSummary.map((model) => (
+              <div key={model.id} className="agent-compact-row">
+                <div>
+                  <strong className="provider-heading">
+                    {(() => {
+                      const providerBrand = getAgentProviderBrand(model.providerKey);
+                      return providerBrand.logoSrc ? (
+                        <img
+                          alt={providerBrand.logoAlt ?? model.label}
+                          className={`provider-heading-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
+                          src={providerBrand.logoSrc}
+                        />
+                      ) : null;
+                    })()}
+                    <span>{model.label}</span>
+                  </strong>
+                  <p>{model.assignedAgents.join(" · ") || t("agents.models.noAgentsAssigned")}</p>
+                </div>
+                <span className={`run-status-pill run-status-pill-${model.status}`}>
+                  {t(`agents.models.status.${model.status}`, { defaultValue: titleCaseEnum(model.status) })}
+                </span>
+              </div>
+            ))}
+          </div>
+        );
+      case "connectors":
+        return (
+          <div className="agent-compact-grid mission-panel-scroll">
+            {orderedConnectorSummary.map((connector) => (
+              <div key={connector.id} className="agent-compact-row">
+                <div>
+                  <strong className="provider-heading">
+                    {(() => {
+                      const connectorBrand = getConnectorBrand(connector.connectorKey);
+                      return connectorBrand.logoSrc ? (
+                        <img
+                          alt={connectorBrand.logoAlt ?? connector.label}
+                          className={`provider-heading-logo${connectorBrand.logoClassName ? ` ${connectorBrand.logoClassName}` : ""}`}
+                          src={connectorBrand.logoSrc}
+                        />
+                      ) : null;
+                    })()}
+                    <span>{connector.label}</span>
+                  </strong>
+                  <p>{connector.capability}</p>
+                </div>
+                <span className={`run-status-pill run-status-pill-${connector.status}`}>
+                  {t(`agents.connectors.status.${connector.status}`, { defaultValue: titleCaseEnum(connector.status) })}
+                </span>
+              </div>
+            ))}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="page-stack">
       <SectionHeader
@@ -247,8 +383,49 @@ export const AgentsMissionControlPage = () => {
 
       <div className={`agents-mission-layout${selectedAgent ? "" : " is-graph-expanded"}`}>
         <SurfaceCard
-          className="agents-graph-card"
+          className="agents-graph-card mission-team-map-card"
           title={t("agents.mission.teamMap")}
+          aside={
+            <div className="mission-panel-anchor" ref={missionPanelRef}>
+              <div className="mission-panel-toolbar">
+                {missionPanelButtons.map((button) => {
+                  const Icon = button.icon;
+                  const isActive = activeMissionPanel === button.key;
+
+                  return (
+                    <button
+                      key={button.key}
+                      aria-expanded={isActive}
+                      aria-label={button.label}
+                      className={`icon-ghost-control mission-panel-trigger${isActive ? " is-active" : ""}`}
+                      data-tooltip={button.label}
+                      onClick={() => setActiveMissionPanel((current) => (current === button.key ? null : button.key))}
+                      type="button"
+                    >
+                      <Icon size={15} />
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activeMissionPanel ? (
+                <div className="mission-panel-popover" role="dialog" aria-label={missionPanelButtons.find((item) => item.key === activeMissionPanel)?.label}>
+                  <div className="mission-panel-popover-header">
+                    <strong>{missionPanelButtons.find((item) => item.key === activeMissionPanel)?.label}</strong>
+                    <button
+                      aria-label={t("common.close", { defaultValue: "Cerrar" })}
+                      className="icon-ghost-control"
+                      onClick={() => setActiveMissionPanel(null)}
+                      type="button"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className="mission-panel-popover-body">{renderMissionPanelContent()}</div>
+                </div>
+              ) : null}
+            </div>
+          }
         >
           <div className="mission-graph">
             {data.supervisor ? (
@@ -522,156 +699,6 @@ export const AgentsMissionControlPage = () => {
           </div>
         </SurfaceCard>
       ) : null}
-
-      <div className="agents-support-grid mission-overview-activity-grid">
-        <CollapsibleMissionCard
-          className="mission-activity-card"
-          collapsed={collapsedSections.queue}
-          onToggle={() => toggleSection("queue")}
-          title={t("agents.runs.recentActivity")}
-        >
-            <div className="mission-collapsible-content">
-              <div className="agent-detail-row">
-                <button className={`chip-button${queueFilter === "all" ? " is-active" : ""}`} onClick={() => setQueueFilter("all")} type="button">
-                  {t("agents.runs.filters.all")}
-                </button>
-                <button
-                  className={`chip-button${queueFilter === "needs_approval" ? " is-active" : ""}`}
-                  onClick={() => setQueueFilter("needs_approval")}
-                  type="button"
-                >
-                  {t("agents.runs.summary.needsApproval")}
-                </button>
-                <button
-                  className={`chip-button${queueFilter === "running" ? " is-active" : ""}`}
-                  onClick={() => setQueueFilter("running")}
-                  type="button"
-                >
-                  {t("agents.runs.summary.running")}
-                </button>
-                <button className={`chip-button${queueFilter === "done" ? " is-active" : ""}`} onClick={() => setQueueFilter("done")} type="button">
-                  {t("agents.runs.summary.done")}
-                </button>
-              </div>
-              <div className="agent-support-list agent-support-list-scroll">
-                {filteredQueue.map((run) => (
-                  <button
-                    key={run.id}
-                    className="agent-run-row agent-run-row-button"
-                    onClick={() => setSelectedAgentId(run.agentId ?? data.supervisor?.id ?? null)}
-                    type="button"
-                  >
-                    <div>
-                      <strong>{run.title}</strong>
-                      <p>{run.status === "needs_approval" ? run.approvalReason ?? run.agentDisplayName : run.agentDisplayName}</p>
-                    </div>
-                    <div className="agent-run-row-meta">
-                      <span className={`run-status-pill run-status-pill-${run.status}`}>
-                        {t(`agents.runs.status.${run.status}`, { defaultValue: getAgentRunStatusLabel(run.status) })}
-                      </span>
-                      <span className="agent-run-time">{run.updatedAtLabel}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-        </CollapsibleMissionCard>
-
-        <CollapsibleMissionCard
-          className="mission-activity-card"
-          collapsed={collapsedSections.activity}
-          onToggle={() => toggleSection("activity")}
-          title={t("agents.mission.updates")}
-        >
-            <div className="agent-support-list agent-support-list-scroll mission-collapsible-content">
-              {data.activity.map((activity) => (
-                <button
-                  key={activity.id}
-                  className="agent-activity-row agent-activity-row-button"
-                  onClick={() => setSelectedAgentId(activity.agentId ?? data.supervisor?.id ?? null)}
-                  type="button"
-                >
-                  <div className={`agent-activity-icon tone-${activity.tone}`}>
-                    {activity.tone === "success" ? <ShieldCheck size={14} /> : activity.tone === "warning" ? <CircleAlert size={14} /> : <Bot size={14} />}
-                  </div>
-                  <div>
-                    <strong>{activity.title}</strong>
-                    <p>{activity.body}</p>
-                    <span className="agent-activity-meta">
-                      {activity.agentDisplayName} · {activity.timestampLabel}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-        </CollapsibleMissionCard>
-      </div>
-
-      <div className="agents-support-grid">
-        <CollapsibleMissionCard
-          collapsed={collapsedSections.models}
-          onToggle={() => toggleSection("models")}
-          title={t("agents.models.title")}
-        >
-            <div className="agent-compact-grid mission-collapsible-content">
-              {orderedModelSummary.map((model) => (
-                <div key={model.id} className="agent-compact-row">
-                  <div>
-                    <strong className="provider-heading">
-                      {(() => {
-                        const providerBrand = getAgentProviderBrand(model.providerKey);
-                        return providerBrand.logoSrc ? (
-                          <img
-                            alt={providerBrand.logoAlt ?? model.label}
-                            className={`provider-heading-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
-                            src={providerBrand.logoSrc}
-                          />
-                        ) : null;
-                      })()}
-                      <span>{model.label}</span>
-                    </strong>
-                    <p>{model.assignedAgents.join(" · ") || t("agents.models.noAgentsAssigned")}</p>
-                  </div>
-                  <span className={`run-status-pill run-status-pill-${model.status}`}>
-                    {t(`agents.models.status.${model.status}`, { defaultValue: titleCaseEnum(model.status) })}
-                  </span>
-                </div>
-              ))}
-            </div>
-        </CollapsibleMissionCard>
-
-        <CollapsibleMissionCard
-          collapsed={collapsedSections.connectors}
-          onToggle={() => toggleSection("connectors")}
-          title={t("agents.connectors.title")}
-        >
-            <div className="agent-compact-grid mission-collapsible-content">
-              {orderedConnectorSummary.map((connector) => (
-                <div key={connector.id} className="agent-compact-row">
-                  <div>
-                    <strong className="provider-heading">
-                      {(() => {
-                        const connectorBrand = getConnectorBrand(connector.connectorKey);
-                        return connectorBrand.logoSrc ? (
-                          <img
-                            alt={connectorBrand.logoAlt ?? connector.label}
-                            className={`provider-heading-logo${connectorBrand.logoClassName ? ` ${connectorBrand.logoClassName}` : ""}`}
-                            src={connectorBrand.logoSrc}
-                          />
-                        ) : null;
-                      })()}
-                      <span>{connector.label}</span>
-                    </strong>
-                    <p>{connector.capability}</p>
-                  </div>
-                  <span className={`run-status-pill run-status-pill-${connector.status}`}>
-                    {t(`agents.connectors.status.${connector.status}`, { defaultValue: titleCaseEnum(connector.status) })}
-                  </span>
-                </div>
-              ))}
-            </div>
-        </CollapsibleMissionCard>
-      </div>
 
       <AgentWizardPanel initialAgent={selectedAgent} mode="edit" onClose={() => setEditorOpen(false)} open={editorOpen} />
     </div>
