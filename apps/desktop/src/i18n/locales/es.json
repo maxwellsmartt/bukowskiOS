@@ -3154,6 +3154,7 @@
     "connectors": {
       "title": "Canales",
       "availableChannels": "Canales disponibles",
+      "availableChannelsSubtitle": "{{count}} canales listos para revisar y activar por etapa.",
       "channelFallback": "Canal",
       "unavailable": "Canales no disponibles: {{message}}",
       "notVerified": "Sin verificar",
@@ -3185,6 +3186,26 @@
         "email": "Alertas y borradores",
         "telegram": "Mensajes directos",
         "whatsapp": "Mensajería"
+      },
+      "lifecycle": {
+        "live": {
+          "label": "Operativo",
+          "title": "Canal en producción",
+          "body": "Este canal ya puede recibir mensajes reales, vincular usuarios y responder dentro del workspace.",
+          "railHint": "Listo para uso diario"
+        },
+        "staged": {
+          "label": "Preparado",
+          "title": "Superficie lista para integrar",
+          "body": "La experiencia ya está diagramada. Falta conectar credenciales, webhooks y entrega real antes de operarlo.",
+          "railHint": "UI lista · falta conexión"
+        },
+        "planned": {
+          "label": "Planificado",
+          "title": "Canal en preparación",
+          "body": "Todavía no debe asumirse como operativo. Aquí dejamos claro qué hará y qué faltará para habilitarlo bien.",
+          "railHint": "Aún no operativo"
+        }
       },
       "errors": {
         "clearToken": "No se pudo borrar el token guardado.",

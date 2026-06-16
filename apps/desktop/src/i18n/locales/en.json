@@ -3150,6 +3150,7 @@
     "connectors": {
       "title": "Channels",
       "availableChannels": "Available channels",
+      "availableChannelsSubtitle": "{{count}} channels ready to review and activate by stage.",
       "channelFallback": "Channel",
       "unavailable": "Channels unavailable: {{message}}",
       "notVerified": "Not verified",
@@ -3181,6 +3182,26 @@
         "email": "Alerts and drafts",
         "telegram": "Direct messages",
         "whatsapp": "Messaging"
+      },
+      "lifecycle": {
+        "live": {
+          "label": "Live",
+          "title": "Production channel",
+          "body": "This channel can already receive real messages, link users, and reply from this workspace.",
+          "railHint": "Ready for daily use"
+        },
+        "staged": {
+          "label": "Staged",
+          "title": "Interface ready to integrate",
+          "body": "The experience is already designed. Credentials, webhooks, and real delivery still need to be wired before using it.",
+          "railHint": "UI ready · wiring pending"
+        },
+        "planned": {
+          "label": "Planned",
+          "title": "Channel in preparation",
+          "body": "It should not be treated as operational yet. This space makes the rollout path and requirements explicit.",
+          "railHint": "Not operational yet"
+        }
       },
       "errors": {
         "clearToken": "Unable to clear the stored token.",

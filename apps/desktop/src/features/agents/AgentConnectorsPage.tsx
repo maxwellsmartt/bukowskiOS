@@ -44,10 +44,24 @@ type LinkableIdentityOption = {
   linkState: "linked" | "ready" | "revoked" | "blocked";
 };
 
+type ConnectorLifecycle = "live" | "staged" | "planned";
+
 const buildConnectorDraft = (connector: AgentConnectorRow | null): ConnectorDraft => ({
   enabled: connector?.status === "configured",
   botToken: "",
 });
+
+const getConnectorLifecycle = (connectorKey: string): ConnectorLifecycle => {
+  if (connectorKey === "telegram") {
+    return "live";
+  }
+
+  if (connectorKey === "whatsapp" || connectorKey === "email") {
+    return "staged";
+  }
+
+  return "planned";
+};
 
 const getConnectorCapabilityLabel = (connectorKey: string, t: TFunction) => {
   if (connectorKey === "telegram") {
@@ -105,6 +119,15 @@ const getIdentityTone = (state: LinkableIdentityOption["linkState"]) => {
   return "critical" as const;
 };
 
+const getConnectorLifecycleLabel = (lifecycle: ConnectorLifecycle, t: TFunction) =>
+  t(`agents.connectors.lifecycle.${lifecycle}.label`);
+
+const getConnectorLifecycleTitle = (lifecycle: ConnectorLifecycle, t: TFunction) =>
+  t(`agents.connectors.lifecycle.${lifecycle}.title`);
+
+const getConnectorLifecycleBody = (lifecycle: ConnectorLifecycle, t: TFunction) =>
+  t(`agents.connectors.lifecycle.${lifecycle}.body`);
+
 export const AgentConnectorsPage = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
@@ -143,24 +166,12 @@ export const AgentConnectorsPage = () => {
     });
   }, [data]);
 
-  const summaryCards = useMemo(
-    () => [
-      { label: t("agents.connectors.summary.ready"), value: data.filter((connector) => connector.status === "configured").length },
-      {
-        label: t("agents.connectors.summary.needsSetup"),
-        value: data.filter((connector) => connector.status === "not_configured").length,
-      },
-      { label: t("agents.connectors.summary.disabled"), value: data.filter((connector) => connector.status === "disabled").length },
-      { label: t("agents.connectors.summary.activeLinks"), value: data.reduce((total, connector) => total + connector.activeLinks, 0) },
-    ],
-    [data, t],
-  );
-
   const selectedConnector = useMemo(
     () => data.find((connector) => connector.connectorKey === selectedConnectorKey) ?? null,
     [data, selectedConnectorKey],
   );
   const selectedConnectorIsLive = selectedConnector?.connectorKey === "telegram";
+  const selectedConnectorLifecycle = selectedConnector ? getConnectorLifecycle(selectedConnector.connectorKey) : null;
 
   useEffect(() => {
     if (!window.bukowskiApp) {
@@ -474,26 +485,23 @@ export const AgentConnectorsPage = () => {
     <div className="page-stack">
       <SectionHeader title={t("agents.connectors.title")} titleTone="accent" />
 
-      <div className="agents-health-grid">
-        {summaryCards.map((card) => (
-          <SurfaceCard key={card.label} className="agents-health-card">
-            <span className="agents-health-label">{card.label}</span>
-            <strong className="agents-health-value">{card.value}</strong>
-          </SurfaceCard>
-        ))}
-      </div>
-
       <div className="agents-models-layout">
-        <SurfaceCard title={t("agents.connectors.availableChannels")}>
+        <SurfaceCard
+          title={t("agents.connectors.availableChannels")}
+          subtitle={t("agents.connectors.availableChannelsSubtitle", { count: orderedConnectors.length })}
+        >
           <div className="models-provider-list">
             {orderedConnectors.map((connector) => {
               const connectorBrand = getConnectorBrand(connector.connectorKey);
+              const connectorLifecycle = getConnectorLifecycle(connector.connectorKey);
 
               return (
                 <button
                   key={connector.id}
-                  className={`models-provider-row${selectedConnectorKey === connector.connectorKey ? " is-selected" : ""}${
-                    connector.status === "configured" ? " is-active-provider" : " is-inactive-provider"
+                  className={`models-provider-row models-provider-row-${connectorLifecycle}${
+                    selectedConnectorKey === connector.connectorKey ? " is-selected" : ""
+                  }${connector.status === "configured" ? " is-configured-provider" : ""}${
+                    connector.status === "disabled" ? " is-disabled-provider" : ""
                   }`}
                   onClick={() => setSelectedConnectorKey(connector.connectorKey)}
                   type="button"
@@ -515,15 +523,21 @@ export const AgentConnectorsPage = () => {
                             src={connectorBrand.logoSrc}
                           />
                         ) : null}
-                        <span>{connector.label}</span>
-                      </strong>
-                      <StatusBadge tone={getConnectorStatusTone(connector.status)}>
-                        {getConnectorStatusLabel(connector.status, t)}
-                      </StatusBadge>
+                          <span>{connector.label}</span>
+                        </strong>
+                      <span className={`channel-lifecycle-pill channel-lifecycle-pill-${connectorLifecycle}`}>
+                        {getConnectorLifecycleLabel(connectorLifecycle, t)}
+                      </span>
                     </div>
                     <div className="agent-detail-row">
                       <span>{getConnectorCapabilityLabel(connector.connectorKey, t)}</span>
-                      {connector.botUsername ? <span>@{connector.botUsername}</span> : null}
+                      <span>{t(`agents.connectors.lifecycle.${connectorLifecycle}.railHint`)}</span>
+                    </div>
+                    <div className="agent-detail-row">
+                      <StatusBadge tone={getConnectorStatusTone(connector.status)}>
+                        {getConnectorStatusLabel(connector.status, t)}
+                      </StatusBadge>
+                      {connectorLifecycle === "live" && connector.botUsername ? <span>@{connector.botUsername}</span> : null}
                     </div>
                   </div>
                 </button>
@@ -553,29 +567,35 @@ export const AgentConnectorsPage = () => {
               t("agents.connectors.channelFallback")
             )
           }
+          subtitle={
+            selectedConnector && selectedConnectorLifecycle
+              ? getConnectorLifecycleBody(selectedConnectorLifecycle, t)
+              : undefined
+          }
         >
           {selectedConnector ? (
             <div className="agent-detail-stack">
-              <div className="summary-grid">
-                <div className="summary-row">
-                  <span className="summary-label">{t("agents.connectors.fields.status")}</span>
-                  <span className="summary-value">
-                    <StatusBadge tone={getConnectorStatusTone(selectedConnector.status)}>
-                      {getConnectorStatusLabel(selectedConnector.status, t)}
-                    </StatusBadge>
+              <div className={`connector-stage-banner connector-stage-banner-${selectedConnectorLifecycle ?? "planned"}`}>
+                <div className="connector-stage-banner-copy">
+                  <span className="agent-detail-kicker">
+                    {selectedConnectorLifecycle ? getConnectorLifecycleTitle(selectedConnectorLifecycle, t) : t("agents.connectors.channelFallback")}
                   </span>
+                  <strong>{selectedConnector.deliverySummary}</strong>
                 </div>
-                <div className="summary-row">
-                  <span className="summary-label">{t("agents.connectors.fields.channel")}</span>
-                  <span className="summary-value">{getConnectorCapabilityLabel(selectedConnector.connectorKey, t)}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">{t("agents.connectors.fields.tokenStored")}</span>
-                  <span className="summary-value">{selectedConnector.hasStoredSecret ? t("common.yes", { defaultValue: "Yes" }) : t("common.no", { defaultValue: "No" })}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">{t("agents.connectors.fields.botUsername")}</span>
-                  <span className="summary-value">{selectedConnector.botUsername ? `@${selectedConnector.botUsername}` : t("agents.connectors.notVerified")}</span>
+                <div className="connector-stage-banner-meta">
+                  <StatusBadge tone={getConnectorStatusTone(selectedConnector.status)}>
+                    {getConnectorStatusLabel(selectedConnector.status, t)}
+                  </StatusBadge>
+                  <span className={`channel-lifecycle-pill channel-lifecycle-pill-${selectedConnectorLifecycle ?? "planned"}`}>
+                    {selectedConnectorLifecycle ? getConnectorLifecycleLabel(selectedConnectorLifecycle, t) : t("agents.connectors.lifecycle.planned.label")}
+                  </span>
+                  {selectedConnector.connectorKey === "telegram" && selectedConnector.botUsername ? (
+                    <span className="subtle-pill">@{selectedConnector.botUsername}</span>
+                  ) : null}
+                  <span className="subtle-pill">
+                    {t("agents.connectors.fields.tokenStored")}:{" "}
+                    {selectedConnector.hasStoredSecret ? t("common.yes", { defaultValue: "Yes" }) : t("common.no", { defaultValue: "No" })}
+                  </span>
                 </div>
               </div>
 
@@ -649,7 +669,7 @@ export const AgentConnectorsPage = () => {
               ) : null}
 
               {selectedConnectorIsLive ? (
-                <details className="detail-disclosure" open>
+                <details className="detail-disclosure">
                   <summary className="detail-disclosure-summary">{t("agents.connectors.linkUserToTelegram")}</summary>
                   <div className="detail-disclosure-content">
                     <div className="models-provider-health-grid">
@@ -723,16 +743,11 @@ export const AgentConnectorsPage = () => {
                   </div>
                 </details>
               ) : (
-                <div className="summary-row">
-                  <span className="summary-label">{t("agents.connectors.fields.availability")}</span>
-                  <span className="summary-value">{t("agents.connectors.setupFuture")}</span>
+                <div className="models-provider-diagnostic">
+                  <span className="agent-detail-kicker">{t("agents.connectors.fields.availability")}</span>
+                  <p>{t("agents.connectors.setupFuture")}</p>
                 </div>
               )}
-
-              <div className="summary-row">
-                <span className="summary-label">{t("agents.connectors.fields.summary")}</span>
-                <span className="summary-value">{selectedConnector.deliverySummary}</span>
-              </div>
 
               {selectedConnectorIsLive && generatedLinkToken ? (
                 <div className="models-provider-feedback models-provider-feedback-success">
