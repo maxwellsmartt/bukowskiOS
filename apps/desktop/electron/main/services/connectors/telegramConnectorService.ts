@@ -7,7 +7,7 @@ import type { ConnectorSecretStore } from "../ai/aiSecretStore";
 import { getDesktopLogger } from "../logger";
 import type { ConnectorBridgeService } from "./connectorBridgeService";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
+const defaultWorkspaceId = DEFAULT_WORKSPACE_ID;
 const logger = getDesktopLogger("telegram-connector");
 
 type TelegramGetMeResponse = {
@@ -27,9 +27,26 @@ type TelegramGetFileResponse = {
   description?: string;
 };
 
+type TelegramSendMessageResponse = {
+  ok: boolean;
+  result?: {
+    message_id?: number;
+  };
+  description?: string;
+};
+
+type WorkspacePollerState = {
+  workspaceId: string;
+  currentOffset: number;
+  degraded: boolean;
+  running: boolean;
+  stopRequested: boolean;
+};
+
 const telegramMessageSoftLimit = 3500;
 const telegramProcessingNoticeDelayMs = 8_000;
 const telegramProcessingTimeoutMs = 85_000;
+const pollerReconcileIntervalMs = 2_500;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -79,6 +96,9 @@ const formatTelegramVoiceError = (error: unknown) => {
   return "No pude transcribir esa nota de voz. Inténtalo de nuevo en unos segundos.";
 };
 
+const buildScopedTelegramMessageId = (workspaceId: string, chatId: string | number, messageId: string | number) =>
+  `${workspaceId}:${String(chatId)}:${String(messageId)}`;
+
 export const createTelegramConnectorService = (
   db: DatabaseSync,
   options: {
@@ -88,12 +108,12 @@ export const createTelegramConnectorService = (
     pollingMode?: "host" | "disabled";
   },
 ) => {
-  let running = false;
-  let currentOffset = 0;
-  let pollingDegraded = false;
+  let serviceRunning = false;
+  let reconcileTimer: NodeJS.Timeout | null = null;
+  const workspacePollers = new Map<string, WorkspacePollerState>();
   const pollingMode = options.pollingMode ?? "host";
 
-  const getConfig = (currentWorkspaceId = workspaceId) =>
+  const getConfig = (workspaceId = defaultWorkspaceId) =>
     db
       .prepare(
         `
@@ -104,7 +124,22 @@ export const createTelegramConnectorService = (
           LIMIT 1
         `,
       )
-      .get(currentWorkspaceId) as { status: string } | undefined;
+      .get(workspaceId) as { status: string } | undefined;
+
+  const listPollableWorkspaceIds = () =>
+    (db
+      .prepare(
+        `
+          SELECT workspace_id
+          FROM agent_connector_configs
+          WHERE connector_key = 'telegram'
+            AND status = 'configured'
+          ORDER BY workspace_id ASC
+        `,
+      )
+      .all() as Array<{ workspace_id: string }>)
+      .map((row) => row.workspace_id)
+      .filter((workspaceId) => options.secretStore.hasConnectorSecret(workspaceId, "telegram"));
 
   const updateConnectorHealth = (input: {
     workspaceId?: string;
@@ -113,7 +148,7 @@ export const createTelegramConnectorService = (
     error?: string | null;
     testedAt?: string | null;
   }) => {
-    const currentWorkspaceId = input.workspaceId ?? workspaceId;
+    const workspaceId = input.workspaceId ?? defaultWorkspaceId;
     const now = input.testedAt ?? new Date().toISOString();
     db.prepare(
       `
@@ -126,13 +161,13 @@ export const createTelegramConnectorService = (
         WHERE workspace_id = ?
           AND connector_key = 'telegram'
       `,
-    ).run(input.status ?? null, input.botUsername ?? null, input.error ?? null, now, now, currentWorkspaceId);
+    ).run(input.status ?? null, input.botUsername ?? null, input.error ?? null, now, now, workspaceId);
   };
 
-  const getBotToken = (currentWorkspaceId = workspaceId) => options.secretStore.getConnectorSecret(currentWorkspaceId, "telegram");
+  const getBotToken = (workspaceId = defaultWorkspaceId) => options.secretStore.getConnectorSecret(workspaceId, "telegram");
 
-  const callTelegram = async <T>(method: string, body?: Record<string, unknown>, currentWorkspaceId = workspaceId): Promise<T> => {
-    const token = getBotToken(currentWorkspaceId);
+  const callTelegram = async <T>(method: string, body?: Record<string, unknown>, workspaceId = defaultWorkspaceId): Promise<T> => {
+    const token = getBotToken(workspaceId);
     if (!token) {
       throw new Error("Telegram bot token is not configured.");
     }
@@ -148,15 +183,19 @@ export const createTelegramConnectorService = (
     return (await response.json()) as T;
   };
 
-  const downloadTelegramFile = async (fileId: string) => {
-    const token = getBotToken();
+  const downloadTelegramFile = async (fileId: string, workspaceId: string) => {
+    const token = getBotToken(workspaceId);
     if (!token) {
       throw new Error("Telegram bot token is not configured.");
     }
 
-    const fileResponse = await callTelegram<TelegramGetFileResponse>("getFile", {
-      file_id: fileId,
-    });
+    const fileResponse = await callTelegram<TelegramGetFileResponse>(
+      "getFile",
+      {
+        file_id: fileId,
+      },
+      workspaceId,
+    );
     const filePath = fileResponse.result?.file_path;
     if (!fileResponse.ok || !filePath) {
       throw new Error(fileResponse.description || "Telegram voice note could not be loaded.");
@@ -209,28 +248,48 @@ export const createTelegramConnectorService = (
     return chunks.filter(Boolean);
   };
 
-  const sendChatAction = async (chatId: string | number, action: "typing" | "upload_voice" = "typing") => {
+  const sendChatAction = async (
+    chatId: string | number,
+    workspaceId: string,
+    action: "typing" | "upload_voice" = "typing",
+  ) => {
     try {
-      await callTelegram("sendChatAction", {
-        chat_id: chatId,
-        action,
-      });
+      await callTelegram(
+        "sendChatAction",
+        {
+          chat_id: chatId,
+          action,
+        },
+        workspaceId,
+      );
     } catch {
       // Best effort only. A missing chat action must not block delivery.
     }
   };
 
-  const sendTelegramReply = async (chatId: string | number, text: string) => {
+  const sendTelegramReply = async (chatId: string | number, text: string, workspaceId: string) => {
     const chunks = splitTelegramMessage(text);
+    let lastExternalMessageId: string | null = null;
 
     for (const chunk of chunks) {
       try {
-        await callTelegram("sendMessage", {
-          chat_id: chatId,
-          text: chunk,
-        });
+        const response = await callTelegram<TelegramSendMessageResponse>(
+          "sendMessage",
+          {
+            chat_id: chatId,
+            text: chunk,
+          },
+          workspaceId,
+        );
+        if (!response.ok) {
+          throw new Error(response.description || "Telegram sendMessage failed.");
+        }
+        if (response.result?.message_id != null) {
+          lastExternalMessageId = buildScopedTelegramMessageId(workspaceId, chatId, response.result.message_id);
+        }
       } catch (error) {
         logger.warn("Telegram reply delivery failed.", {
+          workspaceId,
           chatId: String(chatId),
           chunkLength: chunk.length,
           error: error instanceof Error ? error.message : String(error),
@@ -238,9 +297,11 @@ export const createTelegramConnectorService = (
         throw error;
       }
     }
+
+    return lastExternalMessageId;
   };
 
-  const resolveTelegramMessageText = async (message: any) => {
+  const resolveTelegramMessageText = async (message: any, workspaceId: string) => {
     if (typeof message.text === "string") {
       return message.text.trim();
     }
@@ -257,8 +318,8 @@ export const createTelegramConnectorService = (
       throw new Error("Voice notes are not available in this build.");
     }
 
-    await sendChatAction(message.chat.id, "upload_voice");
-    const file = await downloadTelegramFile(fileId);
+    await sendChatAction(message.chat.id, workspaceId, "upload_voice");
+    const file = await downloadTelegramFile(fileId, workspaceId);
     let transcription;
     try {
       transcription = await options.audioTranscriptionService.transcribeBuffer({
@@ -269,6 +330,7 @@ export const createTelegramConnectorService = (
       });
     } catch (error) {
       logger.warn("Telegram voice transcription failed.", {
+        workspaceId,
         fileName: file.fileName,
         mimeType: file.mimeType,
         byteSize: file.data.byteLength,
@@ -278,6 +340,7 @@ export const createTelegramConnectorService = (
     }
 
     logger.info("Telegram voice transcribed.", {
+      workspaceId,
       fileName: file.fileName,
       mimeType: file.mimeType,
       byteSize: file.data.byteLength,
@@ -287,29 +350,35 @@ export const createTelegramConnectorService = (
     return transcription.text;
   };
 
-  const processUpdate = async (update: any) => {
+  const processUpdate = async (update: any, workspaceId: string) => {
     const message = update?.message;
     if (!message || message.chat?.type !== "private") {
       return;
     }
 
+    const scopedMessageId = buildScopedTelegramMessageId(workspaceId, message.chat?.id ?? "dm", message.message_id ?? "unknown");
+    const scopedReplyToMessageId = message.reply_to_message?.message_id
+      ? buildScopedTelegramMessageId(workspaceId, message.chat?.id ?? "dm", message.reply_to_message.message_id)
+      : null;
+
     let text = "";
     try {
-      text = await resolveTelegramMessageText(message);
+      text = await resolveTelegramMessageText(message, workspaceId);
       if (!text) {
         return;
       }
     } catch (error) {
       const replyText = formatTelegramVoiceError(error);
       if (replyText) {
-        await sendTelegramReply(message.chat.id, replyText);
+        await sendTelegramReply(message.chat.id, replyText, workspaceId);
       }
       return;
     }
 
     const isVoiceMessage = Boolean(message.voice?.file_id || message.audio?.file_id);
     logger.info("Telegram inbound resolved.", {
-      externalMessageId: String(message.message_id),
+      workspaceId,
+      externalMessageId: scopedMessageId,
       source: isVoiceMessage ? "voice" : "text",
       textLength: text.length,
     });
@@ -326,16 +395,17 @@ export const createTelegramConnectorService = (
       });
       replyText = result.replyText;
     } else {
-      await sendChatAction(message.chat.id);
+      await sendChatAction(message.chat.id, workspaceId);
       let processingNoticeSent = false;
       const processingNoticeTimer = setTimeout(() => {
         processingNoticeSent = true;
         const notice = isVoiceMessage
           ? "Ya transcribí tu audio. Estoy procesando la solicitud y te respondo en breve."
           : "Estoy procesando la solicitud y te respondo en breve.";
-        void sendTelegramReply(message.chat.id, notice).catch((error) => {
+        void sendTelegramReply(message.chat.id, notice, workspaceId).catch((error) => {
           logger.warn("Telegram processing notice failed.", {
-            externalMessageId: String(message.message_id),
+            workspaceId,
+            externalMessageId: scopedMessageId,
             error: error instanceof Error ? error.message : String(error),
           });
         });
@@ -343,12 +413,14 @@ export const createTelegramConnectorService = (
       let result;
       try {
         logger.info("Telegram DM entering assistant bridge.", {
-          externalMessageId: String(message.message_id),
+          workspaceId,
+          externalMessageId: scopedMessageId,
           source: isVoiceMessage ? "voice" : "text",
           textLength: text.length,
         });
         result = await withTimeout(
           options.bridgeService.processTelegramDm({
+            workspaceId,
             externalUserId: String(message.from?.id ?? ""),
             externalUsername: message.from?.username ?? null,
             displayName:
@@ -356,9 +428,9 @@ export const createTelegramConnectorService = (
               message.from?.username ||
               "Telegram user",
             externalChannelId: String(message.chat?.id ?? ""),
-            externalMessageId: String(message.message_id),
+            externalMessageId: scopedMessageId,
             message: text,
-            replyToMessageId: message.reply_to_message?.message_id ? String(message.reply_to_message.message_id) : null,
+            replyToMessageId: scopedReplyToMessageId,
             sentAt: message.date ? new Date(message.date * 1000).toISOString() : null,
           }),
           telegramProcessingTimeoutMs,
@@ -366,7 +438,8 @@ export const createTelegramConnectorService = (
         );
       } catch (error) {
         logger.warn("Telegram assistant bridge failed or timed out.", {
-          externalMessageId: String(message.message_id),
+          workspaceId,
+          externalMessageId: scopedMessageId,
           source: isVoiceMessage ? "voice" : "text",
           error: error instanceof Error ? error.message : String(error),
         });
@@ -381,72 +454,87 @@ export const createTelegramConnectorService = (
         clearTimeout(processingNoticeTimer);
       }
       if (!result) {
-        await sendTelegramReply(message.chat.id, replyText);
+        await sendTelegramReply(message.chat.id, replyText, workspaceId);
         return;
       }
       replyText = result.replyText;
       logger.info("Telegram DM processed.", {
+        workspaceId,
         status: result.status,
         correlationId: result.correlationId,
         threadId: result.threadId,
         replyLength: replyText.length,
       });
+      return;
     }
 
     if (replyText) {
       try {
-        await sendTelegramReply(message.chat.id, replyText);
+        await sendTelegramReply(message.chat.id, replyText, workspaceId);
       } catch {
         // The polling loop will mark Telegram degraded and retry connectivity.
       }
     } else {
       logger.warn("Telegram DM produced no reply text.", {
-        externalMessageId: String(message.message_id),
+        workspaceId,
+        externalMessageId: scopedMessageId,
         textLength: text.length,
       });
-      await sendTelegramReply(message.chat.id, "Recibí tu mensaje, pero no pude generar una respuesta clara. Inténtalo otra vez en unos segundos.");
+      await sendTelegramReply(
+        message.chat.id,
+        "Recibí tu mensaje, pero no pude generar una respuesta clara. Inténtalo otra vez en unos segundos.",
+        workspaceId,
+      );
     }
   };
 
-  const loop = async () => {
-    while (running) {
+  const runWorkspacePoller = async (state: WorkspacePollerState) => {
+    state.running = true;
+    state.stopRequested = false;
+
+    while (serviceRunning && !state.stopRequested) {
       try {
-        const config = getConfig();
-        if (!config || config.status !== "configured" || !options.secretStore.hasConnectorSecret(workspaceId, "telegram")) {
-          await sleep(1500);
-          continue;
+        const config = getConfig(state.workspaceId);
+        if (!config || config.status !== "configured" || !options.secretStore.hasConnectorSecret(state.workspaceId, "telegram")) {
+          break;
         }
 
         const payload = await callTelegram<{
           ok: boolean;
           result?: Array<any>;
           description?: string;
-        }>("getUpdates", {
-          timeout: 20,
-          offset: currentOffset,
-          allowed_updates: ["message"],
-        });
+        }>(
+          "getUpdates",
+          {
+            timeout: 20,
+            offset: state.currentOffset,
+            allowed_updates: ["message"],
+          },
+          state.workspaceId,
+        );
 
         if (!payload.ok) {
           throw new Error(payload.description || "Telegram polling failed.");
         }
 
         for (const update of payload.result ?? []) {
-          currentOffset = Math.max(currentOffset, Number(update.update_id ?? 0) + 1);
-          await processUpdate(update);
+          state.currentOffset = Math.max(state.currentOffset, Number(update.update_id ?? 0) + 1);
+          await processUpdate(update, state.workspaceId);
         }
 
-        if (pollingDegraded) {
+        if (state.degraded) {
           updateConnectorHealth({
+            workspaceId: state.workspaceId,
             status: "configured",
             error: null,
             testedAt: new Date().toISOString(),
           });
-          pollingDegraded = false;
+          state.degraded = false;
         }
       } catch (error) {
-        pollingDegraded = true;
+        state.degraded = true;
         updateConnectorHealth({
+          workspaceId: state.workspaceId,
           error:
             error instanceof Error
               ? `Telegram temporalmente fuera de línea. Reintentando automáticamente. ${error.message}`
@@ -456,18 +544,83 @@ export const createTelegramConnectorService = (
         await sleep(3000);
       }
     }
+
+    state.running = false;
+    if (state.stopRequested || !serviceRunning) {
+      workspacePollers.delete(state.workspaceId);
+    }
   };
+
+  const reconcileWorkspacePollers = async () => {
+    if (!serviceRunning || pollingMode === "disabled") {
+      return;
+    }
+
+    const desired = new Set(listPollableWorkspaceIds());
+
+    for (const [workspaceId, state] of workspacePollers.entries()) {
+      if (!desired.has(workspaceId)) {
+        state.stopRequested = true;
+        workspacePollers.delete(workspaceId);
+      }
+    }
+
+    for (const workspaceId of desired) {
+      const existing = workspacePollers.get(workspaceId);
+      if (existing?.running) {
+        continue;
+      }
+
+      const nextState: WorkspacePollerState = existing ?? {
+        workspaceId,
+        currentOffset: 0,
+        degraded: false,
+        running: false,
+        stopRequested: false,
+      };
+      nextState.stopRequested = false;
+      workspacePollers.set(workspaceId, nextState);
+      void runWorkspacePoller(nextState);
+    }
+  };
+
+  const scheduleReconcile = () => {
+    if (reconcileTimer) {
+      clearTimeout(reconcileTimer);
+      reconcileTimer = null;
+    }
+
+    if (!serviceRunning || pollingMode === "disabled") {
+      return;
+    }
+
+    reconcileTimer = setTimeout(() => {
+      void reconcileWorkspacePollers().finally(() => {
+        scheduleReconcile();
+      });
+    }, pollerReconcileIntervalMs);
+  };
+
+  options.bridgeService.setDeliveryAdapter({
+    sendTelegramMessage: async ({ workspaceId, externalChannelId, body }) => {
+      const externalMessageId = await sendTelegramReply(externalChannelId, body, workspaceId);
+      return {
+        externalMessageId:
+          externalMessageId ?? buildScopedTelegramMessageId(workspaceId, externalChannelId, `fallback-${Date.now().toString(36)}`),
+      };
+    },
+  });
 
   return {
     async testConnection(input?: { workspaceId?: string }) {
-      const currentWorkspaceId = input?.workspaceId ?? workspaceId;
-      const response = await callTelegram<TelegramGetMeResponse>("getMe", undefined, currentWorkspaceId);
+      const workspaceId = input?.workspaceId ?? defaultWorkspaceId;
+      const response = await callTelegram<TelegramGetMeResponse>("getMe", undefined, workspaceId);
       if (!response.ok) {
         throw new Error(response.description || "Telegram getMe failed.");
       }
 
       updateConnectorHealth({
-        workspaceId: currentWorkspaceId,
+        workspaceId,
         status: "configured",
         botUsername: response.result?.username ?? null,
         error: null,
@@ -480,28 +633,34 @@ export const createTelegramConnectorService = (
     },
 
     async saveConfig(input: { workspaceId?: string; enabled: boolean; botToken?: string; clearStoredSecret?: boolean }) {
-      const currentWorkspaceId = input.workspaceId ?? workspaceId;
+      const workspaceId = input.workspaceId ?? defaultWorkspaceId;
       if (input.clearStoredSecret) {
-        options.secretStore.clearConnectorSecret(currentWorkspaceId, "telegram");
+        options.secretStore.clearConnectorSecret(workspaceId, "telegram");
       }
 
       if (input.botToken?.trim()) {
-        options.secretStore.setConnectorSecret(currentWorkspaceId, "telegram", input.botToken);
+        options.secretStore.setConnectorSecret(workspaceId, "telegram", input.botToken);
       }
 
-      const hasSecret = options.secretStore.hasConnectorSecret(currentWorkspaceId, "telegram");
+      const hasSecret = options.secretStore.hasConnectorSecret(workspaceId, "telegram");
       const nextStatus = input.enabled ? (hasSecret ? "configured" : "not_configured") : "disabled";
       updateConnectorHealth({
-        workspaceId: currentWorkspaceId,
+        workspaceId,
         status: nextStatus,
         error: nextStatus === "not_configured" ? "Telegram needs a bot token before it can start." : null,
         testedAt: new Date().toISOString(),
       });
 
-      if (nextStatus === "configured") {
-        await this.restart();
-      } else {
-        this.stop();
+      if (serviceRunning) {
+        if (nextStatus !== "configured") {
+          const poller = workspacePollers.get(workspaceId);
+          if (poller) {
+            poller.stopRequested = true;
+            workspacePollers.delete(workspaceId);
+          }
+        }
+        await reconcileWorkspacePollers();
+        scheduleReconcile();
       }
 
       return nextStatus as "configured" | "not_configured" | "disabled";
@@ -512,18 +671,43 @@ export const createTelegramConnectorService = (
         logger.info("Telegram polling is disabled on this device. Another host/webhook should process updates.");
         return;
       }
-      if (running) {
+      if (serviceRunning) {
         return;
       }
-      running = true;
-      void loop();
+      serviceRunning = true;
+      await reconcileWorkspacePollers();
+      scheduleReconcile();
     },
 
     stop() {
-      running = false;
+      serviceRunning = false;
+      if (reconcileTimer) {
+        clearTimeout(reconcileTimer);
+        reconcileTimer = null;
+      }
+      for (const state of workspacePollers.values()) {
+        state.stopRequested = true;
+      }
+      workspacePollers.clear();
     },
 
-    async restart() {
+    async restart(input?: { workspaceId?: string }) {
+      if (!serviceRunning) {
+        await this.start();
+        return;
+      }
+
+      if (input?.workspaceId) {
+        const poller = workspacePollers.get(input.workspaceId);
+        if (poller) {
+          poller.stopRequested = true;
+          workspacePollers.delete(input.workspaceId);
+        }
+        await reconcileWorkspacePollers();
+        scheduleReconcile();
+        return;
+      }
+
       this.stop();
       await sleep(50);
       await this.start();

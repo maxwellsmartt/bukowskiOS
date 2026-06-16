@@ -93,6 +93,7 @@ describe("connector bridge service", () => {
     });
 
     const result = await service.processTelegramDm({
+      workspaceId: "workspace-metadata",
       externalUserId: "telegram-user-unlinked",
       externalUsername: "unlinked_ops",
       displayName: "Unlinked Ops",
@@ -177,6 +178,7 @@ describe("connector bridge service", () => {
     });
 
     const first = await service.processTelegramDm({
+      workspaceId: "workspace-metadata",
       externalUserId: "telegram-user-linked",
       externalUsername: "luis_ops",
       displayName: "Luis via Telegram",
@@ -198,6 +200,7 @@ describe("connector bridge service", () => {
     ).run();
 
     const second = await service.processTelegramDm({
+      workspaceId: "workspace-metadata",
       externalUserId: "telegram-user-linked",
       externalUsername: "luis_ops",
       displayName: "Luis via Telegram",
@@ -362,6 +365,7 @@ describe("connector bridge service", () => {
     );
 
     const result = await service.processTelegramDm({
+      workspaceId: "workspace-metadata",
       externalUserId: "telegram-user-recovery",
       externalUsername: "ops_recovery",
       displayName: "Ops via Telegram",
@@ -383,9 +387,9 @@ describe("connector bridge service", () => {
     fs.rmSync(attachmentsRootPath, { recursive: true, force: true });
   });
 
-  it("routes Telegram work to the linked user's operational workspace instead of the seed workspace", async () => {
-    const { cleanup, database } = createTestDatabase("bukowski-connector-bridge-operational-workspace");
-    const attachmentsRootPath = createAttachmentsRoot("bukowski-connector-bridge-operational-workspace");
+  it("keeps Telegram DMs anchored to the workspace that owns the receiving bot", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-connector-bridge-workspace-anchor");
+    const attachmentsRootPath = createAttachmentsRoot("bukowski-connector-bridge-workspace-anchor");
     database.prepare("UPDATE agent_connector_configs SET status = 'configured' WHERE workspace_id = 'workspace-metadata' AND connector_key = 'telegram'").run();
     database.prepare(
       `
@@ -433,7 +437,7 @@ describe("connector bridge service", () => {
           updated_at
         ) VALUES (?, 'workspace-metadata', 'telegram', ?, ?, ?, ?, 'linked', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-    ).run("connector-account-operational-workspace", "telegram-user-operational", "luis_ops", "Luis via Telegram", "user-luis");
+    ).run("connector-account-workspace-anchor", "telegram-user-operational", "luis_ops", "Luis via Telegram", "user-luis");
 
     let gatewayWorkspaceId: string | null = null;
     const assistantChatService = createAssistantChatService(database, {
@@ -486,6 +490,7 @@ describe("connector bridge service", () => {
     });
 
     const result = await service.processTelegramDm({
+      workspaceId: "workspace-metadata",
       externalUserId: "telegram-user-operational",
       externalUsername: "luis_ops",
       displayName: "Luis via Telegram",
@@ -495,7 +500,104 @@ describe("connector bridge service", () => {
     });
 
     expect(result.status).toBe("delivery_pending");
-    expect(gatewayWorkspaceId).toBe("workspace-real");
+    expect(gatewayWorkspaceId).toBe("workspace-metadata");
+
+    cleanup();
+    fs.rmSync(attachmentsRootPath, { recursive: true, force: true });
+  });
+
+  it("requires a fresh link inside the workspace that received the Telegram DM", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-connector-bridge-cross-workspace-link");
+    const attachmentsRootPath = createAttachmentsRoot("bukowski-connector-bridge-cross-workspace-link");
+    database.prepare("UPDATE agent_connector_configs SET status = 'configured' WHERE workspace_id = 'workspace-metadata' AND connector_key = 'telegram'").run();
+    database.prepare(
+      `
+        INSERT INTO workspaces (id, slug, name, base_currency, is_active, created_at, updated_at)
+        VALUES ('workspace-real', 'metadata-cine2', 'Metadata Cine2', 'USD', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+    ).run();
+    database.prepare(
+      `
+        INSERT INTO agent_connector_configs (
+          id,
+          workspace_id,
+          connector_key,
+          display_name,
+          status,
+          capability_summary,
+          notes,
+          created_at,
+          updated_at
+        ) VALUES (
+          'agent-connector-telegram-workspace-real',
+          'workspace-real',
+          'telegram',
+          'Telegram',
+          'configured',
+          'Fast operator messaging and alert routing.',
+          'DM-first operational connector.',
+          CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP
+        )
+      `,
+    ).run();
+    database.prepare(
+      `
+        INSERT INTO workspace_memberships (id, workspace_id, user_id, role_id, status, joined_at, created_at)
+        VALUES ('membership-real-luis', 'workspace-real', 'user-luis', 'role-admin', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+    ).run();
+    database.prepare(
+      `
+        INSERT INTO connector_accounts (
+          id,
+          workspace_id,
+          connector_key,
+          external_user_id,
+          external_username,
+          display_name,
+          linked_user_id,
+          link_status,
+          linked_at,
+          created_at,
+          updated_at
+        ) VALUES (?, 'workspace-real', 'telegram', ?, ?, ?, ?, 'linked', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+    ).run("connector-account-real-only", "telegram-user-real-only", "luis_real", "Luis in real workspace", "user-luis");
+
+    const assistantChatService = createAssistantChatService(database, {
+      attachmentsRootPath,
+      assistantGatewayService: {
+        sendMessage: async () => {
+          throw new Error("Should not reach gateway when the current bot workspace has no link.");
+        },
+        continueApprovedRun: async () => {
+          throw new Error("Not used in this test.");
+        },
+      },
+      memoryService: {
+        extractAndPersist: () => [],
+        getOverlay: () => ({ agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] }),
+        pruneStaleEntries: () => undefined,
+        recordFailure: () => undefined,
+      },
+    });
+    const service = createConnectorBridgeService(database, {
+      assistantChatService,
+    });
+
+    const result = await service.processTelegramDm({
+      workspaceId: "workspace-metadata",
+      externalUserId: "telegram-user-real-only",
+      externalUsername: "luis_real",
+      displayName: "Luis in real workspace",
+      externalChannelId: "telegram-dm-real-only",
+      externalMessageId: "telegram-real-only-msg",
+      message: "Necesito el estado del proyecto",
+    });
+
+    expect(result.status).toBe("linked_required");
+    expect(result.replyText).toContain("vinculada");
 
     cleanup();
     fs.rmSync(attachmentsRootPath, { recursive: true, force: true });
@@ -570,6 +672,7 @@ describe("connector bridge service", () => {
     });
 
     const first = await service.processTelegramDm({
+      workspaceId: "workspace-metadata",
       externalUserId: "telegram-user-duplicate",
       externalUsername: "miguel_ops",
       displayName: "Miguel via Telegram",
@@ -578,6 +681,7 @@ describe("connector bridge service", () => {
       message: "Estado del Teradek",
     });
     const duplicate = await service.processTelegramDm({
+      workspaceId: "workspace-metadata",
       externalUserId: "telegram-user-duplicate",
       externalUsername: "miguel_ops",
       displayName: "Miguel via Telegram",
@@ -699,6 +803,7 @@ describe("connector bridge service", () => {
     });
 
     const degraded = await service.processTelegramDm({
+      workspaceId: "workspace-metadata",
       externalUserId: "telegram-user-recovery",
       externalUsername: "ana_ops",
       displayName: "Ana via Telegram",
@@ -710,6 +815,7 @@ describe("connector bridge service", () => {
     responseMode = "healthy";
 
     const restored = await service.processTelegramDm({
+      workspaceId: "workspace-metadata",
       externalUserId: "telegram-user-recovery",
       externalUsername: "ana_ops",
       displayName: "Ana via Telegram",
@@ -723,7 +829,8 @@ describe("connector bridge service", () => {
         `
           SELECT status, payload_json
           FROM connector_message_receipts
-          WHERE connector_key = 'telegram'
+          WHERE workspace_id = 'workspace-metadata'
+            AND connector_key = 'telegram'
             AND direction = 'inbound'
             AND external_message_id = ?
           LIMIT 1
