@@ -12568,16 +12568,19 @@ button.timeline-signal-chip:focus-visible {
 .agents-health-grid,
 .agents-support-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 12px;
+  gap: 10px;
   align-items: stretch;
+}
+
+.agents-health-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .agents-health-card {
   display: grid;
-  gap: 8px;
-  min-height: 110px;
-  padding: 14px 16px 15px;
+  gap: 6px;
+  min-height: 96px;
+  padding: 12px 14px 13px;
   border: 1px solid var(--border-subtle);
   border-radius: 18px;
   background:
@@ -12692,8 +12695,8 @@ button.timeline-signal-chip:focus-visible {
 
 .agents-health-value {
   color: var(--text-primary);
-  font-size: 25px;
-  font-weight: 650;
+  font-size: 23px;
+  font-weight: 680;
 }
 
 .agents-mission-layout,
@@ -12828,6 +12831,9 @@ button.timeline-signal-chip:focus-visible {
   top: calc(100% + 10px);
   right: 0;
   z-index: 35;
+  display: flex;
+  max-height: min(460px, calc(100vh - 140px));
+  flex-direction: column;
   width: min(400px, calc(100vw - 48px));
   padding: 14px;
   border: 1px solid rgba(154, 194, 183, 0.18);
@@ -12838,6 +12844,7 @@ button.timeline-signal-chip:focus-visible {
   box-shadow:
     0 24px 60px rgba(0, 0, 0, 0.42),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  overflow: hidden;
 }
 
 .mission-panel-popover-header {
@@ -12855,8 +12862,16 @@ button.timeline-signal-chip:focus-visible {
 
 .mission-panel-popover-body {
   display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
   gap: 10px;
   margin-top: 12px;
+}
+
+.mission-panel-section {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
 }
 
 .mission-panel-filter-row {
@@ -12867,24 +12882,39 @@ button.timeline-signal-chip:focus-visible {
 
 .mission-panel-scroll {
   min-height: 0;
-  max-height: min(330px, 54vh);
+  max-height: min(340px, calc(100vh - 240px));
   overflow: auto;
   padding-right: 4px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.mission-panel-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.mission-panel-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mission-panel-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .mission-graph {
   position: relative;
   display: grid;
-  gap: 18px;
+  gap: 10px;
   flex: 1 1 auto;
-  min-height: clamp(460px, calc(100dvh - 390px), 760px);
-  padding: 12px 8px 8px;
+  min-height: clamp(420px, calc(100dvh - 350px), 720px);
+  padding: 8px 8px 4px;
 }
 
 .mission-graph-spine {
   width: 1px;
-  height: 22px;
-  margin: 0 auto -2px;
+  height: 14px;
+  margin: 0 auto -6px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
 }
 
@@ -12892,8 +12922,8 @@ button.timeline-signal-chip:focus-visible {
   position: relative;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 14px;
-  padding-top: 18px;
+  gap: 12px;
+  padding-top: 12px;
 }
 
 .mission-graph-band::before {
@@ -12909,12 +12939,12 @@ button.timeline-signal-chip:focus-visible {
 .mission-graph-branch {
   display: grid;
   justify-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
 .mission-graph-branch-line {
   width: 1px;
-  height: 14px;
+  height: 8px;
   background: rgba(255, 255, 255, 0.07);
 }
 
@@ -12923,10 +12953,10 @@ button.timeline-signal-chip:focus-visible {
   display: grid;
   grid-template-rows: auto auto auto;
   align-content: stretch;
-  gap: 9px;
+  gap: 7px;
   width: 100%;
-  min-height: 156px;
-  padding: 15px 15px 13px;
+  min-height: 124px;
+  padding: 14px 14px 12px;
   border: 1px solid rgba(255, 255, 255, 0.075);
   border-radius: 18px;
   background:
@@ -13069,16 +13099,20 @@ button.timeline-signal-chip:focus-visible {
 
 .mission-node-footer {
   display: flex;
-  align-items: stretch;
-  gap: 7px;
+  align-items: center;
+  gap: 6px;
   margin-top: auto;
   min-width: 0;
-  flex-direction: column;
+  flex-wrap: wrap;
+}
+
+.mission-node-footer-single-row {
+  flex-wrap: nowrap;
 }
 
 .mission-node-copy {
   display: grid;
-  gap: 7px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -13759,6 +13793,39 @@ button.timeline-signal-chip:focus-visible {
   gap: 6px;
   min-width: 0;
   flex-wrap: wrap;
+}
+
+.mission-node-footer-single-row .mission-node-model-pill {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mission-node-footer-single-row .mission-node-model-pill span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-node-footer-single-row .mission-operational-pill,
+.mission-node-footer-single-row .mission-node-status {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 1180px) {
+  .agents-health-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .agents-health-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mission-node-footer-single-row {
+    flex-wrap: wrap;
+  }
 }
 
 .agent-directory-meta {

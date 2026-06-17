@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BellDot, Bot, CircleAlert, CloudCog, History, PauseCircle, PlayCircle, PlugZap, ShieldCheck, X } from "lucide-react";
+import { BellDot, Bot, CircleAlert, History, PauseCircle, PlayCircle, PlugZap, ShieldCheck, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
-import type { AppSyncStatusSnapshot } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -51,29 +50,6 @@ type MissionSectionKey = "queue" | "activity" | "models" | "connectors";
 type MissionConnectorLifecycle = "live" | "staged" | "planned";
 const providerDisplayOrder = ["openai", "anthropic", "openclaw", "custom"] as const;
 const connectorDisplayOrder = ["telegram", "whatsapp", "email", "webhook"] as const;
-const emptySyncSnapshot: AppSyncStatusSnapshot = {
-  diagnostics: {
-    databaseSizeBytes: 0,
-    backupSizeBytes: 0,
-    databaseExists: false,
-    backupExists: false,
-    lastBackupAt: null,
-    lastIntegrityCheckAt: null,
-    lastIntegrityCheckStatus: "never",
-    lastRetentionRunAt: null,
-    lastRetentionSummary: null,
-    lastSyncRunAt: null,
-    lastSyncSummary: null,
-    lastSyncStatus: "idle",
-    syncOutboxPendingCount: 0,
-    syncOutboxProcessingCount: 0,
-    syncOutboxFailedCount: 0,
-    databaseEncrypted: false,
-    encryptionAvailable: false,
-    internalBuildArtifacts: [],
-  },
-  pullCursors: [],
-};
 
 const sortByDisplayOrder = <T extends { label: string }>(items: T[], key: (item: T) => string, displayOrder: readonly string[]) =>
   [...items].sort((left, right) => {
@@ -156,23 +132,8 @@ export const AgentsMissionControlPage = () => {
   const [processingRunId, setProcessingRunId] = useState<string | null>(null);
   const [approvalFeedback, setApprovalFeedback] = useState<string | null>(null);
   const [activeMissionPanel, setActiveMissionPanel] = useState<MissionSectionKey | null>(null);
-  const [syncSnapshot, setSyncSnapshot] = useState<AppSyncStatusSnapshot>(emptySyncSnapshot);
   const missionPanelRef = useRef<HTMLDivElement | null>(null);
   const { data: detail, reload: reloadDetail } = useAgentDetail(selectedAgentId, { workspaceId });
-
-  const loadSyncSnapshot = async () => {
-    if (!window.bukowskiApp?.getSyncStatusSnapshot) {
-      setSyncSnapshot(emptySyncSnapshot);
-      return;
-    }
-
-    try {
-      const nextSnapshot = await window.bukowskiApp.getSyncStatusSnapshot();
-      setSyncSnapshot(nextSnapshot);
-    } catch {
-      setSyncSnapshot(emptySyncSnapshot);
-    }
-  };
 
   useVisiblePolling(
     () => {
@@ -183,17 +144,6 @@ export const AgentsMissionControlPage = () => {
     },
     { intervalMs: 2000 },
   );
-
-  useVisiblePolling(
-    () => {
-      void loadSyncSnapshot();
-    },
-    { intervalMs: 15_000 },
-  );
-
-  useEffect(() => {
-    void loadSyncSnapshot();
-  }, [workspaceId]);
 
   useEffect(() => {
     const focusedAgentId = searchParams.get("agent");
@@ -220,39 +170,6 @@ export const AgentsMissionControlPage = () => {
     return data.queue.filter((run) => run.status === queueFilter);
   }, [data.queue, queueFilter]);
   const pendingApprovals = useMemo(() => data.queue.filter((run) => run.status === "needs_approval"), [data.queue]);
-  const inboundSyncFailures = useMemo(
-    () => syncSnapshot.pullCursors.filter((cursor) => Boolean(cursor.lastError)).length,
-    [syncSnapshot.pullCursors],
-  );
-  const syncQueuedCount =
-    syncSnapshot.diagnostics.syncOutboxPendingCount + syncSnapshot.diagnostics.syncOutboxProcessingCount;
-  const syncFailedCount = syncSnapshot.diagnostics.syncOutboxFailedCount + inboundSyncFailures;
-  const syncCardTone = syncFailedCount > 0 ? "critical" : syncQueuedCount > 0 ? "warning" : "positive";
-  const syncSummaryText = useMemo(() => {
-    if (syncFailedCount > 0) {
-      return (
-        syncSnapshot.diagnostics.lastSyncSummary ||
-        t("agents.mission.sync.failedSummary", {
-          count: syncFailedCount,
-          defaultValue: `${syncFailedCount} frentes de sync necesitan revisión.`,
-        })
-      );
-    }
-
-    if (syncQueuedCount > 0) {
-      return (
-        syncSnapshot.diagnostics.lastSyncSummary ||
-        t("agents.mission.sync.queuedSummary", {
-          count: syncQueuedCount,
-          defaultValue: `${syncQueuedCount} cambios siguen en cola o procesándose.`,
-        })
-      );
-    }
-
-    return t("agents.mission.sync.healthySummary", {
-      defaultValue: "Control plane estable. No vemos colas trabadas ni errores visibles en esta pasada.",
-    });
-  }, [syncFailedCount, syncQueuedCount, syncSnapshot.diagnostics.lastSyncSummary, t]);
   const orderedModelSummary = useMemo(
     () => sortByDisplayOrder(data.modelSummary, (model) => model.providerKey, providerDisplayOrder),
     [data.modelSummary],
@@ -385,29 +302,6 @@ export const AgentsMissionControlPage = () => {
               ? "positive"
               : "neutral",
       },
-      {
-        label: t("agents.mission.health.syncStatus", { defaultValue: "Sync" }),
-        value:
-          syncFailedCount > 0
-            ? String(syncFailedCount)
-            : syncQueuedCount > 0
-              ? String(syncQueuedCount)
-              : t("agents.mission.health.syncHealthyShort", { defaultValue: "OK" }),
-        helper:
-          syncFailedCount > 0
-            ? t("agents.mission.health.syncFailedHint", {
-                count: syncFailedCount,
-                defaultValue: `${syncFailedCount} áreas necesitan atención`,
-              })
-            : syncQueuedCount > 0
-              ? t("agents.mission.health.syncQueuedHint", {
-                  count: syncQueuedCount,
-                  defaultValue: `${syncQueuedCount} cambios en cola`,
-                })
-              : t("agents.mission.health.syncHealthyHint", { defaultValue: "Subida y bajada sin alertas" }),
-        icon: CloudCog,
-        tone: syncCardTone,
-      },
     ],
     [
       connectorLifecycleSummary.blocked,
@@ -420,9 +314,6 @@ export const AgentsMissionControlPage = () => {
       providerReadinessSummary.configured,
       providerReadinessSummary.healthy,
       rosterAgents.length,
-      syncCardTone,
-      syncFailedCount,
-      syncQueuedCount,
       t,
       workingAgentCount,
     ],
@@ -521,7 +412,7 @@ export const AgentsMissionControlPage = () => {
     switch (activeMissionPanel) {
       case "queue":
         return (
-          <>
+          <div className="mission-panel-section">
             <div className="agent-detail-row mission-panel-filter-row">
               <button className={`chip-button${queueFilter === "all" ? " is-active" : ""}`} onClick={() => setQueueFilter("all")} type="button">
                 {t("agents.runs.filters.all")}
@@ -568,7 +459,7 @@ export const AgentsMissionControlPage = () => {
                 </button>
               ))}
             </div>
-          </>
+          </div>
         );
       case "activity":
         return (
@@ -706,22 +597,6 @@ export const AgentsMissionControlPage = () => {
         })}
       </div>
 
-      <SurfaceCard
-        className={`agents-sync-banner agents-sync-banner-${syncCardTone}`}
-        title={t("agents.mission.sync.title", { defaultValue: "Estado operativo de sync" })}
-        subtitle={syncSummaryText}
-      >
-        <div className="agents-sync-banner-metrics">
-          <span className="subtle-pill">{t("agents.mission.sync.pending", { count: syncQueuedCount, defaultValue: `${syncQueuedCount} en cola` })}</span>
-          <span className="subtle-pill">{t("agents.mission.sync.failed", { count: syncFailedCount, defaultValue: `${syncFailedCount} con fallo` })}</span>
-          <span className="subtle-pill">
-            {syncSnapshot.pullCursors.length
-              ? t("agents.mission.sync.sources", { count: syncSnapshot.pullCursors.length, defaultValue: `${syncSnapshot.pullCursors.length} fuentes entrantes` })
-              : t("agents.mission.sync.sourcesEmpty", { defaultValue: "Sin fuentes entrantes registradas" })}
-          </span>
-        </div>
-      </SurfaceCard>
-
       <div className={`agents-mission-layout${selectedAgent ? "" : " is-graph-expanded"}`}>
         <SurfaceCard
           className="agents-graph-card mission-team-map-card"
@@ -797,32 +672,24 @@ export const AgentsMissionControlPage = () => {
                     </div>
                     <div className="mission-node-copy">
                       <span className="mission-node-role mission-node-role-clamped">{data.supervisor.role}</span>
-                      <span className="mission-node-mission mission-node-mission-clamped" title={data.supervisor.mission}>
-                        {data.supervisor.mission}
-                      </span>
                     </div>
-                    <div className="mission-node-footer">
-                      <div className="mission-node-meta-row">
-                        <span className="subtle-pill mission-node-domain-pill">{titleCaseEnum(data.supervisor.domain)}</span>
-                        <span className="subtle-pill mission-node-model-pill" title={data.supervisor.modelLabel}>
-                          {providerBrand.logoSrc ? (
-                            <img
-                              alt={providerBrand.logoAlt ?? providerBrand.label ?? t("agents.shared.aiService")}
-                              className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
-                              src={providerBrand.logoSrc}
-                            />
-                          ) : null}
-                          <span>{data.supervisor.modelLabel}</span>
-                        </span>
-                      </div>
-                      <div className="mission-node-footer-status-row">
-                        <span className={`mission-operational-pill mission-operational-pill-${data.supervisor.operationalState}`}>
-                          {t(`agents.shared.operationalState.${data.supervisor.operationalState}`)}
-                        </span>
-                        <span className={`mission-node-status mission-node-status-${data.supervisor.status}`}>
-                          {t(`agents.shared.agentStatus.${data.supervisor.status}`)}
-                        </span>
-                      </div>
+                    <div className="mission-node-footer mission-node-footer-single-row">
+                      <span className="subtle-pill mission-node-model-pill" title={data.supervisor.modelLabel}>
+                        {providerBrand.logoSrc ? (
+                          <img
+                            alt={providerBrand.logoAlt ?? providerBrand.label ?? t("agents.shared.aiService")}
+                            className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
+                            src={providerBrand.logoSrc}
+                          />
+                        ) : null}
+                        <span>{data.supervisor.modelLabel}</span>
+                      </span>
+                      <span className={`mission-operational-pill mission-operational-pill-${data.supervisor.operationalState}`}>
+                        {t(`agents.shared.operationalState.${data.supervisor.operationalState}`)}
+                      </span>
+                      <span className={`mission-node-status mission-node-status-${data.supervisor.status}`}>
+                        {t(`agents.shared.agentStatus.${data.supervisor.status}`)}
+                      </span>
                     </div>
                   </button>
                 );
@@ -862,32 +729,24 @@ export const AgentsMissionControlPage = () => {
                         </div>
                         <div className="mission-node-copy">
                           <span className="mission-node-role mission-node-role-clamped">{agent.role}</span>
-                          <span className="mission-node-mission mission-node-mission-clamped" title={agent.mission}>
-                            {agent.mission}
-                          </span>
                         </div>
-                        <div className="mission-node-footer">
-                          <div className="mission-node-meta-row">
-                            <span className="subtle-pill mission-node-domain-pill">{titleCaseEnum(agent.domain)}</span>
-                            <span className="subtle-pill mission-node-model-pill" title={agent.modelLabel}>
-                              {providerBrand.logoSrc ? (
-                                <img
-                                  alt={providerBrand.logoAlt ?? providerBrand.label ?? t("agents.shared.aiService")}
-                                  className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
-                                  src={providerBrand.logoSrc}
-                                />
-                              ) : null}
-                              <span>{agent.modelLabel}</span>
-                            </span>
-                          </div>
-                          <div className="mission-node-footer-status-row">
-                            <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
-                              {t(`agents.shared.operationalState.${agent.operationalState}`)}
-                            </span>
-                            <span className={`mission-node-status mission-node-status-${agent.status}`}>
-                              {t(`agents.shared.agentStatus.${agent.status}`)}
-                            </span>
-                          </div>
+                        <div className="mission-node-footer mission-node-footer-single-row">
+                          <span className="subtle-pill mission-node-model-pill" title={agent.modelLabel}>
+                            {providerBrand.logoSrc ? (
+                              <img
+                                alt={providerBrand.logoAlt ?? providerBrand.label ?? t("agents.shared.aiService")}
+                                className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
+                                src={providerBrand.logoSrc}
+                              />
+                            ) : null}
+                            <span>{agent.modelLabel}</span>
+                          </span>
+                          <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
+                            {t(`agents.shared.operationalState.${agent.operationalState}`)}
+                          </span>
+                          <span className={`mission-node-status mission-node-status-${agent.status}`}>
+                            {t(`agents.shared.agentStatus.${agent.status}`)}
+                          </span>
                         </div>
                       </button>
                     </div>
