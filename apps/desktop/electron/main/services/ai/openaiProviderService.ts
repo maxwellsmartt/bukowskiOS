@@ -2,6 +2,11 @@ import { getDesktopLogger } from "../logger";
 
 const logger = getDesktopLogger("openai-provider");
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com";
+const datedModelSuffixPattern = /-\d{4}-\d{2}-\d{2}$/u;
+const excludedOpenAIModelPattern =
+  /(image|embedding|audio|tts|whisper|dall-e|moderation|transcribe|realtime|search|preview|codex|nano)/u;
+const curatedOpenAIModelPattern =
+  /^(gpt-4o(?:-mini)?|gpt-5(?:\.\d+)?(?:-(mini|pro))?)$/u;
 
 export type OpenAIProviderConfig = {
   apiKey: string;
@@ -135,6 +140,116 @@ const resolveModel = (model: string) => {
   return separatorIndex > 0 ? normalized.slice(separatorIndex + 1) : normalized;
 };
 
+const stripOpenAIModelVersionSuffix = (value: string) => value.replace(datedModelSuffixPattern, "");
+
+const titleCaseToken = (value: string) => {
+  if (!value) {
+    return value;
+  }
+
+  return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
+const looksLikeConnectivityFailure = (summary: string) => {
+  const normalized = summary.toLowerCase();
+  return (
+    normalized.includes("fetch failed") ||
+    normalized.includes("network") ||
+    normalized.includes("socket") ||
+    normalized.includes("econn") ||
+    normalized.includes("enotfound") ||
+    normalized.includes("timed out") ||
+    normalized.includes("timeout")
+  );
+};
+
+const formatModelDateSuffix = (value: string) => {
+  const match = value.match(/(\d{4})-(\d{2})-(\d{2})$/u);
+  if (!match) {
+    return "";
+  }
+
+  const [, year, month, day] = match;
+  return `${year}-${month}-${day}`;
+};
+
+export const isCuratedOpenAIModelId = (value: string) => {
+  const normalized = resolveModel(value).trim().toLowerCase();
+  if (!normalized || excludedOpenAIModelPattern.test(normalized)) {
+    return false;
+  }
+
+  return curatedOpenAIModelPattern.test(stripOpenAIModelVersionSuffix(normalized));
+};
+
+export const formatOpenAIModelLabel = (value: string) => {
+  const modelId = resolveModel(value).trim();
+  if (!modelId) {
+    return value;
+  }
+
+  const normalized = modelId.toLowerCase();
+  const baseId = stripOpenAIModelVersionSuffix(normalized);
+  const dateSuffix = baseId === normalized ? "" : formatModelDateSuffix(normalized);
+
+  const buildDatedLabel = (label: string) => (dateSuffix ? `${label} · ${dateSuffix}` : label);
+
+  if (baseId.startsWith("gpt-")) {
+    const [, family = "", variant = ""] = baseId.match(/^gpt-([^-]+)(?:-(.+))?$/u) ?? [];
+    const familyLabel = family.toLowerCase() === "4o" ? "4o" : family;
+    const variantLabel = variant
+      .split("-")
+      .filter(Boolean)
+      .map((token) => titleCaseToken(token))
+      .join(" ");
+
+    return buildDatedLabel(`GPT ${familyLabel}${variantLabel ? ` ${variantLabel}` : ""}`);
+  }
+
+  if (baseId.startsWith("o")) {
+    const [family = "", variant = ""] = baseId.split("-");
+    const variantLabel = variant ? ` ${titleCaseToken(variant)}` : "";
+    return buildDatedLabel(`${family.toUpperCase()}${variantLabel}`);
+  }
+
+  return buildDatedLabel(
+    baseId
+      .split("-")
+      .filter(Boolean)
+      .map((token) => titleCaseToken(token))
+      .join(" "),
+  );
+};
+
+export const compareOpenAIModelPriority = (left: string, right: string) => {
+  const score = (value: string) => {
+    const normalized = stripOpenAIModelVersionSuffix(resolveModel(value).trim().toLowerCase());
+
+    if (normalized.startsWith("gpt-5")) {
+      const [, family = "0", variant = ""] = normalized.match(/^gpt-([^-]+)(?:-(.+))?$/u) ?? [];
+      const familyScore = Number.parseFloat(family) || 5;
+      const variantScore = variant === "pro" ? 30 : variant === "mini" ? 10 : 20;
+      return 5000 + familyScore * 100 + variantScore;
+    }
+
+    if (normalized.startsWith("gpt-4o")) {
+      return normalized.endsWith("-mini") ? 3100 : 3200;
+    }
+
+    return 0;
+  };
+
+  const scoreDelta = score(right) - score(left);
+  if (scoreDelta !== 0) {
+    return scoreDelta;
+  }
+
+  return formatOpenAIModelLabel(left).localeCompare(formatOpenAIModelLabel(right), "en-US", {
+    numeric: true,
+    sensitivity: "base",
+  });
+};
+
 const extractOutputText = (payload: Record<string, unknown>) => {
   if (typeof payload.output_text === "string" && payload.output_text.trim()) {
     return payload.output_text;
@@ -211,7 +326,7 @@ const looksLikeInvalidKeyFailure = (summary: string, statusCode?: number) => {
 const classifyOpenAIFailureStatus = (summary: string, statusCode?: number): "invalid_key" | "unavailable" =>
   looksLikeInvalidKeyFailure(summary, statusCode) ? "invalid_key" : "unavailable";
 
-const toOpenAIUserFacingFailure = (summary: string, statusCode?: number, baseUrl?: string) => {
+export const toOpenAIUserFacingFailure = (summary: string, statusCode?: number, baseUrl?: string) => {
   const normalized = summary.toLowerCase();
   const resolvedBaseUrl = resolveBaseUrl(baseUrl);
 
@@ -230,6 +345,10 @@ const toOpenAIUserFacingFailure = (summary: string, statusCode?: number, baseUrl
 
   if (statusCode === 429 || normalized.includes("rate limit")) {
     return "OpenAI está limitando temporalmente las solicitudes. Espera unos segundos y vuelve a intentarlo.";
+  }
+
+  if (looksLikeConnectivityFailure(summary)) {
+    return `No se pudo conectar con OpenAI desde esta Mac. Revisa conexión, firewall/VPN y que la Base URL siga siendo ${resolvedBaseUrl}.`;
   }
 
   if (statusCode === 403) {
@@ -259,27 +378,33 @@ export const createOpenAIProviderService = () => ({
       }
 
       const payload = (await response.json()) as { data?: Array<Record<string, unknown>> };
-      return (payload.data ?? [])
+      const allModels = (payload.data ?? [])
         .map((model) => {
           const id = typeof model.id === "string" ? model.id : "";
           return {
             key: `openai:${id}`,
-            label: id,
+            label: formatOpenAIModelLabel(id),
             raw: model,
           };
         })
+        .filter((model) => model.key.trim().length > 0);
+
+      const availableIds = new Set(allModels.map((model) => resolveModel(model.key).trim().toLowerCase()));
+
+      return allModels
         .filter((model) => {
-          const id = model.label.toLowerCase();
-          if (!id) {
+          const normalized = resolveModel(model.key).trim().toLowerCase();
+          if (!isCuratedOpenAIModelId(normalized)) {
             return false;
           }
 
-          return (
-            /^(gpt|o\d|chatgpt)/u.test(id) &&
-            !/(image|embedding|audio|tts|whisper|dall-e|moderation|transcribe|realtime)/u.test(id)
-          );
+          const baseId = stripOpenAIModelVersionSuffix(normalized);
+          return !(baseId !== normalized && availableIds.has(baseId));
         })
-        .sort((left, right) => left.label.localeCompare(right.label));
+        .sort((left, right) => compareOpenAIModelPriority(left.key, right.key));
+    } catch (error) {
+      const summary = error instanceof Error ? error.message : "OpenAI model listing failed.";
+      throw new Error(toOpenAIUserFacingFailure(summary, undefined, config.baseUrl));
     } finally {
       clearTimeout(timeout);
     }
@@ -346,7 +471,7 @@ export const createOpenAIProviderService = () => ({
       return {
         ok: false,
         status: "unavailable",
-        summary,
+        summary: toOpenAIUserFacingFailure(summary, undefined, config.baseUrl),
       };
     } finally {
       clearTimeout(timeout);
@@ -423,7 +548,7 @@ export const createOpenAIProviderService = () => ({
       return {
         ok: false,
         status: "unavailable",
-        summary,
+        summary: toOpenAIUserFacingFailure(summary, undefined, config.baseUrl),
       };
     } finally {
       clearTimeout(timeout);

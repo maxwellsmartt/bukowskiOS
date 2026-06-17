@@ -1544,15 +1544,15 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       }
       case "agent": {
         const rows = selectAll("SELECT * FROM agents WHERE id = ?", row.entity_id);
-        return rows.length ? [{ table: "agents", onConflict: "id", rows }] : [];
+        return rows.length ? [{ table: "agents", onConflict: "workspace_id,id", rows }] : [];
       }
       case "ai_provider_config": {
         const rows = selectAll("SELECT * FROM ai_provider_configs WHERE id = ?", row.entity_id);
-        return rows.length ? [{ table: "ai_provider_configs", onConflict: "id", rows }] : [];
+        return rows.length ? [{ table: "ai_provider_configs", onConflict: "workspace_id,id", rows }] : [];
       }
       case "agent_connector_config": {
         const rows = selectAll("SELECT * FROM agent_connector_configs WHERE id = ?", row.entity_id);
-        return rows.length ? [{ table: "agent_connector_configs", onConflict: "id", rows }] : [];
+        return rows.length ? [{ table: "agent_connector_configs", onConflict: "workspace_id,id", rows }] : [];
       }
       default:
         return null;

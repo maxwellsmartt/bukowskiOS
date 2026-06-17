@@ -15,6 +15,12 @@ import type {
 } from "@contracts";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import {
+  compareOpenAIModelPriority,
+  formatOpenAIModelLabel,
+  isCuratedOpenAIModelId,
+  toOpenAIUserFacingFailure,
+} from "../ai/openaiProviderService";
 
 type AgentWorkspaceQuery = {
   workspaceId?: string | null;
@@ -506,8 +512,8 @@ const isVisibleActivityRow = (row: ReturnType<typeof loadActivity>[number]) =>
 const getDefaultProviderModelOptions = (providerKey: string) => {
   const defaults: Record<string, Array<{ key: string; label: string; source: "default" }>> = {
     openai: [
-      { key: "openai:gpt-5.2", label: "GPT-5.2", source: "default" },
-      { key: "openai:gpt-5-mini", label: "GPT-5 Mini", source: "default" },
+      { key: "openai:gpt-5.2", label: "GPT 5.2", source: "default" },
+      { key: "openai:gpt-5-mini", label: "GPT 5 Mini", source: "default" },
     ],
     anthropic: [
       { key: "anthropic:claude-sonnet-4-20250514", label: "Claude Sonnet 4", source: "default" },
@@ -588,11 +594,18 @@ const buildProviderRows = (
     const assignedModels = Array.from(new Set(assignedRows.map((agent) => agent.modelLabel).filter(Boolean)));
     const hasStoredSecret = secretStore?.hasProviderSecret(workspaceId, row.provider_key) ?? false;
     const isActiveProvider = row.enabled === 1 && assignedRows.length > 0;
-    const modelOptions = loadProviderModelOptions(db, workspaceId, row.provider_key).map((model) => ({
-      key: model.model_key,
-      label: model.display_name,
-      source: model.source === "api" ? ("api" as const) : ("default" as const),
-    }));
+    const modelOptions = loadProviderModelOptions(db, workspaceId, row.provider_key)
+      .filter((model) => (row.provider_key === "openai" ? isCuratedOpenAIModelId(model.model_key) : true))
+      .sort((left, right) =>
+        row.provider_key === "openai"
+          ? compareOpenAIModelPriority(left.model_key, right.model_key)
+          : left.display_name.localeCompare(right.display_name, "en-US", { sensitivity: "base" }),
+      )
+      .map((model) => ({
+        key: model.model_key,
+        label: row.provider_key === "openai" ? formatOpenAIModelLabel(model.model_key) : model.display_name,
+        source: model.source === "api" ? ("api" as const) : ("default" as const),
+      }));
     const mergedModelOptions = [
       ...(modelOptions.length ? modelOptions : getDefaultProviderModelOptions(row.provider_key)),
     ];
@@ -600,9 +613,15 @@ const buildProviderRows = (
       .filter(Boolean)
       .forEach((modelKey) => {
         if (!mergedModelOptions.some((option) => option.key === modelKey)) {
+          const fallbackLabel =
+            row.provider_key === "openai"
+              ? formatOpenAIModelLabel(modelKey)
+              : modelKey.includes(":")
+                ? modelKey.split(":").slice(1).join(":")
+                : modelKey;
           mergedModelOptions.push({
             key: modelKey,
-            label: modelKey.includes(":") ? modelKey.split(":").slice(1).join(":") : modelKey,
+            label: fallbackLabel,
             source: "default",
           });
         }
@@ -629,7 +648,10 @@ const buildProviderRows = (
       retryCount: row.retry_count,
       lastTestedAtLabel: formatOptionalTimestampLabel(row.last_tested_at),
       lastSuccessAtLabel: formatOptionalTimestampLabel(row.last_success_at),
-      lastErrorSummary: row.last_error_summary ?? "",
+      lastErrorSummary:
+        row.provider_key === "openai" && row.last_error_summary
+          ? toOpenAIUserFacingFailure(row.last_error_summary, undefined, row.base_url)
+          : row.last_error_summary ?? "",
       assignedAgents: assignedRows.map((agent) => agent.displayName),
       assignedModels,
       notes: row.notes,

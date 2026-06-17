@@ -3065,12 +3065,42 @@
       "approvalFallback": "This supervised draft is waiting for your review.",
       "viewAgent": "View agent",
       "updates": "Updates",
+      "sync": {
+        "title": "Sync operational status",
+        "failedSummary_one": "{{count}} sync surface needs review.",
+        "failedSummary_other": "{{count}} sync surfaces need review.",
+        "queuedSummary_one": "{{count}} change is still queued or processing.",
+        "queuedSummary_other": "{{count}} changes are still queued or processing.",
+        "healthySummary": "Control plane stable. No stuck queues or visible errors in this pass.",
+        "pending_one": "{{count}} queued",
+        "pending_other": "{{count}} queued",
+        "failed_one": "{{count}} failed",
+        "failed_other": "{{count}} failed",
+        "sources_one": "{{count}} inbound source",
+        "sources_other": "{{count}} inbound sources",
+        "sourcesEmpty": "No inbound sources registered"
+      },
       "health": {
         "activeAgents": "Active agents",
+        "activeAgentsHint": "Ready to operate now",
         "pausedAgents": "Paused agents",
+        "pendingReviews": "Reviews",
+        "pendingReviewsHint_one": "{{count}} is waiting for your approval",
+        "pendingReviewsHint_other": "{{count}} are waiting for your approval",
+        "pendingReviewsClear": "Nothing blocked on approval",
         "recentActivity": "Recent activity",
+        "recentActivityHint": "Runs visible in this pass",
         "activeChannels": "Active channels",
-        "assignedModels": "Assigned models"
+        "activeChannelsHint": "Connected channels available now",
+        "assignedModels": "Assigned models",
+        "assignedModelsHint": "Current AI roster coverage",
+        "syncStatus": "Sync",
+        "syncHealthyShort": "OK",
+        "syncHealthyHint": "Upload and download clear",
+        "syncQueuedHint_one": "{{count}} change queued",
+        "syncQueuedHint_other": "{{count}} changes queued",
+        "syncFailedHint_one": "{{count}} area needs attention",
+        "syncFailedHint_other": "{{count}} areas need attention"
       }
     },
     "models": {
@@ -3080,6 +3110,7 @@
       "selectService": "Select an AI service",
       "selectServiceEmpty": "Select an AI service to review its setup and health.",
       "comingSoon": "Coming soon",
+      "liveCatalog": "Operational catalog",
       "keyStored": "Key stored",
       "storedOnThisMac": "Stored on this Mac",
       "assignedAgentCount_one": "{{count}} agent",
@@ -3137,6 +3168,18 @@
         "openaiDashboardUrl": "That URL looks like the OpenAI dashboard. For API traffic use https://api.openai.com or leave this field empty.",
         "anthropicBaseUrl": "Leave this empty or use https://api.anthropic.com unless you are routing through your own gateway."
       },
+      "operationalHint": {
+        "comingSoonTitle": "Shell ready for a future integration",
+        "comingSoonBody": "This surface is already diagrammed, but it should not be treated as an operational provider yet.",
+        "invalidKeyTitle": "The credential needs review",
+        "invalidKeyBody": "This usually points to an invalid key, the wrong project, or billing access missing for that model.",
+        "unavailableTitle": "The endpoint did not respond as expected",
+        "unavailableBody": "This is usually connectivity, a down gateway, project permissions, or an incorrect Base URL.",
+        "missingKeyTitle": "The local key is still missing",
+        "missingKeyBody": "Store it on this Mac, test the connection, then refresh the catalog so this provider is fully ready.",
+        "openaiCuratedTitle": "Curated catalog for day-to-day operations",
+        "openaiCuratedBody": "We only surface the most general and stable production models here, avoiding technical or experimental variants."
+      },
       "toasts": {
         "providerSaved": "Provider saved",
         "keyCleared": "Provider key cleared",
@@ -3178,9 +3221,26 @@
       "disable": "Disable",
       "clearToken": "Clear token",
       "selectChannel": "Select a channel to configure it.",
+      "status": {
+        "live": "Live",
+        "staged": "Staged",
+        "planned": "Planned",
+        "blocked": "Blocked",
+        "paused": "Paused",
+        "configured": "Configured",
+        "needs_setup": "Needs setup",
+        "disabled": "Disabled"
+      },
       "availability": {
         "enabled": "Enabled",
         "disabled": "Disabled"
+      },
+      "hints": {
+        "liveReady": "Live and responding from this workspace",
+        "stagedReady": "Ready and waiting for the final connection",
+        "paused": "Configured but paused",
+        "plannedBlocked": "Blocked until this channel is enabled",
+        "blocked": "Blocked until credentials and real delivery are connected"
       },
       "capabilities": {
         "default": "Integrations",

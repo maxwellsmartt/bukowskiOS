@@ -3339,8 +3339,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .sync-control svg {
-  width: 17px;
-  height: 17px;
+  width: 15px;
+  height: 15px;
 }
 
 .sync-control-healthy {
@@ -3440,8 +3440,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .sync-popover-status svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   color: currentColor;
   filter: none;
 }
@@ -12568,21 +12568,117 @@ button.timeline-signal-chip:focus-visible {
 .agents-health-grid,
 .agents-support-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 12px;
   align-items: stretch;
 }
 
 .agents-health-card {
   display: grid;
-  gap: 6px;
-  min-height: 92px;
-  padding: 14px 16px;
+  gap: 8px;
+  min-height: 110px;
+  padding: 14px 16px 15px;
   border: 1px solid var(--border-subtle);
   border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.032), rgba(255, 255, 255, 0.014)),
+    radial-gradient(circle at top right, rgba(154, 194, 183, 0.06), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.014)),
     rgba(255, 255, 255, 0.012);
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.agents-health-card-topline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agents-health-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+}
+
+.agents-health-icon-positive,
+.agents-health-card-positive .agents-health-value {
+  color: #b8f2d3;
+}
+
+.agents-health-icon-warning,
+.agents-health-card-warning .agents-health-value {
+  color: #ffd7a1;
+}
+
+.agents-health-icon-critical,
+.agents-health-card-critical .agents-health-value {
+  color: #ffcccc;
+}
+
+.agents-health-helper {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.agents-sync-banner {
+  display: grid;
+  gap: 12px;
+  border-radius: 20px;
+}
+
+.agents-sync-banner-positive {
+  border-color: rgba(92, 190, 146, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(92, 190, 146, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.012)),
+    rgba(17, 22, 26, 0.94);
+}
+
+.agents-sync-banner-warning {
+  border-color: rgba(214, 171, 91, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(214, 171, 91, 0.09), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.012)),
+    rgba(17, 22, 26, 0.94);
+}
+
+.agents-sync-banner-critical {
+  border-color: rgba(227, 113, 113, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(227, 113, 113, 0.09), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.012)),
+    rgba(17, 22, 26, 0.94);
+}
+
+.agents-sync-banner .surface-card-subtitle {
+  max-width: 72ch;
+}
+
+.agents-sync-banner-metrics {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.agents-health-card-positive {
+  border-color: rgba(92, 190, 146, 0.16);
+}
+
+.agents-health-card-warning {
+  border-color: rgba(214, 171, 91, 0.18);
+}
+
+.agents-health-card-critical {
+  border-color: rgba(227, 113, 113, 0.2);
 }
 
 .agents-health-label,
@@ -12596,8 +12692,8 @@ button.timeline-signal-chip:focus-visible {
 
 .agents-health-value {
   color: var(--text-primary);
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 25px;
+  font-weight: 650;
 }
 
 .agents-mission-layout,
@@ -12643,6 +12739,7 @@ button.timeline-signal-chip:focus-visible {
   box-shadow:
     0 22px 48px rgba(0, 0, 0, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  min-height: clamp(560px, calc(100dvh - 250px), 900px);
 }
 
 .mission-team-map-card .surface-card-header {
@@ -12683,29 +12780,47 @@ button.timeline-signal-chip:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .mission-panel-trigger {
-  width: 30px;
-  min-width: 30px;
-  height: 30px;
-  border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: pointer;
+  transition: color 120ms ease, transform 120ms ease;
 }
 
 .mission-panel-trigger:hover {
-  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  transform: translateY(-1px);
 }
 
 .mission-panel-trigger.is-active {
-  border-color: rgba(154, 183, 229, 0.44);
-  background:
-    linear-gradient(180deg, rgba(154, 183, 229, 0.12), rgba(154, 183, 229, 0.04)),
-    rgba(255, 255, 255, 0.024);
-  color: var(--text-primary);
-  box-shadow: inset 0 0 0 1px rgba(154, 183, 229, 0.16);
+  color: #cadcff;
+}
+
+.mission-panel-helper-copy {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.mission-panel-pill-stack {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .mission-panel-popover {
@@ -12713,7 +12828,7 @@ button.timeline-signal-chip:focus-visible {
   top: calc(100% + 10px);
   right: 0;
   z-index: 35;
-  width: min(380px, calc(100vw - 48px));
+  width: min(400px, calc(100vw - 48px));
   padding: 14px;
   border: 1px solid rgba(154, 194, 183, 0.18);
   border-radius: 18px;
@@ -12762,23 +12877,23 @@ button.timeline-signal-chip:focus-visible {
   display: grid;
   gap: 18px;
   flex: 1 1 auto;
-  min-height: clamp(440px, calc(100dvh - 340px), 760px);
-  padding: 18px 10px 10px;
+  min-height: clamp(460px, calc(100dvh - 390px), 760px);
+  padding: 12px 8px 8px;
 }
 
 .mission-graph-spine {
   width: 1px;
-  height: 34px;
-  margin: 0 auto -6px;
+  height: 22px;
+  margin: 0 auto -2px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
 }
 
 .mission-graph-band {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-  padding-top: 22px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  padding-top: 18px;
 }
 
 .mission-graph-band::before {
@@ -12794,31 +12909,35 @@ button.timeline-signal-chip:focus-visible {
 .mission-graph-branch {
   display: grid;
   justify-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .mission-graph-branch-line {
   width: 1px;
-  height: 18px;
+  height: 14px;
   background: rgba(255, 255, 255, 0.07);
 }
 
 .mission-node {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(36px, 36px) auto;
+  grid-template-rows: auto auto auto;
   align-content: stretch;
-  gap: 10px;
+  gap: 9px;
   width: 100%;
-  min-height: 126px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+  min-height: 156px;
+  padding: 15px 15px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.008)),
-    var(--bg-panel);
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.045), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)),
+    rgba(20, 24, 29, 0.9);
   text-align: left;
-  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+  box-shadow:
+    0 18px 36px rgba(6, 10, 14, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
 }
 
 .mission-node-operational-idle {
@@ -12893,7 +13012,7 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .mission-node-root {
-  max-width: 260px;
+  max-width: 390px;
   margin: 0 auto;
 }
 
@@ -12909,18 +13028,19 @@ button.timeline-signal-chip:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  min-height: 26px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .mission-node-name {
   color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -12944,17 +13064,47 @@ button.timeline-signal-chip:focus-visible {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  min-height: 36px;
+  -webkit-line-clamp: 1;
 }
 
 .mission-node-footer {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: stretch;
+  gap: 7px;
   margin-top: auto;
   min-width: 0;
   flex-direction: column;
+}
+
+.mission-node-copy {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.mission-node-mission {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  line-height: 1.48;
+}
+
+.mission-node-mission-clamped {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.mission-node-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.mission-node-domain-pill {
+  color: var(--text-primary);
 }
 
 .mission-node-status,
@@ -13287,7 +13437,9 @@ button.timeline-signal-chip:focus-visible {
   padding: 15px 16px;
   border: 1px solid var(--border-subtle);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.018);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.014);
 }
 
 .agent-run-row-meta {
@@ -13562,7 +13714,7 @@ button.timeline-signal-chip:focus-visible {
 .mission-node-footer .subtle-pill,
 .agent-directory-meta .mission-operational-pill,
 .agent-directory-meta .subtle-pill {
-  min-height: 24px;
+  min-height: 23px;
   padding: 0 8px;
   font-size: 10px;
 }
@@ -13577,6 +13729,28 @@ button.timeline-signal-chip:focus-visible {
   min-width: 0;
   max-width: 100%;
   gap: 6px;
+  padding-inline: 9px;
+}
+
+.models-provider-diagnostic-positive {
+  border-color: rgba(92, 190, 146, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(92, 190, 146, 0.09), transparent 36%),
+    rgba(255, 255, 255, 0.016);
+}
+
+.models-provider-diagnostic-warning {
+  border-color: rgba(214, 171, 91, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(214, 171, 91, 0.09), transparent 36%),
+    rgba(255, 255, 255, 0.016);
+}
+
+.models-provider-diagnostic-critical {
+  border-color: rgba(227, 113, 113, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(227, 113, 113, 0.09), transparent 36%),
+    rgba(255, 255, 255, 0.016);
 }
 
 .mission-node-footer-status-row {
@@ -13672,6 +13846,14 @@ button.timeline-signal-chip:focus-visible {
 
 .agent-model-detail-card {
   max-height: calc(100dvh - 190px);
+  border-color: rgba(154, 194, 183, 0.16);
+  background:
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.012)),
+    rgba(17, 22, 26, 0.94);
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .agent-model-detail-card .models-provider-health-card,

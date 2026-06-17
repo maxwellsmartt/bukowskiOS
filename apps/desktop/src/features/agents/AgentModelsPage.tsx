@@ -7,6 +7,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { usePersistentState } from "@shared/hooks/usePersistentState";
 import { getAgentProviderBrand } from "@shared/lib/agentProviderBranding";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
@@ -73,12 +74,31 @@ const looksLikeOpenAIDashboardUrl = (value: string) => {
   return normalized.includes("platform.openai.com") || normalized.includes("/api-keys");
 };
 
+const getProviderRowStateClass = (provider: AgentModelRow) => {
+  if (!provider.supportsLiveRequests) {
+    return " models-provider-row-planned";
+  }
+
+  if (provider.status === "healthy" || provider.status === "configured") {
+    return " is-configured-provider";
+  }
+
+  if (provider.status === "invalid_key" || provider.status === "unavailable") {
+    return " is-disabled-provider";
+  }
+
+  return " models-provider-row-staged";
+};
+
 export const AgentModelsPage = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId: workspaceId } = useWorkspace();
   const toast = useToast();
   const { data, error } = useAgentModels({ workspaceId });
-  const [selectedProviderKey, setSelectedProviderKey] = useState<string | null>(null);
+  const [selectedProviderKey, setSelectedProviderKey] = usePersistentState<string | null>(
+    `agents-models:selected-provider:${workspaceId ?? "default"}`,
+    null,
+  );
   const [providerDraft, setProviderDraft] = useState<ProviderDraft>(buildProviderDraft(null));
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, AssignmentDraft>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -117,10 +137,19 @@ export const AgentModelsPage = () => {
   );
 
   useEffect(() => {
-    if (!selectedProviderKey && data.providers.length) {
-      setSelectedProviderKey(data.providers[0]?.providerKey ?? null);
+    if (!orderedProviders.length) {
+      if (selectedProviderKey !== null) {
+        setSelectedProviderKey(null);
+      }
+      return;
     }
-  }, [data.providers, selectedProviderKey]);
+
+    if (selectedProviderKey && orderedProviders.some((provider) => provider.providerKey === selectedProviderKey)) {
+      return;
+    }
+
+    setSelectedProviderKey(orderedProviders[0]?.providerKey ?? null);
+  }, [orderedProviders, selectedProviderKey, setSelectedProviderKey]);
 
   useEffect(() => {
     setProviderDraft(buildProviderDraft(selectedProvider));
@@ -140,6 +169,68 @@ export const AgentModelsPage = () => {
     ],
     [data.summary, t],
   );
+  const getProviderDefaultModelLabel = (provider: AgentModelRow) =>
+    provider.modelOptions.find((option) => option.key === provider.defaultModelKey)?.label ?? provider.defaultModelKey;
+  const selectedDefaultModelLabel = useMemo(() => {
+    if (!selectedProvider) {
+      return "";
+    }
+
+    return getProviderDefaultModelLabel(selectedProvider);
+  }, [selectedProvider]);
+  const selectedProviderOperationalHint = useMemo(() => {
+    if (!selectedProvider?.supportsLiveRequests) {
+      return {
+        tone: "neutral" as const,
+        title: t("agents.models.operationalHint.comingSoonTitle", { defaultValue: "Shell listo para futura integración" }),
+        body: t("agents.models.operationalHint.comingSoonBody", {
+          defaultValue: "Esta superficie ya está diagramada, pero todavía no debe asumirse como proveedor operativo.",
+        }),
+      };
+    }
+
+    if (selectedProvider.status === "invalid_key") {
+      return {
+        tone: "critical" as const,
+        title: t("agents.models.operationalHint.invalidKeyTitle", { defaultValue: "La credencial necesita revisión" }),
+        body: t("agents.models.operationalHint.invalidKeyBody", {
+          defaultValue: "Normalmente esto apunta a key inválida, proyecto equivocado o billing sin acceso para ese modelo.",
+        }),
+      };
+    }
+
+    if (selectedProvider.status === "unavailable") {
+      return {
+        tone: "warning" as const,
+        title: t("agents.models.operationalHint.unavailableTitle", { defaultValue: "El endpoint no respondió como esperábamos" }),
+        body: t("agents.models.operationalHint.unavailableBody", {
+          defaultValue: "Suele ser conectividad, un gateway caído, permisos del proyecto o una Base URL incorrecta.",
+        }),
+      };
+    }
+
+    if (!selectedProvider.hasStoredSecret) {
+      return {
+        tone: "warning" as const,
+        title: t("agents.models.operationalHint.missingKeyTitle", { defaultValue: "Falta guardar la key local" }),
+        body: t("agents.models.operationalHint.missingKeyBody", {
+          defaultValue: "Guárdala en esta Mac, prueba la conexión y después refresca el catálogo para dejar este proveedor listo.",
+        }),
+      };
+    }
+
+    if (selectedProvider.providerKey === "openai") {
+      return {
+        tone: "positive" as const,
+        title: t("agents.models.operationalHint.openaiCuratedTitle", { defaultValue: "Catálogo curado para operación diaria" }),
+        body: t("agents.models.operationalHint.openaiCuratedBody", {
+          defaultValue: "Aquí mostramos sólo modelos generales y más estables para producción, evitando variantes técnicas o experimentales.",
+        }),
+      };
+    }
+
+    return null;
+  }, [selectedProvider, t]);
   const baseUrlHelper = useMemo(() => {
     if (!selectedProvider?.supportsLiveRequests) {
       return null;
@@ -359,7 +450,7 @@ export const AgentModelsPage = () => {
                   <button
                     key={provider.id}
                     className={`models-provider-row${selectedProviderKey === provider.providerKey ? " is-selected" : ""}${
-                      provider.isActiveProvider ? " is-active-provider" : " is-inactive-provider"
+                      getProviderRowStateClass(provider)
                     }`}
                     onClick={() => setSelectedProviderKey(provider.providerKey)}
                     type="button"
@@ -388,6 +479,13 @@ export const AgentModelsPage = () => {
                           {providerStatusLabel(provider.status)}
                         </span>
                         <span>{t("agents.models.assignedAgentCount", { count: provider.assignedAgents.length })}</span>
+                        <span className="subtle-pill">
+                          <ServerCog size={12} />
+                          <span>{getProviderDefaultModelLabel(provider)}</span>
+                        </span>
+                        <span className="subtle-pill">
+                          <span>{provider.supportsLiveRequests ? t("agents.models.liveCatalog", { defaultValue: "Catálogo operativo" }) : t("agents.models.comingSoon")}</span>
+                        </span>
                         {provider.hasStoredSecret ? (
                           <span className="subtle-pill">
                             <KeyRound size={12} />
@@ -445,7 +543,7 @@ export const AgentModelsPage = () => {
                 </span>
                 <span className="subtle-pill">
                   <ServerCog size={12} />
-                  <span>{selectedProvider.defaultModelKey}</span>
+                  <span>{selectedDefaultModelLabel}</span>
                 </span>
                 {selectedProvider.hasStoredSecret ? (
                   <span className="subtle-pill">
@@ -473,6 +571,13 @@ export const AgentModelsPage = () => {
                   <strong>{selectedProvider.modelsLastSyncedAtLabel}</strong>
                 </div>
               </div>
+
+              {selectedProviderOperationalHint ? (
+                <div className={`models-provider-diagnostic models-provider-diagnostic-${selectedProviderOperationalHint.tone}`}>
+                  <span className="agent-detail-kicker">{selectedProviderOperationalHint.title}</span>
+                  <p>{selectedProviderOperationalHint.body}</p>
+                </div>
+              ) : null}
 
               <div className="action-form-grid">
                 <label className="field-block field-block-span-2">

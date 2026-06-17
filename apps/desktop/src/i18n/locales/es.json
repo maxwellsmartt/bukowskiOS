@@ -3069,21 +3069,52 @@
       "approvalFallback": "Este borrador supervisado espera tu revisión.",
       "viewAgent": "Ver agente",
       "updates": "Actualizaciones",
+      "sync": {
+        "title": "Estado operativo de sync",
+        "failedSummary_one": "{{count}} frente de sync necesita revisión.",
+        "failedSummary_other": "{{count}} frentes de sync necesitan revisión.",
+        "queuedSummary_one": "{{count}} cambio sigue en cola o procesándose.",
+        "queuedSummary_other": "{{count}} cambios siguen en cola o procesándose.",
+        "healthySummary": "Control plane estable. No vemos colas trabadas ni errores visibles en esta pasada.",
+        "pending_one": "{{count}} en cola",
+        "pending_other": "{{count}} en cola",
+        "failed_one": "{{count}} con fallo",
+        "failed_other": "{{count}} con fallo",
+        "sources_one": "{{count}} fuente entrante",
+        "sources_other": "{{count}} fuentes entrantes",
+        "sourcesEmpty": "Sin fuentes entrantes registradas"
+      },
       "health": {
         "activeAgents": "Agentes activos",
+        "activeAgentsHint": "Listos para operar ahora",
         "pausedAgents": "Agentes pausados",
+        "pendingReviews": "Revisiones",
+        "pendingReviewsHint_one": "{{count}} espera tu visto bueno",
+        "pendingReviewsHint_other": "{{count}} esperan tu visto bueno",
+        "pendingReviewsClear": "Nada detenido por aprobación",
         "recentActivity": "Actividad reciente",
+        "recentActivityHint": "Ejecuciones visibles en esta pasada",
         "activeChannels": "Canales activos",
-        "assignedModels": "Modelos asignados"
+        "activeChannelsHint": "Canales conectados y disponibles",
+        "assignedModels": "Modelos asignados",
+        "assignedModelsHint": "Cobertura actual del roster AI",
+        "syncStatus": "Sync",
+        "syncHealthyShort": "OK",
+        "syncHealthyHint": "Subida y bajada sin alertas",
+        "syncQueuedHint_one": "{{count}} cambio en cola",
+        "syncQueuedHint_other": "{{count}} cambios en cola",
+        "syncFailedHint_one": "{{count}} área necesita atención",
+        "syncFailedHint_other": "{{count}} áreas necesitan atención"
       }
     },
     "models": {
-      "title": "Modelos AI",
-      "services": "Servicios AI",
-      "unavailable": "Modelos AI no disponibles: {{message}}",
-      "selectService": "Selecciona un servicio AI",
-      "selectServiceEmpty": "Selecciona un servicio AI para revisar su setup y estado.",
+      "title": "Modelos IA",
+      "services": "Servicios IA",
+      "unavailable": "Modelos IA no disponibles: {{message}}",
+      "selectService": "Selecciona un servicio IA",
+      "selectServiceEmpty": "Selecciona un servicio IA para revisar su setup y estado.",
       "comingSoon": "Próximamente",
+      "liveCatalog": "Catálogo operativo",
       "keyStored": "Key guardada",
       "storedOnThisMac": "Guardada en esta Mac",
       "assignedAgentCount_one": "{{count}} agente",
@@ -3141,6 +3172,18 @@
         "openaiDashboardUrl": "Esa URL parece del dashboard de OpenAI. Para conectar el API usa https://api.openai.com o deja el campo vacío.",
         "anthropicBaseUrl": "Déjalo vacío o usa https://api.anthropic.com si no estás pasando por un gateway propio."
       },
+      "operationalHint": {
+        "comingSoonTitle": "Shell listo para futura integración",
+        "comingSoonBody": "Esta superficie ya está diagramada, pero todavía no debe asumirse como proveedor operativo.",
+        "invalidKeyTitle": "La credencial necesita revisión",
+        "invalidKeyBody": "Normalmente esto apunta a key inválida, proyecto equivocado o billing sin acceso para ese modelo.",
+        "unavailableTitle": "El endpoint no respondió como esperábamos",
+        "unavailableBody": "Suele ser conectividad, un gateway caído, permisos del proyecto o una Base URL incorrecta.",
+        "missingKeyTitle": "Falta guardar la key local",
+        "missingKeyBody": "Guárdala en esta Mac, prueba la conexión y después refresca el catálogo para dejar este proveedor listo.",
+        "openaiCuratedTitle": "Catálogo curado para operación diaria",
+        "openaiCuratedBody": "Aquí mostramos sólo modelos generales y más estables para producción, evitando variantes técnicas o experimentales."
+      },
       "toasts": {
         "providerSaved": "Provider guardado",
         "keyCleared": "Key del provider borrada",
@@ -3182,9 +3225,26 @@
       "disable": "Desactivar",
       "clearToken": "Borrar token",
       "selectChannel": "Selecciona un canal para configurarlo.",
+      "status": {
+        "live": "Live",
+        "staged": "Preparado",
+        "planned": "Planificado",
+        "blocked": "Bloqueado",
+        "paused": "Pausado",
+        "configured": "Configurado",
+        "needs_setup": "Necesita setup",
+        "disabled": "Desactivado"
+      },
       "availability": {
         "enabled": "Activo",
         "disabled": "Inactivo"
+      },
+      "hints": {
+        "liveReady": "Live y respondiendo desde este workspace",
+        "stagedReady": "Preparado y pendiente de la conexión final",
+        "paused": "Configurado pero en pausa",
+        "plannedBlocked": "Bloqueado hasta que este canal se habilite",
+        "blocked": "Bloqueado hasta conectar credenciales y entrega real"
       },
       "capabilities": {
         "default": "Integraciones",

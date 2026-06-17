@@ -497,6 +497,14 @@ export const registerAppIpc = ({
   applyRemoteFinanceBusinessRows,
   applyRemoteAutomationControlPlaneRows,
 }: RegisterAppIpcOptions) => {
+  const assertWorkspaceAdminAccess = (workspaceId: string, action: string) =>
+    workspaceAccess.assertWorkspaceAccess({
+      workspaceId,
+      action,
+      accessLevel: "write",
+      requiredPermission: "users.invite",
+    });
+
   safeHandleReadWithSchema(ipcChannels.app.getInfo, emptyReadArgsSchema, () => ({
     appName: "bukowskiOS",
     platform: process.platform,
@@ -628,6 +636,7 @@ export const registerAppIpc = ({
     ipcChannels.app.sendWorkspaceInvite,
     sendWorkspaceInviteSchema,
     async (_event, input) => {
+      await assertWorkspaceAdminAccess(input.workspaceId, "send workspace invites");
       const result = await invokeSupabaseEdgeFunction<Partial<import("@contracts").AppSendWorkspaceInviteResult>>(
         "send-invite",
         {
@@ -695,20 +704,23 @@ export const registerAppIpc = ({
   safeHandle(
     ipcChannels.app.uploadWorkspaceImageAsset,
     uploadWorkspaceImageAssetSchema,
-    async (_event, input) =>
-      uploadWorkspaceImageObject({
+    async (_event, input) => {
+      await assertWorkspaceAdminAccess(input.workspaceId, "upload workspace branding assets");
+      return uploadWorkspaceImageObject({
         workspaceId: input.workspaceId,
         assetKind: input.assetKind,
         fileName: input.fileName,
         contentType: input.contentType,
         bytes: input.bytes,
-    }),
+      });
+    },
     "The app could not upload that workspace image.",
   );
   safeHandle(
     ipcChannels.app.updateRemoteWorkspaceIdentity,
     updateRemoteWorkspaceIdentitySchema,
     async (_event, input) => {
+      await assertWorkspaceAdminAccess(input.workspaceId, "update workspace settings");
       const payload: Record<string, string | null> = {
         updated_at: new Date().toISOString(),
       };
@@ -730,6 +742,7 @@ export const registerAppIpc = ({
     ipcChannels.app.updateWorkspaceMemberRole,
     updateWorkspaceMemberRoleSchema,
     async (_event, input) => {
+      await assertWorkspaceAdminAccess(input.workspaceId, "change workspace member roles");
       await assertWorkspaceRole({ workspaceId: input.workspaceId, roleId: input.roleId });
       await requestSupabaseRest({
         table: "workspace_memberships",
@@ -747,6 +760,7 @@ export const registerAppIpc = ({
     ipcChannels.app.setWorkspaceMemberStatus,
     setWorkspaceMemberStatusSchema,
     async (_event, input) => {
+      await assertWorkspaceAdminAccess(input.workspaceId, "change workspace member status");
       await requestSupabaseRest({
         table: "workspace_memberships",
         method: "PATCH",
@@ -763,6 +777,7 @@ export const registerAppIpc = ({
     ipcChannels.app.revokeWorkspaceInvite,
     revokeWorkspaceInviteSchema,
     async (_event, input) => {
+      await assertWorkspaceAdminAccess(input.workspaceId, "revoke workspace invites");
       await requestSupabaseRest({
         table: "workspace_memberships",
         method: "DELETE",
@@ -779,6 +794,7 @@ export const registerAppIpc = ({
     ipcChannels.app.createCustomRole,
     createCustomRoleSchema,
     async (_event, input) => {
+      await assertWorkspaceAdminAccess(input.workspaceId, "create custom roles");
       const roles = await requestSupabaseRest<Array<{ id?: string }>>({
         table: "roles",
         method: "POST",
@@ -804,6 +820,7 @@ export const registerAppIpc = ({
     ipcChannels.app.updateCustomRole,
     updateCustomRoleSchema,
     async (_event, input) => {
+      await assertWorkspaceAdminAccess(input.workspaceId, "update custom roles");
       await assertWorkspaceRole({ workspaceId: input.workspaceId, roleId: input.roleId, requireCustom: true });
       await requestSupabaseRest({
         table: "roles",
@@ -826,6 +843,7 @@ export const registerAppIpc = ({
     ipcChannels.app.deleteCustomRole,
     deleteCustomRoleSchema,
     async (_event, input) => {
+      await assertWorkspaceAdminAccess(input.workspaceId, "delete custom roles");
       await assertWorkspaceRole({ workspaceId: input.workspaceId, roleId: input.roleId, requireCustom: true });
       await requestSupabaseRest({
         table: "roles",
@@ -843,6 +861,7 @@ export const registerAppIpc = ({
     ipcChannels.app.setRolePermission,
     setRolePermissionSchema,
     async (_event, input) => {
+      await assertWorkspaceAdminAccess(input.workspaceId, "change custom role permissions");
       await assertWorkspaceRole({ workspaceId: input.workspaceId, roleId: input.roleId, requireCustom: true });
 
       if (input.enabled) {

@@ -102,6 +102,52 @@ describe("security regression checks", () => {
     expect(missingGuard).toEqual([]);
   });
 
+  it("requires workspace admin access checks around remote admin app IPC handlers", () => {
+    const source = readText("apps/desktop/electron/main/ipc/registerAppIpc.ts");
+    const expectedGuardedChannels = [
+      "ipcChannels.app.sendWorkspaceInvite",
+      "ipcChannels.app.uploadWorkspaceImageAsset",
+      "ipcChannels.app.updateRemoteWorkspaceIdentity",
+      "ipcChannels.app.updateWorkspaceMemberRole",
+      "ipcChannels.app.setWorkspaceMemberStatus",
+      "ipcChannels.app.revokeWorkspaceInvite",
+      "ipcChannels.app.createCustomRole",
+      "ipcChannels.app.updateCustomRole",
+      "ipcChannels.app.deleteCustomRole",
+      "ipcChannels.app.setRolePermission",
+    ];
+
+    const missingGuard = expectedGuardedChannels.filter((channel) => {
+      const channelIndex = source.indexOf(channel);
+      if (channelIndex < 0) return true;
+      const handlerBlock = source.slice(channelIndex, channelIndex + 900);
+      return !handlerBlock.includes("assertWorkspaceAdminAccess(");
+    });
+
+    expect(missingGuard).toEqual([]);
+    expect(source).toContain('requiredPermission: "users.invite"');
+  });
+
+  it("does not let plain workspace membership mutate the remote automation control plane", () => {
+    const migrationText = listFiles("supabase/migrations")
+      .filter((relativePath) => relativePath.endsWith(".sql"))
+      .map(readText)
+      .join("\n");
+    const hardeningMigration = readText(
+      "supabase/migrations/20260617113000_automation_control_plane_admin_write_hardening.sql",
+    );
+
+    expect(migrationText).toContain('CREATE POLICY "admins can insert agents control plane"');
+    expect(migrationText).toContain('WITH CHECK (public.has_permission(workspace_id, \'users.invite\'))');
+    expect(migrationText).toContain('CREATE POLICY "admins can update ai provider configs"');
+    expect(migrationText).toContain('CREATE POLICY "admins can delete agent connector configs"');
+    expect(hardeningMigration).toContain('DROP POLICY IF EXISTS "members can insert agents control plane" ON public.agents;');
+    expect(hardeningMigration).toContain('DROP POLICY IF EXISTS "members can update ai provider configs" ON public.ai_provider_configs;');
+    expect(hardeningMigration).toContain(
+      'DROP POLICY IF EXISTS "members can delete agent connector configs" ON public.agent_connector_configs;',
+    );
+  });
+
   it("does not bootstrap existing workspaces by slug upsert", () => {
     const source = readText("supabase/functions/admin-workspace-bootstrap/index.ts");
 

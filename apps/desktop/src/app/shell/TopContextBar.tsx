@@ -149,6 +149,8 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const inboundFailedCount = pullCursors.filter((cursor) => cursor.lastError).length;
   const latestInboundCheck = pullCursors[0]?.updatedAt ?? null;
   const latestSyncActivity = diagnostics?.lastSyncRunAt ?? latestInboundCheck;
+  const outboundFailedCount = diagnostics?.syncOutboxFailedCount ?? 0;
+  const hasRetryableOutboundFailures = outboundFailedCount > 0;
 
   const syncState = useMemo(() => {
     if (!hasLoadedSyncSnapshot) {
@@ -160,7 +162,6 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       };
     }
 
-    const outboundFailedCount = diagnostics?.syncOutboxFailedCount ?? 0;
     const lastSyncStatus = diagnostics?.lastSyncStatus ?? "idle";
 
     if (outboundFailedCount > 0 || lastSyncStatus === "failed" || inboundFailedCount > 0) {
@@ -248,15 +249,25 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       }
     }, syncButtonReleaseMs);
 
-    window.bukowskiApp
-      .runLocalSync()
-      .then((result) => {
+    const action = hasRetryableOutboundFailures
+      ? window.bukowskiApp.retryAllFailedSyncOutboxRows()
+      : window.bukowskiApp.runLocalSync();
+
+    action
+      .then(async (result) => {
         if (isMountedRef.current) {
           setDiagnostics(result.diagnostics);
           setHasLoadedSyncSnapshot(true);
-          setSyncActionNotice(t("shell.topBar.syncPopover.syncComplete", { defaultValue: "Sincronización revisada." }));
+          setSyncActionNotice(
+            result.summary ||
+              t("shell.topBar.syncPopover.syncComplete", {
+                defaultValue: "Sincronización revisada.",
+              }),
+          );
           setSyncActionError(null);
         }
+
+        await refreshDiagnostics();
       })
       .catch(() => {
         if (isMountedRef.current) {
@@ -384,10 +395,12 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
 
               <div className="sync-popover-actions">
                 <button className="action-primary-button sync-popover-sync-button" disabled={isRunningSync} onClick={() => void handleRunSync()} type="button">
-                  <RefreshCw size={13} className={isRunningSync ? "is-spinning" : undefined} />
+                  <RefreshCw size={12} className={isRunningSync ? "is-spinning" : undefined} />
                   {isRunningSync
                     ? t("shell.topBar.syncPopover.syncing", { defaultValue: "Sincronizando" })
-                    : t("shell.topBar.syncPopover.syncNow", { defaultValue: "Sincronizar" })}
+                    : hasRetryableOutboundFailures
+                      ? t("shell.topBar.syncPopover.retryFailed", { defaultValue: "Reintentar sync" })
+                      : t("shell.topBar.syncPopover.syncNow", { defaultValue: "Sincronizar" })}
                 </button>
                 <button
                   className="action-primary-button"

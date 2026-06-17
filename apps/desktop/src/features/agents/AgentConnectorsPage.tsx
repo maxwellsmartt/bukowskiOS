@@ -79,28 +79,42 @@ const getConnectorCapabilityLabel = (connectorKey: string, t: TFunction) => {
   return t("agents.connectors.capabilities.default");
 };
 
-const getConnectorStatusTone = (status: AgentConnectorRow["status"]) => {
-  if (status === "configured") {
+const getConnectorStatusTone = (status: AgentConnectorRow["status"], lifecycle: ConnectorLifecycle) => {
+  if (status === "configured" && lifecycle === "live") {
     return "success" as const;
   }
 
-  if (status === "not_configured") {
+  if (status === "configured") {
     return "warning" as const;
+  }
+
+  if (status === "not_configured") {
+    return "critical" as const;
   }
 
   return "neutral" as const;
 };
 
-const getConnectorStatusLabel = (status: AgentConnectorRow["status"], t: TFunction) => {
+const getConnectorStatusLabel = (
+  status: AgentConnectorRow["status"],
+  lifecycle: ConnectorLifecycle,
+  t: TFunction,
+) => {
+  if (status === "configured" && lifecycle === "live") {
+    return t("agents.connectors.status.live", { defaultValue: "Live" });
+  }
+
   if (status === "configured") {
-    return t("agents.connectors.status.configured");
+    return t("agents.connectors.status.staged", { defaultValue: "Preparado" });
   }
 
   if (status === "not_configured") {
-    return t("agents.connectors.status.needs_setup");
+    return lifecycle === "planned"
+      ? t("agents.connectors.status.planned", { defaultValue: "Planificado" })
+      : t("agents.connectors.status.blocked", { defaultValue: "Bloqueado" });
   }
 
-  return t("agents.connectors.status.disabled");
+  return t("agents.connectors.status.paused", { defaultValue: "Paused" });
 };
 
 const getIdentityTone = (state: LinkableIdentityOption["linkState"]) => {
@@ -127,6 +141,30 @@ const getConnectorLifecycleTitle = (lifecycle: ConnectorLifecycle, t: TFunction)
 
 const getConnectorLifecycleBody = (lifecycle: ConnectorLifecycle, t: TFunction) =>
   t(`agents.connectors.lifecycle.${lifecycle}.body`);
+
+const getConnectorStateHint = (
+  status: AgentConnectorRow["status"],
+  lifecycle: ConnectorLifecycle,
+  t: TFunction,
+) => {
+  if (status === "configured" && lifecycle === "live") {
+    return t("agents.connectors.hints.liveReady", { defaultValue: "Live y respondiendo desde este workspace" });
+  }
+
+  if (status === "configured") {
+    return t("agents.connectors.hints.stagedReady", { defaultValue: "Preparado y pendiente de la conexión final" });
+  }
+
+  if (status === "disabled") {
+    return t("agents.connectors.hints.paused", { defaultValue: "Configurado pero en pausa" });
+  }
+
+  if (lifecycle === "planned") {
+    return t("agents.connectors.hints.plannedBlocked", { defaultValue: "Bloqueado hasta que este canal se habilite" });
+  }
+
+  return t("agents.connectors.hints.blocked", { defaultValue: "Bloqueado hasta conectar credenciales y entrega real" });
+};
 
 export const AgentConnectorsPage = () => {
   const { t } = useTranslation();
@@ -506,12 +544,12 @@ export const AgentConnectorsPage = () => {
                   onClick={() => setSelectedConnectorKey(connector.connectorKey)}
                   type="button"
                 >
-                  <span
-                    aria-label={getConnectorStatusLabel(connector.status, t)}
+                    <span
+                    aria-label={getConnectorStatusLabel(connector.status, connectorLifecycle, t)}
                     className={`agent-live-dot agent-live-dot-${
                       connector.status === "configured" ? "green" : connector.status === "disabled" ? "red" : "amber"
                     }`}
-                    data-tooltip={`${connector.label} · ${getConnectorStatusLabel(connector.status, t)}`}
+                    data-tooltip={`${connector.label} · ${getConnectorStatusLabel(connector.status, connectorLifecycle, t)}`}
                   />
                   <div className="models-provider-row-copy">
                     <div className="models-provider-row-topline">
@@ -531,11 +569,11 @@ export const AgentConnectorsPage = () => {
                     </div>
                     <div className="agent-detail-row">
                       <span>{getConnectorCapabilityLabel(connector.connectorKey, t)}</span>
-                      <span>{t(`agents.connectors.lifecycle.${connectorLifecycle}.railHint`)}</span>
+                      <span>{getConnectorStateHint(connector.status, connectorLifecycle, t)}</span>
                     </div>
                     <div className="agent-detail-row">
-                      <StatusBadge tone={getConnectorStatusTone(connector.status)}>
-                        {getConnectorStatusLabel(connector.status, t)}
+                      <StatusBadge tone={getConnectorStatusTone(connector.status, connectorLifecycle)}>
+                        {getConnectorStatusLabel(connector.status, connectorLifecycle, t)}
                       </StatusBadge>
                       {connectorLifecycle === "live" && connector.botUsername ? <span>@{connector.botUsername}</span> : null}
                     </div>
@@ -583,8 +621,8 @@ export const AgentConnectorsPage = () => {
                   <strong>{selectedConnector.deliverySummary}</strong>
                 </div>
                 <div className="connector-stage-banner-meta">
-                  <StatusBadge tone={getConnectorStatusTone(selectedConnector.status)}>
-                    {getConnectorStatusLabel(selectedConnector.status, t)}
+                  <StatusBadge tone={getConnectorStatusTone(selectedConnector.status, selectedConnectorLifecycle ?? "planned")}>
+                    {getConnectorStatusLabel(selectedConnector.status, selectedConnectorLifecycle ?? "planned", t)}
                   </StatusBadge>
                   <span className={`channel-lifecycle-pill channel-lifecycle-pill-${selectedConnectorLifecycle ?? "planned"}`}>
                     {selectedConnectorLifecycle ? getConnectorLifecycleLabel(selectedConnectorLifecycle, t) : t("agents.connectors.lifecycle.planned.label")}
