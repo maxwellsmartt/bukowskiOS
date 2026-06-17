@@ -12573,14 +12573,14 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .agents-health-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .agents-health-card {
   display: grid;
-  gap: 6px;
-  min-height: 96px;
-  padding: 12px 14px 13px;
+  gap: 5px;
+  min-height: 84px;
+  padding: 10px 12px 11px;
   border: 1px solid var(--border-subtle);
   border-radius: 18px;
   background:
@@ -12602,9 +12602,9 @@ button.timeline-signal-chip:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-secondary);
@@ -12627,8 +12627,8 @@ button.timeline-signal-chip:focus-visible {
 
 .agents-health-helper {
   color: var(--text-secondary);
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 10px;
+  line-height: 1.35;
 }
 
 .agents-sync-banner {
@@ -12695,7 +12695,7 @@ button.timeline-signal-chip:focus-visible {
 
 .agents-health-value {
   color: var(--text-primary);
-  font-size: 23px;
+  font-size: 20px;
   font-weight: 680;
 }
 
@@ -12742,7 +12742,7 @@ button.timeline-signal-chip:focus-visible {
   box-shadow:
     0 22px 48px rgba(0, 0, 0, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  min-height: clamp(560px, calc(100dvh - 250px), 900px);
+  min-height: clamp(440px, calc(100dvh - 260px), 620px);
 }
 
 .mission-team-map-card .surface-card-header {
@@ -12905,16 +12905,16 @@ button.timeline-signal-chip:focus-visible {
 .mission-graph {
   position: relative;
   display: grid;
-  gap: 10px;
+  gap: 6px;
   flex: 1 1 auto;
-  min-height: clamp(420px, calc(100dvh - 350px), 720px);
-  padding: 8px 8px 4px;
+  min-height: clamp(320px, calc(100dvh - 360px), 500px);
+  padding: 4px 6px 2px;
 }
 
 .mission-graph-spine {
   width: 1px;
-  height: 14px;
-  margin: 0 auto -6px;
+  height: 10px;
+  margin: 0 auto -9px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
 }
 
@@ -12922,8 +12922,8 @@ button.timeline-signal-chip:focus-visible {
   position: relative;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 12px;
-  padding-top: 12px;
+  gap: 10px;
+  padding-top: 8px;
 }
 
 .mission-graph-band::before {
@@ -12939,12 +12939,12 @@ button.timeline-signal-chip:focus-visible {
 .mission-graph-branch {
   display: grid;
   justify-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .mission-graph-branch-line {
   width: 1px;
-  height: 8px;
+  height: 4px;
   background: rgba(255, 255, 255, 0.07);
 }
 
@@ -12953,10 +12953,10 @@ button.timeline-signal-chip:focus-visible {
   display: grid;
   grid-template-rows: auto auto auto;
   align-content: stretch;
-  gap: 7px;
+  gap: 5px;
   width: 100%;
-  min-height: 124px;
-  padding: 14px 14px 12px;
+  min-height: 96px;
+  padding: 12px 12px 10px;
   border: 1px solid rgba(255, 255, 255, 0.075);
   border-radius: 18px;
   background:
@@ -13042,14 +13042,14 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .mission-node-root {
-  max-width: 390px;
+  max-width: 360px;
   margin: 0 auto;
 }
 
 .mission-node-topline {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
   min-width: 0;
 }
@@ -13058,18 +13058,18 @@ button.timeline-signal-chip:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  min-height: 28px;
-  border-radius: 9px;
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .mission-node-name {
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   min-width: 0;
   overflow: hidden;
@@ -13101,7 +13101,7 @@ button.timeline-signal-chip:focus-visible {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: auto;
+  margin-top: 1px;
   min-width: 0;
   flex-wrap: wrap;
 }
@@ -13112,8 +13112,13 @@ button.timeline-signal-chip:focus-visible {
 
 .mission-node-copy {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
+}
+
+.mission-node-copy .mission-node-role {
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .mission-node-mission {
@@ -13810,6 +13815,12 @@ button.timeline-signal-chip:focus-visible {
 .mission-node-footer-single-row .mission-operational-pill,
 .mission-node-footer-single-row .mission-node-status {
   flex: 0 0 auto;
+}
+
+@media (max-width: 1600px) {
+  .agents-health-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 1180px) {
