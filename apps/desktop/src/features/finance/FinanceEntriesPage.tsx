@@ -11,7 +11,7 @@ import { useAssetsList } from "@features/assets/useAssetsData";
 import { useIncidentsData } from "@features/incidents/useIncidentsData";
 import { useProjectsRegistry } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
-import { ListToolbar } from "@shared/components/ListToolbar";
+import { ListSortMenuButton, ListToolbar } from "@shared/components/ListToolbar";
 import { ModalShell } from "@shared/components/ModalShell";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -258,12 +258,23 @@ export const FinanceEntriesPage = () => {
           sortBy={financeControls.sortBy}
           sortDirection={financeControls.sortDirection}
           sortOptions={financeEntrySortOptions}
+          showSortControl={false}
         />
         {isLoading && data.length === 0 ? (
           <TableSkeleton body={t("finance.entries.loading")} columns={6} />
         ) : null}
         <DataTable
           activeRowId={editingEntryId}
+          controlsTrailingAddon={
+            <ListSortMenuButton
+              activeSortLabel={financeControls.activeSortOption?.label}
+              onSortByChange={financeControls.setSortField}
+              onToggleSortDirection={financeControls.toggleSortDirection}
+              sortBy={financeControls.sortBy}
+              sortDirection={financeControls.sortDirection}
+              sortOptions={financeEntrySortOptions}
+            />
+          }
           fillParent
           emptyContent={
             <div className="table-empty-state">

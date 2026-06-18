@@ -3977,19 +3977,18 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .list-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
   gap: 12px;
-  flex-wrap: wrap;
 }
 
 .list-toolbar-search {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-width: min(320px, 100%);
-  flex: 1;
+  min-width: 0;
+  width: 100%;
   min-height: 34px;
   padding: 0 12px;
   border: 1px solid var(--border-subtle);
@@ -4012,11 +4011,34 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .list-toolbar-controls {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
   flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+}
+
+.list-toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.table-filter-select-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.table-filter-select {
+  min-width: min(240px, 100%);
+  max-width: min(320px, 100%);
 }
 
 .compact-filter-field {
@@ -8718,13 +8740,28 @@ body.is-resizing-side-rail {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+  flex: 1 1 auto;
   height: 100%;
   min-width: 0;
   min-height: 0;
-  max-height: 100%;
   overflow: auto;
   overscroll-behavior: contain;
-  padding-right: 2px;
+  scrollbar-gutter: stable;
+  padding: 2px 6px 28px 2px;
+  box-sizing: border-box;
+}
+
+.project-detail-rail-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.project-detail-rail-shell > .project-detail-stack,
+.project-detail-rail-shell > .surface-card.project-detail-stack {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .project-overview-card .surface-card-header {
@@ -12729,7 +12766,6 @@ button.timeline-signal-chip:focus-visible {
   position: relative;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   isolation: isolate;
 }
 
@@ -12827,12 +12863,10 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .mission-panel-popover {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  z-index: 35;
+  position: fixed;
+  z-index: 9050;
   display: flex;
-  max-height: min(460px, calc(100vh - 140px));
+  max-height: min(460px, calc(100vh - 80px));
   flex-direction: column;
   width: min(400px, calc(100vw - 48px));
   padding: 14px;
@@ -12866,6 +12900,7 @@ button.timeline-signal-chip:focus-visible {
   flex: 1 1 auto;
   gap: 10px;
   margin-top: 12px;
+  overflow: hidden;
 }
 
 .mission-panel-section {
@@ -12880,9 +12915,17 @@ button.timeline-signal-chip:focus-visible {
   gap: 6px;
 }
 
+.mission-panel-filter-select-row {
+  justify-content: flex-start;
+}
+
+.mission-panel-filter-select {
+  width: min(228px, 100%);
+}
+
 .mission-panel-scroll {
   min-height: 0;
-  max-height: min(340px, calc(100vh - 240px));
+  max-height: min(340px, calc(100vh - 200px));
   overflow: auto;
   padding-right: 4px;
   overscroll-behavior: contain;

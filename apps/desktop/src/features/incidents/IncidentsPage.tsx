@@ -7,11 +7,12 @@ import type { AssetListQuery, IncidentListQuery, IncidentListRow, IncidentSortFi
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useAssetsList } from "@features/assets/useAssetsData";
+import { CompactSelect } from "@shared/components/CompactSelect";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useRmaSnapshot } from "@features/rma/useRmaData";
 import { useCatalogData } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
-import { ListToolbar } from "@shared/components/ListToolbar";
+import { ListSortMenuButton, ListToolbar } from "@shared/components/ListToolbar";
 import { ModalShell } from "@shared/components/ModalShell";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -219,6 +220,14 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
                   : incidentStats.total,
       })),
     [incidentStats, t],
+  );
+  const incidentFilterSelectOptions = useMemo(
+    () =>
+      translatedFilterOptions.map((option) => ({
+        value: option.value,
+        label: `${option.label} · ${option.count}`,
+      })),
+    [translatedFilterOptions],
   );
 
   const selectedOpenIncidentIds = data.filter((row) => selectedRowIds.includes(row.id) && row.status === "Open").map((row) => row.id);
@@ -436,19 +445,17 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           sortBy={incidentControls.sortBy}
           sortDirection={incidentControls.sortDirection}
           sortOptions={translatedSortOptions}
+          showSortControl={false}
         />
-        <div className="incident-filter-row" aria-label={t("incidents.filters.title")}>
-          {translatedFilterOptions.map((option) => (
-            <button
-              className={`filter-chip incident-filter-chip${incidentFilter === option.value ? " active" : ""}`}
-              key={option.value}
-              onClick={() => setIncidentFilter(option.value)}
-              type="button"
-            >
-              <span>{option.label}</span>
-              <strong>{option.count}</strong>
-            </button>
-          ))}
+        <div className="table-filter-select-row" aria-label={t("incidents.filters.title")}>
+          <CompactSelect<IncidentFilter>
+            ariaLabel={t("incidents.filters.title")}
+            className="table-filter-select"
+            onChange={setIncidentFilter}
+            options={incidentFilterSelectOptions}
+            popupMinWidth={240}
+            value={incidentFilter}
+          />
         </div>
         {selectedRowIds.length ? (
           <div className="selection-action-bar">
@@ -581,6 +588,17 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           rows={visibleIncidents}
           selectable
           selectedRowIds={selectedRowIds}
+          controlsTrailingAddon={
+            <ListSortMenuButton
+              activeSortLabel={incidentControls.activeSortOption ? t(incidentControls.activeSortOption.label) : undefined}
+              className="data-table-sort-trigger"
+              onSortByChange={incidentControls.setSortField}
+              onToggleSortDirection={incidentControls.toggleSortDirection}
+              sortBy={incidentControls.sortBy}
+              sortDirection={incidentControls.sortDirection}
+              sortOptions={translatedSortOptions}
+            />
+          }
           sortState={
             incidentControls.activeColumnKey
               ? {

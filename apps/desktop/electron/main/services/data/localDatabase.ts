@@ -1304,6 +1304,11 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   };
   const selectAll = (sql: string, ...params: Array<string | number>) =>
     database.prepare(sql).all(...params) as Array<Record<string, unknown>>;
+  const pickColumns = <T extends Record<string, unknown>>(source: T, columns: readonly string[]) =>
+    columns.reduce<Record<string, unknown>>((accumulator, column) => {
+      accumulator[column] = source[column] ?? null;
+      return accumulator;
+    }, {});
 
   const resolveSupabaseDomainUpserts = (
     row: { entity_type: string; entity_id: string },
@@ -1543,15 +1548,72 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         return rows.length ? [{ table: "reminders", onConflict: "id", rows }] : [];
       }
       case "agent": {
-        const rows = selectAll("SELECT * FROM agents WHERE id = ?", row.entity_id);
+        const rows = selectAll("SELECT * FROM agents WHERE id = ?", row.entity_id).map((record) =>
+          pickColumns(record, [
+            "workspace_id",
+            "id",
+            "agent_key",
+            "display_name",
+            "emoji",
+            "role_summary",
+            "domain_key",
+            "model_key",
+            "model_label",
+            "status",
+            "approval_mode",
+            "allowed_tools_json",
+            "allowed_domains_json",
+            "notes",
+            "is_supervisor",
+            "sort_order",
+            "created_at",
+            "updated_at",
+          ]),
+        );
         return rows.length ? [{ table: "agents", onConflict: "workspace_id,id", rows }] : [];
       }
       case "ai_provider_config": {
-        const rows = selectAll("SELECT * FROM ai_provider_configs WHERE id = ?", row.entity_id);
+        const rows = selectAll("SELECT * FROM ai_provider_configs WHERE id = ?", row.entity_id).map((record) =>
+          pickColumns(record, [
+            "workspace_id",
+            "id",
+            "provider_key",
+            "display_name",
+            "supports_live_requests",
+            "enabled",
+            "default_model_key",
+            "fallback_model_key",
+            "base_url",
+            "timeout_ms",
+            "retry_count",
+            "status",
+            "last_tested_at",
+            "last_success_at",
+            "last_error_summary",
+            "notes",
+            "created_at",
+            "updated_at",
+          ]),
+        );
         return rows.length ? [{ table: "ai_provider_configs", onConflict: "workspace_id,id", rows }] : [];
       }
       case "agent_connector_config": {
-        const rows = selectAll("SELECT * FROM agent_connector_configs WHERE id = ?", row.entity_id);
+        const rows = selectAll("SELECT * FROM agent_connector_configs WHERE id = ?", row.entity_id).map((record) =>
+          pickColumns(record, [
+            "workspace_id",
+            "id",
+            "connector_key",
+            "display_name",
+            "status",
+            "capability_summary",
+            "notes",
+            "bot_username",
+            "last_tested_at",
+            "last_error_summary",
+            "created_at",
+            "updated_at",
+          ]),
+        );
         return rows.length ? [{ table: "agent_connector_configs", onConflict: "workspace_id,id", rows }] : [];
       }
       default:

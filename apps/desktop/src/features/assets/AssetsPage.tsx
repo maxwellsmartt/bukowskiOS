@@ -12,7 +12,7 @@ import { createPackingSlip } from "@features/packing/usePackingData";
 import { useCatalogData } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
-import { ListToolbar } from "@shared/components/ListToolbar";
+import { ListSortMenuButton, ListToolbar } from "@shared/components/ListToolbar";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -2000,6 +2000,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             sortBy={assetControls.sortBy}
             sortDirection={assetControls.sortDirection}
             sortOptions={translatedSortOptions}
+            showSortControl={false}
           />
           {csvImportProgress ? (
             <div className={`asset-import-progress is-${csvImportProgress.status}`}>
@@ -2333,6 +2334,16 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           <DataTable
             activeRowId={selectedAssetId}
             autoScrollToActiveRow
+            controlsTrailingAddon={
+              <ListSortMenuButton
+                activeSortLabel={assetControls.activeSortOption ? t(assetControls.activeSortOption.label) : undefined}
+                onSortByChange={assetControls.setSortField}
+                onToggleSortDirection={assetControls.toggleSortDirection}
+                sortBy={assetControls.sortBy}
+                sortDirection={assetControls.sortDirection}
+                sortOptions={translatedSortOptions}
+              />
+            }
             columns={assetColumns}
             rowActions={(row) => [
               {

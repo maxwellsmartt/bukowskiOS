@@ -6,7 +6,7 @@ import type { CollaboratorFeeListQuery, CollaboratorFeeRow, CollaboratorFeeSortF
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
-import { ListToolbar } from "@shared/components/ListToolbar";
+import { ListSortMenuButton, ListToolbar } from "@shared/components/ListToolbar";
 import { ModalShell } from "@shared/components/ModalShell";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -427,12 +427,23 @@ export const CollaboratorFeesPage = () => {
           sortBy={controls.sortBy}
           sortDirection={controls.sortDirection}
           sortOptions={sortOptions.map((option) => ({ ...option, label: t(option.label) }))}
+          showSortControl={false}
         />
 
 
         {isLoading && data.length === 0 ? <TableSkeleton rows={6} /> : null}
 
         <DataTable
+          controlsTrailingAddon={
+            <ListSortMenuButton
+              activeSortLabel={controls.activeSortOption ? t(controls.activeSortOption.label) : undefined}
+              onSortByChange={controls.setSortField}
+              onToggleSortDirection={controls.toggleSortDirection}
+              sortBy={controls.sortBy}
+              sortDirection={controls.sortDirection}
+              sortOptions={sortOptions.map((option) => ({ ...option, label: t(option.label) }))}
+            />
+          }
           columns={[
             { key: "crew", label: t("finance.collaboratorFees.columns.crew"), render: (row) => row.crewMemberName },
             { key: "project", label: t("finance.collaboratorFees.columns.project"), render: (row) => row.projectName ?? "—" },

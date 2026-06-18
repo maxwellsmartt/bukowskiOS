@@ -6,8 +6,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import type { PackingInsuranceExportOptions, PackingSlipListQuery, PackingSlipSortField } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { CompactSelect } from "@shared/components/CompactSelect";
 import { DataTable } from "@shared/components/DataTable";
-import { ListToolbar } from "@shared/components/ListToolbar";
+import { ListSortMenuButton, ListToolbar } from "@shared/components/ListToolbar";
 import { ModalShell } from "@shared/components/ModalShell";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -174,6 +175,14 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
       { value: "closed" as const, label: t("packing.filters.closed"), count: data.filter((row) => row.status === "Closed").length },
     ],
     [data, packingStats.open, packingStats.overdue, packingStats.pendingSlips, t],
+  );
+  const filterSelectOptions = useMemo(
+    () =>
+      filterOptions.map((option) => ({
+        value: option.value,
+        label: `${option.label} · ${option.count}`,
+      })),
+    [filterOptions],
   );
 
   useEffect(() => {
@@ -487,19 +496,17 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             sortBy={packingControls.sortBy}
             sortDirection={packingControls.sortDirection}
             sortOptions={translatedSortOptions}
+            showSortControl={false}
           />
-          <div className="packing-filter-row" aria-label={t("packing.filters.title")}>
-            {filterOptions.map((option) => (
-              <button
-                className={`filter-chip packing-filter-chip${statusFilter === option.value ? " active" : ""}`}
-                key={option.value}
-                onClick={() => setStatusFilter(option.value)}
-                type="button"
-              >
-                <span>{option.label}</span>
-                <strong>{option.count}</strong>
-              </button>
-            ))}
+          <div className="table-filter-select-row" aria-label={t("packing.filters.title")}>
+            <CompactSelect<PackingStatusFilter>
+              ariaLabel={t("packing.filters.title")}
+              className="table-filter-select"
+              onChange={setStatusFilter}
+              options={filterSelectOptions}
+              popupMinWidth={240}
+              value={statusFilter}
+            />
           </div>
           {selectedRowIds.length ? (
             <div className="selection-action-bar packing-selection-bar">
@@ -651,6 +658,17 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             rows={visiblePackingSlips}
             selectable
             selectedRowIds={selectedRowIds}
+            controlsTrailingAddon={
+              <ListSortMenuButton
+                activeSortLabel={packingControls.activeSortOption ? t(packingControls.activeSortOption.label) : undefined}
+                className="data-table-sort-trigger"
+                onSortByChange={packingControls.setSortField}
+                onToggleSortDirection={packingControls.toggleSortDirection}
+                sortBy={packingControls.sortBy}
+                sortDirection={packingControls.sortDirection}
+                sortOptions={translatedSortOptions}
+              />
+            }
             sortState={
               packingControls.activeColumnKey
                 ? {

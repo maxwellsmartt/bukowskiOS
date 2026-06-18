@@ -7,7 +7,7 @@ import type { InvoiceRow, InvoiceStatus, ListSortDirection } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { AgentCreatedBadge } from "@shared/components/AgentCreatedBadge";
 import { DataTable } from "@shared/components/DataTable";
-import { ListToolbar } from "@shared/components/ListToolbar";
+import { ListSortMenuButton, ListToolbar } from "@shared/components/ListToolbar";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -222,6 +222,7 @@ export const InvoicesPage = () => {
           sortBy={sortBy}
           sortDirection={sortDirection}
           sortOptions={sortOptions.map((option) => ({ ...option, label: t(option.label) }))}
+          showSortControl={false}
           rightActions={
             <label className="compact-filter-field">
               <span>{t("finance.invoices.filters.status")}</span>
@@ -243,6 +244,19 @@ export const InvoicesPage = () => {
         {isLoading && data.length === 0 ? <TableSkeleton rows={6} /> : null}
 
         <DataTable<InvoiceRow>
+          controlsTrailingAddon={
+            <ListSortMenuButton
+              activeSortLabel={activeSortOption ? t(activeSortOption.label) : undefined}
+              onSortByChange={(value) => {
+                setSortBy(value);
+                setSortDirection(value === "issueDate" || value === "total" ? "desc" : "asc");
+              }}
+              onToggleSortDirection={() => setSortDirection((current) => (current === "asc" ? "desc" : "asc"))}
+              sortBy={sortBy}
+              sortDirection={sortDirection}
+              sortOptions={sortOptions.map((option) => ({ ...option, label: t(option.label) }))}
+            />
+          }
           columns={columns}
           emptyContent={
             <div className="table-empty-state">

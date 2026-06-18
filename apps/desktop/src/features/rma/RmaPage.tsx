@@ -9,7 +9,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useAssetsList } from "@features/assets/useAssetsData";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { DataTable } from "@shared/components/DataTable";
-import { ListToolbar } from "@shared/components/ListToolbar";
+import { ListSortMenuButton, ListToolbar } from "@shared/components/ListToolbar";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -412,10 +412,24 @@ export const RmaPage = () => {
               sortBy={sortBy}
               sortDirection={sortDirection}
               sortOptions={rmaCaseSortOptions.map((option) => ({ ...option, label: t(option.label) }))}
+              showSortControl={false}
             />
             <DataTable
               activeRowId={activeRmaCaseId}
               autoScrollToActiveRow
+              controlsTrailingAddon={
+                <ListSortMenuButton
+                  activeSortLabel={activeSortOption ? t(activeSortOption.label) : undefined}
+                  onSortByChange={(value) => {
+                    setSortBy(value);
+                    setSortDirection(value === "recent" ? "desc" : "asc");
+                  }}
+                  onToggleSortDirection={() => setSortDirection((current) => (current === "asc" ? "desc" : "asc"))}
+                  sortBy={sortBy}
+                  sortDirection={sortDirection}
+                  sortOptions={rmaCaseSortOptions.map((option) => ({ ...option, label: t(option.label) }))}
+                />
+              }
               getRowId={(row) => row.id}
               shellClassName="table-shell-fill"
               persistKey="rma-page-cases"

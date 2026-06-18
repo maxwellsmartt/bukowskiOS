@@ -279,7 +279,6 @@ export const ListToolbar = <TSort extends string,>({
             sortOptions={sortOptions}
           />
         ) : null}
-        <div className="list-toolbar-meta" />
       </div>
     </div>
   );

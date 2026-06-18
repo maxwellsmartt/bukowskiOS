@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { BellDot, Bot, CircleAlert, History, PauseCircle, PlayCircle, PlugZap, ShieldCheck, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { CompactSelect } from "@shared/components/CompactSelect";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
@@ -48,6 +50,7 @@ const getAgentIndicatorLabel = (
 
 type MissionSectionKey = "queue" | "activity" | "models" | "connectors";
 type MissionConnectorLifecycle = "live" | "staged" | "planned";
+type MissionQueueFilter = "all" | "needs_approval" | "running" | "done";
 const providerDisplayOrder = ["openai", "anthropic", "openclaw", "custom"] as const;
 const connectorDisplayOrder = ["telegram", "whatsapp", "email", "webhook"] as const;
 
@@ -128,11 +131,13 @@ export const AgentsMissionControlPage = () => {
   const [searchParams] = useSearchParams();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
-  const [queueFilter, setQueueFilter] = useState<"all" | "needs_approval" | "running" | "done">("all");
+  const [queueFilter, setQueueFilter] = useState<MissionQueueFilter>("all");
   const [processingRunId, setProcessingRunId] = useState<string | null>(null);
   const [approvalFeedback, setApprovalFeedback] = useState<string | null>(null);
   const [activeMissionPanel, setActiveMissionPanel] = useState<MissionSectionKey | null>(null);
   const missionPanelRef = useRef<HTMLDivElement | null>(null);
+  const missionPanelPopupRef = useRef<HTMLDivElement | null>(null);
+  const [missionPanelStyle, setMissionPanelStyle] = useState<{ top: number; left: number } | null>(null);
   const { data: detail, reload: reloadDetail } = useAgentDetail(selectedAgentId, { workspaceId });
 
   useVisiblePolling(
@@ -327,11 +332,42 @@ export const AgentsMissionControlPage = () => {
     ],
     [t],
   );
+  const queueFilterOptions = useMemo(
+    () => [
+      { value: "all" as const, label: t("agents.runs.filters.all") },
+      { value: "needs_approval" as const, label: t("agents.runs.summary.needsApproval") },
+      { value: "running" as const, label: t("agents.runs.summary.running") },
+      { value: "done" as const, label: t("agents.runs.summary.done") },
+    ],
+    [t],
+  );
 
   useEffect(() => {
     if (!activeMissionPanel) {
+      setMissionPanelStyle(null);
       return;
     }
+
+    const updateMissionPanelPosition = () => {
+      const anchor = missionPanelRef.current;
+      if (!anchor) {
+        return;
+      }
+
+      const rect = anchor.getBoundingClientRect();
+      const popupWidth = Math.min(400, window.innerWidth - 48);
+      const popupHeight = Math.min(460, window.innerHeight - 80);
+      const left = Math.max(16, Math.min(rect.right - popupWidth, window.innerWidth - popupWidth - 16));
+      const preferredTop = rect.bottom + 10;
+      const top =
+        preferredTop + popupHeight <= window.innerHeight - 16
+          ? preferredTop
+          : Math.max(16, rect.top - popupHeight - 10);
+
+      setMissionPanelStyle({ top, left });
+    };
+
+    updateMissionPanelPosition();
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target;
@@ -339,16 +375,22 @@ export const AgentsMissionControlPage = () => {
         return;
       }
 
-      if (missionPanelRef.current?.contains(target)) {
+      if (missionPanelRef.current?.contains(target) || missionPanelPopupRef.current?.contains(target)) {
         return;
       }
 
       setActiveMissionPanel(null);
     };
 
+    const handleLayoutChange = () => updateMissionPanelPosition();
+
     document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("resize", handleLayoutChange);
+    window.addEventListener("scroll", handleLayoutChange, true);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("resize", handleLayoutChange);
+      window.removeEventListener("scroll", handleLayoutChange, true);
     };
   }, [activeMissionPanel]);
 
@@ -413,27 +455,15 @@ export const AgentsMissionControlPage = () => {
       case "queue":
         return (
           <div className="mission-panel-section">
-            <div className="agent-detail-row mission-panel-filter-row">
-              <button className={`chip-button${queueFilter === "all" ? " is-active" : ""}`} onClick={() => setQueueFilter("all")} type="button">
-                {t("agents.runs.filters.all")}
-              </button>
-              <button
-                className={`chip-button${queueFilter === "needs_approval" ? " is-active" : ""}`}
-                onClick={() => setQueueFilter("needs_approval")}
-                type="button"
-              >
-                {t("agents.runs.summary.needsApproval")}
-              </button>
-              <button
-                className={`chip-button${queueFilter === "running" ? " is-active" : ""}`}
-                onClick={() => setQueueFilter("running")}
-                type="button"
-              >
-                {t("agents.runs.summary.running")}
-              </button>
-              <button className={`chip-button${queueFilter === "done" ? " is-active" : ""}`} onClick={() => setQueueFilter("done")} type="button">
-                {t("agents.runs.summary.done")}
-              </button>
+            <div className="table-filter-select-row mission-panel-filter-select-row">
+              <CompactSelect<MissionQueueFilter>
+                ariaLabel={t("agents.runs.filters.all")}
+                className="table-filter-select mission-panel-filter-select"
+                onChange={setQueueFilter}
+                options={queueFilterOptions}
+                popupMinWidth={228}
+                value={queueFilter}
+              />
             </div>
             <div className="agent-support-list agent-support-list-scroll mission-panel-scroll">
               {filteredQueue.map((run) => (
@@ -624,22 +654,6 @@ export const AgentsMissionControlPage = () => {
                 })}
               </div>
 
-              {activeMissionPanel ? (
-                <div className="mission-panel-popover" role="dialog" aria-label={missionPanelButtons.find((item) => item.key === activeMissionPanel)?.label}>
-                  <div className="mission-panel-popover-header">
-                    <strong>{missionPanelButtons.find((item) => item.key === activeMissionPanel)?.label}</strong>
-                    <button
-                      aria-label={t("common.close", { defaultValue: "Cerrar" })}
-                      className="icon-ghost-control"
-                      onClick={() => setActiveMissionPanel(null)}
-                      type="button"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                  <div className="mission-panel-popover-body">{renderMissionPanelContent()}</div>
-                </div>
-              ) : null}
             </div>
           }
         >
@@ -756,6 +770,32 @@ export const AgentsMissionControlPage = () => {
             </div>
           </div>
         </SurfaceCard>
+
+        {activeMissionPanel && missionPanelStyle && typeof document !== "undefined"
+          ? createPortal(
+              <div
+                ref={missionPanelPopupRef}
+                className="mission-panel-popover"
+                role="dialog"
+                aria-label={missionPanelButtons.find((item) => item.key === activeMissionPanel)?.label}
+                style={{ top: missionPanelStyle.top, left: missionPanelStyle.left }}
+              >
+                <div className="mission-panel-popover-header">
+                  <strong>{missionPanelButtons.find((item) => item.key === activeMissionPanel)?.label}</strong>
+                  <button
+                    aria-label={t("common.close", { defaultValue: "Cerrar" })}
+                    className="icon-ghost-control"
+                    onClick={() => setActiveMissionPanel(null)}
+                    type="button"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="mission-panel-popover-body">{renderMissionPanelContent()}</div>
+              </div>,
+              document.body,
+            )
+          : null}
 
         {selectedAgent ? (
           <SurfaceCard

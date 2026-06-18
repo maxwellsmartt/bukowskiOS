@@ -7,6 +7,7 @@ import type { SoftwareLicenseRow } from "@contracts";
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { CompactSelect } from "@shared/components/CompactSelect";
 import { ListToolbar } from "@shared/components/ListToolbar";
 import { ModalShell } from "@shared/components/ModalShell";
 import { UnsavedChangesDialog } from "@shared/components/UnsavedChangesDialog";
@@ -223,6 +224,14 @@ export const AssetLicensesPage = () => {
       { value: "expired" as const, label: t("assets.licenses.filters.expired"), count: summary.expired },
     ],
     [summary, t],
+  );
+  const filterSelectOptions = useMemo(
+    () =>
+      filterOptions.map((option) => ({
+        value: option.value,
+        label: `${option.label} · ${option.count}`,
+      })),
+    [filterOptions],
   );
   const licenseSortOptions = useMemo(
     () => [
@@ -758,18 +767,15 @@ export const AssetLicensesPage = () => {
             sortDirection={sortDirection}
             sortOptions={licenseSortOptions}
           />
-          <div className="license-filter-row" aria-label={t("assets.licenses.filters.title")}>
-            {filterOptions.map((option) => (
-              <button
-                className={`filter-chip${statusFilter === option.value ? " active" : ""}`}
-                key={option.value}
-                onClick={() => setStatusFilter(option.value)}
-                type="button"
-              >
-                <span>{option.label}</span>
-                <strong>{option.count}</strong>
-              </button>
-            ))}
+          <div className="table-filter-select-row" aria-label={t("assets.licenses.filters.title")}>
+            <CompactSelect<LicenseStatusFilter>
+              ariaLabel={t("assets.licenses.filters.title")}
+              className="table-filter-select"
+              onChange={setStatusFilter}
+              options={filterSelectOptions}
+              popupMinWidth={240}
+              value={statusFilter}
+            />
           </div>
           {isLoading ? <div className="empty-state">{t("assets.licenses.register.loading")}</div> : null}
           {!isLoading && !visibleRows.length ? (

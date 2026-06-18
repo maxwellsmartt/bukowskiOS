@@ -20,7 +20,7 @@ import { assignMoveAssets } from "@features/assets/useAssetsData";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
-import { ListToolbar } from "@shared/components/ListToolbar";
+import { ListSortMenuButton, ListToolbar } from "@shared/components/ListToolbar";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SelectField } from "@shared/components/SelectField";
@@ -1182,9 +1182,20 @@ export const CatalogPage = () => {
             sortBy={catalogControls.sortBy}
             sortDirection={catalogControls.sortDirection}
             sortOptions={activeSortOptions}
+            showSortControl={false}
           />
           <DataTable
             activeRowId={activePreviewIds[activeTab]}
+            controlsTrailingAddon={
+              <ListSortMenuButton
+                activeSortLabel={catalogControls.activeSortOption?.label}
+                onSortByChange={catalogControls.setSortField}
+                onToggleSortDirection={catalogControls.toggleSortDirection}
+                sortBy={catalogControls.sortBy}
+                sortDirection={catalogControls.sortDirection}
+                sortOptions={activeSortOptions}
+              />
+            }
             columns={activeTabConfig.columns}
             emptyMessage={
               catalogControls.searchValue.trim()

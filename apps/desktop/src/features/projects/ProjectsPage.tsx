@@ -509,63 +509,65 @@ export const ProjectsPage = () => {
           />
         </SurfaceCard>
 
-        {selectedRowIds.length > 1 ? (
-          <SurfaceCard className="project-detail-stack project-selection-detail-card" title={t("projects.registry.selectionDetail.title")}>
-            <div className="project-selection-summary">
-              <span>
-                <small>{t("projects.registry.selectionDetail.projects")}</small>
-                <strong>{selectedProjects.length}</strong>
-              </span>
-              <span>
-                <small>{t("projects.registry.selectionDetail.assets")}</small>
-                <strong>{selectedProjects.reduce((total, project) => total + project.assetCount, 0)}</strong>
-              </span>
-              <span>
-                <small>{t("projects.registry.selectionDetail.incidents")}</small>
-                <strong>{selectedProjects.reduce((total, project) => total + project.incidentCount, 0)}</strong>
-              </span>
-              <span>
-                <small>{t("projects.registry.selectionDetail.units")}</small>
-                <strong>{selectedProjects.reduce((total, project) => total + project.activeUnitCount, 0)}</strong>
-              </span>
-            </div>
-            <p className="project-selection-helper">{t("projects.registry.selectionDetail.body")}</p>
-            <div className="selection-action-buttons project-selection-actions">
-              <button className="ghost-control" onClick={addSelectedProjectsToCompare} type="button">
-                <GitCompareArrows size={14} />
-                {t("projects.registry.addToCompare")}
-              </button>
-              <button className="ghost-control" onClick={() => setSelectedRowIds([])} type="button">
-                <X size={14} />
-                {t("projects.registry.clearSelection")}
-              </button>
-            </div>
-            <div className="queue-list project-scroll-list">
-              {selectedProjects.map((project) => (
-                <button
-                  key={project.id}
-                  className="queue-item queue-item-button"
-                  onClick={() => {
-                    setSelectedRowIds([project.id]);
-                    setActiveProjectId(project.id);
-                  }}
-                  type="button"
-                >
-                  <div className="identity-cell">
-                    <span className="identity-title">{project.name}</span>
-                    <span className="identity-meta">
-                      {project.code}
-                      {isPlaceholderValue(project.client) ? "" : ` · ${project.client}`}
-                    </span>
-                  </div>
-                  <StatusBadge tone={projectStatusTone(project.status)}>{t(`projects.statuses.${project.status}`, { defaultValue: project.status })}</StatusBadge>
+        <div className="project-detail-rail-shell">
+          {selectedRowIds.length > 1 ? (
+            <SurfaceCard className="project-detail-stack project-selection-detail-card" title={t("projects.registry.selectionDetail.title")}>
+              <div className="project-selection-summary">
+                <span>
+                  <small>{t("projects.registry.selectionDetail.projects")}</small>
+                  <strong>{selectedProjects.length}</strong>
+                </span>
+                <span>
+                  <small>{t("projects.registry.selectionDetail.assets")}</small>
+                  <strong>{selectedProjects.reduce((total, project) => total + project.assetCount, 0)}</strong>
+                </span>
+                <span>
+                  <small>{t("projects.registry.selectionDetail.incidents")}</small>
+                  <strong>{selectedProjects.reduce((total, project) => total + project.incidentCount, 0)}</strong>
+                </span>
+                <span>
+                  <small>{t("projects.registry.selectionDetail.units")}</small>
+                  <strong>{selectedProjects.reduce((total, project) => total + project.activeUnitCount, 0)}</strong>
+                </span>
+              </div>
+              <p className="project-selection-helper">{t("projects.registry.selectionDetail.body")}</p>
+              <div className="selection-action-buttons project-selection-actions">
+                <button className="ghost-control" onClick={addSelectedProjectsToCompare} type="button">
+                  <GitCompareArrows size={14} />
+                  {t("projects.registry.addToCompare")}
                 </button>
-              ))}
-            </div>
-          </SurfaceCard>
-        ) : (
-          <ProjectDetailPanel data={detail} error={detailError} isLoading={detailLoading} onIncidentCreated={reloadDetail} />
-        )}
+                <button className="ghost-control" onClick={() => setSelectedRowIds([])} type="button">
+                  <X size={14} />
+                  {t("projects.registry.clearSelection")}
+                </button>
+              </div>
+              <div className="queue-list project-scroll-list">
+                {selectedProjects.map((project) => (
+                  <button
+                    key={project.id}
+                    className="queue-item queue-item-button"
+                    onClick={() => {
+                      setSelectedRowIds([project.id]);
+                      setActiveProjectId(project.id);
+                    }}
+                    type="button"
+                  >
+                    <div className="identity-cell">
+                      <span className="identity-title">{project.name}</span>
+                      <span className="identity-meta">
+                        {project.code}
+                        {isPlaceholderValue(project.client) ? "" : ` · ${project.client}`}
+                      </span>
+                    </div>
+                    <StatusBadge tone={projectStatusTone(project.status)}>{t(`projects.statuses.${project.status}`, { defaultValue: project.status })}</StatusBadge>
+                  </button>
+                ))}
+              </div>
+            </SurfaceCard>
+          ) : (
+            <ProjectDetailPanel data={detail} error={detailError} isLoading={detailLoading} onIncidentCreated={reloadDetail} />
+          )}
+        </div>
       </ResizableSideRailLayout>
 
       {reportProject ? (
