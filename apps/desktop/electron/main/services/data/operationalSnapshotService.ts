@@ -476,18 +476,46 @@ const resolveProjectSnapshot = (db: DatabaseSync, workspaceId: string, projectId
   const unitIds = units.map((unit) => String(unit.id));
   const placeholders = unitIds.map(() => "?").join(", ");
 
+  const crewAssignments = unitIds.length
+    ? selectMany(db, `SELECT * FROM project_unit_crew_assignments WHERE project_unit_id IN (${placeholders})`, ...unitIds)
+    : [];
+  const crewMemberIds = [...new Set(crewAssignments.map((row) => String(row.crew_member_id ?? "")).filter(Boolean))];
+  const projectDepartments = selectMany(db, "SELECT * FROM project_departments WHERE project_id = ?", projectId);
+  const unitDepartments = unitIds.length
+    ? selectMany(db, `SELECT * FROM project_unit_departments WHERE project_unit_id IN (${placeholders})`, ...unitIds)
+    : [];
+  const departmentIds = [
+    ...new Set(
+      [...projectDepartments, ...unitDepartments]
+        .map((row) => String(row.department_id ?? ""))
+        .filter(Boolean),
+    ),
+  ];
+
   return {
     project,
     units,
     unitWindows: unitIds.length
       ? selectMany(db, `SELECT * FROM project_unit_windows WHERE project_unit_id IN (${placeholders})`, ...unitIds)
       : [],
-    projectDepartments: selectMany(db, "SELECT * FROM project_departments WHERE project_id = ?", projectId),
-    unitDepartments: unitIds.length
-      ? selectMany(db, `SELECT * FROM project_unit_departments WHERE project_unit_id IN (${placeholders})`, ...unitIds)
+    projectDepartments,
+    unitDepartments,
+    departments: departmentIds.length
+      ? selectMany(
+          db,
+          `SELECT * FROM departments WHERE workspace_id = ? AND id IN (${departmentIds.map(() => "?").join(", ")})`,
+          workspaceId,
+          ...departmentIds,
+        )
       : [],
-    crewAssignments: unitIds.length
-      ? selectMany(db, `SELECT * FROM project_unit_crew_assignments WHERE project_unit_id IN (${placeholders})`, ...unitIds)
+    crewAssignments,
+    crewMembers: crewMemberIds.length
+      ? selectMany(
+          db,
+          `SELECT * FROM crew_members WHERE workspace_id = ? AND id IN (${crewMemberIds.map(() => "?").join(", ")})`,
+          workspaceId,
+          ...crewMemberIds,
+        )
       : [],
   };
 };
@@ -574,15 +602,10 @@ const applyProjectSnapshot = (
 
   const safeProject = { ...project };
   if (safeProject.client_id && !rowExists(db, "clients", safeProject.client_id)) {
-    logger.warn("Applied remote project without missing client reference.", { id: safeProject.id, clientId: safeProject.client_id });
-    safeProject.client_id = null;
+    throw new Error(`Project references unavailable client ${String(safeProject.client_id)}; snapshot deferred.`);
   }
   if (safeProject.production_company_id && !rowExists(db, "production_companies", safeProject.production_company_id)) {
-    logger.warn("Applied remote project without missing production company reference.", {
-      id: safeProject.id,
-      productionCompanyId: safeProject.production_company_id,
-    });
-    safeProject.production_company_id = null;
+    throw new Error(`Project references unavailable production company ${String(safeProject.production_company_id)}; snapshot deferred.`);
   }
 
   const units = toRecordArray(snapshot.units).filter((row) => {
@@ -640,6 +663,8 @@ const applyProjectSnapshot = (
     }
     return belongsToProject && belongsToWorkspace;
   });
+  const crewMembers = toRecordArray(snapshot.crewMembers).filter((row) => row.workspace_id === context.workspaceId);
+  const departments = toRecordArray(snapshot.departments).filter((row) => row.workspace_id === context.workspaceId);
 
   if (Array.isArray(snapshot.crewAssignments) && scopedUnitIds.size) {
     deleteRowsMissingFromSnapshot(
@@ -704,13 +729,11 @@ const applyProjectSnapshot = (
   upsertRow(db, "projects", safeProject);
   for (const row of units) upsertRow(db, "project_units", row);
   for (const row of unitWindows) upsertRow(db, "project_unit_windows", row);
+  for (const row of departments) upsertRow(db, "departments", row);
+  for (const row of crewMembers) upsertRow(db, "crew_members", row);
   for (const row of projectDepartments) {
     if (!rowExists(db, "departments", row.department_id)) {
-      logger.warn("Skipped remote project department because related department is unavailable.", {
-        projectId: row.project_id,
-        departmentId: row.department_id,
-      });
-      continue;
+      throw new Error(`Project department ${String(row.department_id)} is unavailable; snapshot deferred.`);
     }
     db
       .prepare(
@@ -723,11 +746,7 @@ const applyProjectSnapshot = (
   }
   for (const row of unitDepartments) {
     if (!rowExists(db, "departments", row.department_id)) {
-      logger.warn("Skipped remote project unit department because related department is unavailable.", {
-        projectUnitId: row.project_unit_id,
-        departmentId: row.department_id,
-      });
-      continue;
+      throw new Error(`Project unit department ${String(row.department_id)} is unavailable; snapshot deferred.`);
     }
     db
       .prepare(
@@ -740,6 +759,23 @@ const applyProjectSnapshot = (
   }
   for (const row of crewAssignments) {
     try {
+      if (!rowExists(db, "crew_members", row.crew_member_id)) {
+        const crewId = String(row.crew_member_id ?? "");
+        if (!crewId) throw new Error("Crew assignment has no crew member id.");
+        const updatedAt = String(row.updated_at ?? safeProject.updated_at ?? new Date().toISOString());
+        db.prepare(
+          `INSERT OR IGNORE INTO crew_members (
+             id, workspace_id, full_name, role_label, email, phone, notes, is_active, created_at, updated_at
+           ) VALUES (?, ?, ?, NULL, NULL, NULL, ?, 1, ?, ?)`
+        ).run(
+          crewId,
+          context.workspaceId,
+          `Remote crew ${crewId.slice(-6) || crewId}`,
+          "Created from a project snapshot; the crew catalog will hydrate the full record.",
+          updatedAt,
+          updatedAt,
+        );
+      }
       upsertCrewAssignmentRow(db, row);
     } catch {
       logger.warn("Skipped remote project crew assignment because related crew is unavailable.", { id: row.id });

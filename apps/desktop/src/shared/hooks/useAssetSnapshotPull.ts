@@ -3,46 +3,19 @@ import { useEffect, useRef } from "react";
 import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { AppRemoteAssetCurrentStateRow, AppRemoteAssetSnapshotRow } from "@contracts";
+import {
+  applyCompositePullCursor,
+  cursorFromRow,
+  readCompositePullCursor,
+  writeCompositePullCursor,
+} from "@shared/lib/compositePullCursor";
 
-import { immediatePullEvent } from "./useWorkspaceDataRefresh";
+import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
 const POLL_INTERVAL_MS = 60_000;
 const PULL_BATCH_SIZE = 200;
 const MAX_BATCHES_PER_PASS = 5;
-// Same recovery window as useOperationalSnapshotPull: rows that failed to
-// apply (e.g. FK parent had not synced yet) are retried on every pass instead
-// of being lost forever behind an advanced cursor. The apply service skips
-// already-applied rows by updated_at, so re-reading the window is idempotent.
-const CURSOR_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
-
-const cursorKey = (workspaceId: string) => `bukowski:asset-snapshot-pull-cursor:${workspaceId}`;
-
-const getCursorWithLookback = (cursor: string | null) => {
-  if (!cursor) return null;
-  const time = Date.parse(cursor);
-  if (Number.isNaN(time)) return cursor;
-  return new Date(Math.max(0, time - CURSOR_LOOKBACK_MS)).toISOString();
-};
-
-const readCursor = (key: string): string | null => {
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-};
-
-const writeCursor = (key: string, value: string | null) => {
-  try {
-    if (value == null) {
-      window.localStorage.removeItem(key);
-    } else {
-      window.localStorage.setItem(key, value);
-    }
-  } catch {
-    // Ignore storage errors; the next pull can safely retry from an older cursor.
-  }
-};
+const cursorKey = (workspaceId: string) => `bukowski:asset-snapshot-pull-cursor:${workspaceId}:v2`;
 
 const toNumberOrNull = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -111,6 +84,7 @@ export const useAssetSnapshotPull = () => {
   const { supabase, isLocalFallback, status } = useSession();
   const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const inFlightRef = useRef(false);
+  const rerunRequestedRef = useRef(false);
 
   useEffect(() => {
     if (
@@ -141,34 +115,34 @@ export const useAssetSnapshotPull = () => {
     const appApi = window.bukowskiApp;
 
     const runOnce = async () => {
-      if (inFlightRef.current) return;
+      if (inFlightRef.current) {
+        rerunRequestedRef.current = true;
+        return;
+      }
       inFlightRef.current = true;
+      let appliedAny = false;
 
       try {
         const key = cursorKey(activeWorkspaceId);
-        let cursor = readCursor(key);
-        // Rewind only the first batch of the pass; later batches page forward
-        // from the applied cursor so a window larger than one batch still
-        // advances instead of re-reading the same head rows.
-        let effectiveCursor = getCursorWithLookback(cursor);
+        let cursor = readCompositePullCursor(key);
 
         for (let batch = 0; batch < MAX_BATCHES_PER_PASS; batch += 1) {
-          const stateQuery = remote
+          let stateQuery = (remote as any)
             .from("asset_current_state")
             .select("*")
             .eq("workspace_id", activeWorkspaceId)
             .order("updated_at", { ascending: true })
+            .order("asset_id", { ascending: true })
             .limit(PULL_BATCH_SIZE);
-
-          const { data: stateRows, error: stateError } = await (effectiveCursor
-            ? stateQuery.gt("updated_at", effectiveCursor)
-            : stateQuery);
+          stateQuery = applyCompositePullCursor(stateQuery, cursor, "updated_at", "asset_id");
+          const { data: stateRows, error: stateError } = await stateQuery;
           if (stateError) {
             console.warn("[asset-snapshot-pull] State pull failed", stateError);
             break;
           }
 
-          const states = (stateRows ?? []).map((row) => mapState(row as Record<string, unknown>));
+          const rawStateRows = (stateRows ?? []) as Array<Record<string, unknown>>;
+          const states = rawStateRows.map((row) => mapState(row));
           if (!states.length) {
             break;
           }
@@ -194,24 +168,30 @@ export const useAssetSnapshotPull = () => {
             states,
           });
 
-          if (result.cursorAfter) {
-            cursor = result.cursorAfter;
-            effectiveCursor = result.cursorAfter;
-            writeCursor(key, cursor);
-          } else {
-            // Nothing applied (all rows skipped); still move past this batch
-            // so the pass can keep paging instead of spinning on the head.
-            effectiveCursor = states[states.length - 1]?.updated_at ?? effectiveCursor;
+          if (result.errors.length === 0) {
+            const nextCursor = cursorFromRow(rawStateRows[rawStateRows.length - 1], "updated_at", "asset_id");
+            if (nextCursor) {
+              cursor = nextCursor;
+              writeCompositePullCursor(key, cursor);
+            }
           }
+          if (result.appliedCount > 0) appliedAny = true;
 
           if (states.length < PULL_BATCH_SIZE || result.errors.length > 0) {
             break;
           }
         }
+        if (appliedAny) {
+          notifyWorkspaceDataChanged({ source: "sync", entities: ["assets"] });
+        }
       } catch (error) {
         console.warn("[asset-snapshot-pull] Pull pass failed", error);
       } finally {
         inFlightRef.current = false;
+        if (rerunRequestedRef.current) {
+          rerunRequestedRef.current = false;
+          void runOnce();
+        }
       }
     };
 

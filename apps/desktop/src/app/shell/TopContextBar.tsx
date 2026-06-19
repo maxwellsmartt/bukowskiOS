@@ -8,6 +8,11 @@ import { useConnectivity } from "@shared/hooks/useConnectivity";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import { requestImmediatePull } from "@shared/hooks/useWorkspaceDataRefresh";
+import {
+  realtimeSyncStatusEvent,
+  realtimeSyncStatusKey,
+  type RealtimeSyncStatus,
+} from "@shared/hooks/useRealtimeWorkspaceSync";
 import { useLocale } from "@shared/hooks/useLocale";
 import { resolveProjectColor } from "@shared/lib/projectColors";
 import type { AppDiagnosticsSnapshot, AppSyncPullCursorRow, AppSyncStatusSnapshot } from "@contracts";
@@ -34,6 +39,13 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const [syncActionNotice, setSyncActionNotice] = useState<string | null>(null);
   const [hasLoadedSyncSnapshot, setHasLoadedSyncSnapshot] = useState(false);
   const [isLoadingSyncSnapshot, setIsLoadingSyncSnapshot] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeSyncStatus | null>(() => {
+    try {
+      return window.localStorage.getItem(realtimeSyncStatusKey) as RealtimeSyncStatus | null;
+    } catch {
+      return null;
+    }
+  });
   const isMountedRef = useRef(true);
   const syncButtonReleaseTimerRef = useRef<number | null>(null);
   const syncPopoverRef = useRef<HTMLDivElement | null>(null);
@@ -139,6 +151,14 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     void loadSyncSnapshot({ showLoading: true });
   }, []);
 
+  useEffect(() => {
+    const handleRealtimeStatus = (event: Event) => {
+      setRealtimeStatus((event as CustomEvent<RealtimeSyncStatus>).detail);
+    };
+    window.addEventListener(realtimeSyncStatusEvent, handleRealtimeStatus);
+    return () => window.removeEventListener(realtimeSyncStatusEvent, handleRealtimeStatus);
+  }, []);
+
   useVisiblePolling(
     () => {
       void loadSyncSnapshot();
@@ -188,6 +208,15 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       };
     }
 
+    if (realtimeStatus !== "SUBSCRIBED") {
+      return {
+        label: t("shell.topBar.syncPopover.realtimeUnavailable", { defaultValue: "Tiempo real no confirmado" }),
+        className: "sync-control-missing",
+        icon: CloudOff,
+        badge: null as number | null,
+      };
+    }
+
     if (!latestSyncActivity) {
       return {
         label: t("shell.topBar.syncPopover.noSync", { defaultValue: "Sin sync confirmado" }),
@@ -203,7 +232,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       icon: CheckCircle2,
       badge: null as number | null,
     };
-  }, [diagnostics, hasLoadedSyncSnapshot, inboundFailedCount, latestSyncActivity, t]);
+  }, [diagnostics, hasLoadedSyncSnapshot, inboundFailedCount, latestSyncActivity, outboundFailedCount, realtimeStatus, t]);
   const SyncStatusIcon = syncState.icon;
 
   const refreshDiagnostics = () => loadSyncSnapshot({ showLoading: true });

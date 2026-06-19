@@ -4,6 +4,7 @@ import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { CollaboratorPaymentPullTable } from "@contracts";
 import { canReadCollaboratorPayments } from "@shared/lib/financeAccess";
+import { applyCompositePullCursor, cursorFromRow, readCompositePullCursor, writeCompositePullCursor } from "@shared/lib/compositePullCursor";
 import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
 const POLL_INTERVAL_MS = 20_000;
@@ -18,27 +19,11 @@ const tableConfigs: Array<{ table: CollaboratorPaymentPullTable; cursorColumn: s
 const cursorKey = (workspaceId: string, table: CollaboratorPaymentPullTable) =>
   `bukowski:collaborator-payment-pull-cursor:${workspaceId}:${table}`;
 
-const readCursor = (key: string): string | null => {
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-};
-
-const writeCursor = (key: string, value: string | null) => {
-  try {
-    if (value == null) window.localStorage.removeItem(key);
-    else window.localStorage.setItem(key, value);
-  } catch {
-    // Best effort only; an older cursor is safe because apply is idempotent.
-  }
-};
-
 export const useCollaboratorPaymentPull = () => {
   const { supabase, isLocalFallback, status } = useSession();
   const { activeMembership, activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const inFlightRef = useRef(false);
+  const rerunRequestedRef = useRef(false);
   const canPullCollaboratorPayments = canReadCollaboratorPayments(activeMembership);
 
   useEffect(() => {
@@ -55,7 +40,10 @@ export const useCollaboratorPaymentPull = () => {
     }
 
     const runOnce = async () => {
-      if (inFlightRef.current) return;
+      if (inFlightRef.current) {
+        rerunRequestedRef.current = true;
+        return;
+      }
       const appApi = window.bukowskiApp;
       if (!appApi?.applyRemoteCollaboratorPaymentRows) return;
       inFlightRef.current = true;
@@ -64,16 +52,17 @@ export const useCollaboratorPaymentPull = () => {
       try {
         for (const { table, cursorColumn } of tableConfigs) {
           const key = cursorKey(activeWorkspaceId, table);
-          const cursor = readCursor(key);
+          const cursor = readCompositePullCursor(key);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let query = (supabase as any)
             .from(table)
             .select("*")
             .eq("workspace_id", activeWorkspaceId)
             .order(cursorColumn, { ascending: true })
+            .order("id", { ascending: true })
             .limit(PULL_BATCH_SIZE);
 
-          if (cursor) query = query.gt(cursorColumn, cursor);
+          query = applyCompositePullCursor(query, cursor, cursorColumn, "id");
           const { data, error } = await query;
           if (error) {
             console.warn(`[collaborator-payment-pull] ${table} pull failed`, error);
@@ -88,7 +77,10 @@ export const useCollaboratorPaymentPull = () => {
             table,
             rows,
           });
-          if (result.cursorAfter) writeCursor(key, result.cursorAfter);
+          if (result.errors.length === 0) {
+            const nextCursor = cursorFromRow(rows[rows.length - 1], cursorColumn, "id");
+            if (nextCursor) writeCompositePullCursor(key, nextCursor);
+          }
           if (result.appliedCount > 0) appliedAny = true;
           if (result.errors.length > 0) {
             console.warn(`[collaborator-payment-pull] ${table} apply had errors`, result.errors);
@@ -100,6 +92,10 @@ export const useCollaboratorPaymentPull = () => {
         console.warn("[collaborator-payment-pull] Pull pass failed", error);
       } finally {
         inFlightRef.current = false;
+        if (rerunRequestedRef.current) {
+          rerunRequestedRef.current = false;
+          void runOnce();
+        }
       }
     };
 

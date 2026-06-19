@@ -418,7 +418,9 @@ describe("security regression checks", () => {
     expect(sidebarSource).toContain('item.path.startsWith("/finance") && !canAccessFinance');
     expect(appShellSource).toContain("buildProjectSubnav(activeProjectId, { includeBudget: canAccessFinance })");
     expect(treasuryPullSource).toContain("!canPullTreasury");
-    expect(treasuryPullSource).toContain('{ table: "transaction_links", cursorColumn: "updated_at" }');
+    expect(treasuryPullSource).toContain(
+      '{ table: "transaction_links", cursorColumn: "updated_at", idColumn: "id" }',
+    );
     expect(treasuryPullSource).toContain('transaction_links: "v2"');
     expect(financePullSource).toContain("!canPullFinanceBusiness");
     expect(collaboratorPullSource).toContain("!canPullCollaboratorPayments");

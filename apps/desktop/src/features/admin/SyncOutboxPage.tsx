@@ -83,6 +83,8 @@ const INBOUND_COVERAGE = [
   "clients",
   "manufacturers",
   "production_companies",
+  "crew_members",
+  "departments",
   "projects",
   "packing_slips",
   "incidents",
@@ -95,6 +97,7 @@ const INBOUND_COVERAGE = [
   "collaborator_fees",
   "financial_entries",
   "currency_settings",
+  "sync_tombstones",
 ] as const;
 
 type InboundCoverageId = (typeof INBOUND_COVERAGE)[number];
@@ -504,7 +507,7 @@ export const SyncOutboxPage = () => {
           <div className="sync-coverage-grid">
             {INBOUND_COVERAGE.map((entityType) => {
               const cursor = pullCursorByEntity.get(entityType);
-              const isActive = true;
+              const isActive = Boolean(cursor && !cursor.lastError);
               const hasError = Boolean(cursor?.lastError);
               const label = t(`settings.sync.coverage.${entityType}.label`);
               const detail = t(`settings.sync.coverage.${entityType}.detail`);

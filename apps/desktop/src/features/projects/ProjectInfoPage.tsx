@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import type { ProjectColorKey, ProjectDetailSnapshot } from "@contracts";
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useToast } from "@app/providers/ToastProvider";
+import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { SelectField } from "@shared/components/SelectField";
 import { ProjectColorSelect } from "@shared/components/ProjectColorSelect";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -51,6 +52,7 @@ export const ProjectInfoPage = () => {
   const [colorKey, setColorKey] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dateChangeConfirmOpen, setDateChangeConfirmOpen] = useState(false);
   const focusedUnitId = searchParams.get("unit");
 
   useEffect(() => {
@@ -136,7 +138,7 @@ export const ProjectInfoPage = () => {
     { label: t("projects.info.schedule.cancelledUnits"), value: cancelledUnits },
   ];
 
-  const handleSave = async () => {
+  const persistProject = async (cascadeDates: boolean) => {
     if (validationErrors.length) {
       setSaveError(t("projects.info.validation.fixBeforeSaving"));
       return;
@@ -158,6 +160,7 @@ export const ProjectInfoPage = () => {
         preproductionStartDate: hasPreproduction ? normalizeOptional(preproductionStartDate) : undefined,
         preproductionEndDate: hasPreproduction ? normalizeOptional(preproductionEndDate) : undefined,
         colorKey: normalizeOptional(colorKey),
+        cascadeDates,
       });
       await Promise.all([reload(), refreshProjects()]);
       setSaveError(null);
@@ -179,6 +182,19 @@ export const ProjectInfoPage = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (validationErrors.length) {
+      setSaveError(t("projects.info.validation.fixBeforeSaving"));
+      return;
+    }
+    const datesChanged = startDate !== (currentProject.startDate ?? "") || endDate !== (currentProject.endDate ?? "");
+    if (datesChanged && displayData.units.length) {
+      setDateChangeConfirmOpen(true);
+      return;
+    }
+    await persistProject(false);
   };
 
   return (
@@ -213,6 +229,16 @@ export const ProjectInfoPage = () => {
                     {scheduleStart} - {scheduleEnd}
                   </small>
                 </div>
+
+                {currentProject.hasPreproduction ? (
+                  <div className="project-info-summary-window project-info-summary-preproduction">
+                    <span>{t("projects.info.schedule.preproduction")}</span>
+                    <strong>{t("projects.info.schedule.preproduction")}</strong>
+                    <small>
+                      {currentProject.preproductionStartDate ?? t("projects.info.schedule.noStartDate")} - {currentProject.preproductionEndDate ?? t("projects.info.schedule.openEnded")}
+                    </small>
+                  </div>
+                ) : null}
 
                 <div className="project-info-summary-progress">
                   <div className="project-info-summary-progress-copy">
@@ -380,6 +406,20 @@ export const ProjectInfoPage = () => {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={dateChangeConfirmOpen}
+        title={t("projects.info.dateCascade.title")}
+        body={t("projects.info.dateCascade.body")}
+        details={t("projects.info.dateCascade.details")}
+        confirmLabel={t("projects.info.dateCascade.confirm")}
+        cancelLabel={t("common.cancel")}
+        isSubmitting={isSubmitting}
+        onConfirm={async () => {
+          setDateChangeConfirmOpen(false);
+          await persistProject(true);
+        }}
+        onCancel={() => setDateChangeConfirmOpen(false)}
+      />
     </div>
   );
 };

@@ -8989,6 +8989,17 @@ body.is-resizing-side-rail {
   white-space: nowrap;
 }
 
+.project-info-summary-preproduction {
+  border-color: rgba(178, 142, 232, 0.22);
+  background:
+    radial-gradient(circle at top left, rgba(178, 142, 232, 0.12), transparent 58%),
+    rgba(126, 91, 180, 0.055);
+}
+
+.project-info-summary-preproduction > span {
+  color: rgba(205, 181, 242, 0.82);
+}
+
 .project-info-summary-progress-copy {
   display: flex;
   align-items: center;

@@ -4,6 +4,7 @@ import type { AppRemoteAutomationControlPlaneRow, AutomationControlPlanePullEnti
 import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { applyCompositePullCursor, cursorFromRow, readCompositePullCursor, writeCompositePullCursor } from "@shared/lib/compositePullCursor";
 
 import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
@@ -15,30 +16,11 @@ const entityTables: AutomationControlPlanePullEntityType[] = ["agents", "ai_prov
 const cursorKey = (workspaceId: string, entityType: AutomationControlPlanePullEntityType) =>
   `bukowski:automation-control-plane-pull-cursor:${workspaceId}:${entityType}`;
 
-const readCursor = (key: string): string | null => {
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-};
-
-const writeCursor = (key: string, value: string | null) => {
-  try {
-    if (value == null) {
-      window.localStorage.removeItem(key);
-    } else {
-      window.localStorage.setItem(key, value);
-    }
-  } catch {
-    // An older cursor is safe because apply is idempotent.
-  }
-};
-
 export const useAutomationControlPlanePull = () => {
   const { supabase, isLocalFallback, status } = useSession();
   const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const inFlightRef = useRef(false);
+  const rerunRequestedRef = useRef(false);
 
   useEffect(() => {
     if (
@@ -53,7 +35,10 @@ export const useAutomationControlPlanePull = () => {
     }
 
     const runOnce = async () => {
-      if (inFlightRef.current) return;
+      if (inFlightRef.current) {
+        rerunRequestedRef.current = true;
+        return;
+      }
       const appApi = window.bukowskiApp;
       if (!appApi?.applyRemoteAutomationControlPlaneRows) return;
       inFlightRef.current = true;
@@ -62,16 +47,17 @@ export const useAutomationControlPlanePull = () => {
       try {
         for (const entityType of entityTables) {
           const key = cursorKey(activeWorkspaceId, entityType);
-          const cursor = readCursor(key);
+          const cursor = readCompositePullCursor(key);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let query = (supabase as any)
             .from(entityType)
             .select("*")
             .eq("workspace_id", activeWorkspaceId)
             .order("updated_at", { ascending: true })
+            .order("id", { ascending: true })
             .limit(PULL_BATCH_SIZE);
 
-          if (cursor) query = query.gt("updated_at", cursor);
+          query = applyCompositePullCursor(query, cursor, "updated_at", "id");
 
           const { data, error } = await query;
           if (error) {
@@ -95,7 +81,10 @@ export const useAutomationControlPlanePull = () => {
             entityType,
             rows,
           });
-          if (result.cursorAfter) writeCursor(key, result.cursorAfter);
+          if (result.errors.length === 0) {
+            const nextCursor = cursorFromRow(rows[rows.length - 1] as unknown as Record<string, unknown>, "updated_at", "id");
+            if (nextCursor) writeCompositePullCursor(key, nextCursor);
+          }
           if (result.appliedCount > 0) appliedAny = true;
           if (result.errors.length > 0) {
             console.warn(`[automation-control-plane-pull] ${entityType} apply had errors: ${result.errors.join("; ")}`, result.errors);
@@ -115,6 +104,10 @@ export const useAutomationControlPlanePull = () => {
         );
       } finally {
         inFlightRef.current = false;
+        if (rerunRequestedRef.current) {
+          rerunRequestedRef.current = false;
+          void runOnce();
+        }
       }
     };
 

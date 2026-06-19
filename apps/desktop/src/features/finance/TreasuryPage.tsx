@@ -52,7 +52,7 @@ import bancoSantaCruzLogo from "@shared/assets/inbox/logos/banco santa cruz-logo
 
 import { newCommandId } from "./quoteHelpers";
 import { InvoiceInboxPanel } from "./InvoiceInboxPanel";
-import { parseStatementFile } from "./treasury/bankStatementParsers";
+import { parseStatementFile, resolveStatementAccount } from "./treasury/bankStatementParsers";
 import {
   exportTreasuryOverviewPdf,
   useBankAccounts,
@@ -896,7 +896,7 @@ export const TreasuryPage = () => {
   };
 
   const handleFile = async (file: File | undefined) => {
-    if (!file || !importAccountId) return;
+    if (!file) return;
     setBusy(true);
     try {
       const parsed = await parseStatementFile(file, importBankName);
@@ -907,7 +907,12 @@ export const TreasuryPage = () => {
       // Guard against importing a statement into the wrong account: warn when
       // the file's detected currency or account number doesn't match the
       // target account (e.g. a Santa Cruz USD statement into the DOP account).
-      const target = accounts.data.find((a) => a.id === importAccountId);
+      const selectedTarget = accounts.data.find((a) => a.id === importAccountId);
+      const target = selectedTarget ?? resolveStatementAccount(parsed, accounts.data);
+      if (!target) {
+        toast.error(t("finance.treasury.import.accountNotDetected"));
+        return;
+      }
       if (target) {
         const currencyMismatch = parsed.currencyHint && parsed.currencyHint !== target.currency;
         const numberMismatch =
@@ -930,7 +935,7 @@ export const TreasuryPage = () => {
       const sourceFormat = parsed.bankName === "santa_cruz" ? "xlsx" : "csv";
       const preview = await mutations.previewStatementImport({
         workspaceId: activeWorkspaceId,
-        bankAccountId: importAccountId,
+        bankAccountId: target.id,
         sourceFormat,
         originalFilename: file.name,
         periodStart: parsed.periodStart,
@@ -938,8 +943,8 @@ export const TreasuryPage = () => {
         rows: parsed.rows,
       });
       setPendingStatementImport({
-        bankAccountId: importAccountId,
-        bankName: importBankName,
+        bankAccountId: target.id,
+        bankName: parsed.bankName,
         sourceFormat,
         originalFilename: file.name,
         accountAutofillLast4: target && parsed.accountNumber && !accountTerminal(target) ? parsed.accountNumber.slice(-4) : null,
@@ -2208,8 +2213,8 @@ export const TreasuryPage = () => {
                   className="ghost-control treasury-import-button"
                   disabled={accounts.data.length === 0 || busy}
                   onClick={() => {
-                    const account = accounts.data.find((a) => a.id === accountFilter) ?? accounts.data[0];
-                    if (account) triggerImport(account.id, account.bankName);
+                    const account = accounts.data.find((a) => a.id === accountFilter);
+                    triggerImport(account?.id ?? "", account?.bankName ?? "custom");
                   }}
                   type="button"
                 >

@@ -301,6 +301,25 @@ export type AppApplyRemoteCatalogRowsResult = {
   cursorAfter: string | null;
 };
 
+export type AppRemoteSyncTombstone = {
+  workspace_id: string;
+  table_name: string;
+  entity_id: string;
+  deleted_at: string;
+};
+
+export type AppApplyRemoteSyncTombstonesCommand = {
+  workspaceId: string;
+  rows: AppRemoteSyncTombstone[];
+};
+
+export type AppApplyRemoteSyncTombstonesResult = {
+  workspaceId: string;
+  appliedCount: number;
+  skippedDueToOutboxCount: number;
+  errors: string[];
+};
+
 export type AppRemoteAssetSnapshotRow = {
   id: string;
   workspace_id: string;

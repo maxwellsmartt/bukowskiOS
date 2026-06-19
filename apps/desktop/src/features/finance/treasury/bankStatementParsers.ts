@@ -25,6 +25,41 @@ export type ParsedStatement = {
   rows: ParsedBankTransaction[];
 };
 
+export type StatementAccountCandidate = {
+  id: string;
+  bankName: BankName;
+  currency: string;
+  accountNumberFull?: string | null;
+  accountNumberMasked?: string | null;
+  last4?: string | null;
+};
+
+const accountDigits = (value: string | null | undefined) => (value ?? "").replace(/\D/g, "");
+
+export const resolveStatementAccount = <T extends StatementAccountCandidate>(
+  parsed: Pick<ParsedStatement, "accountNumber" | "bankName" | "currencyHint">,
+  accounts: T[],
+): T | null => {
+  const parsedNumber = accountDigits(parsed.accountNumber);
+  const sameBank = accounts.filter((account) => account.bankName === parsed.bankName);
+  const sameCurrency = parsed.currencyHint
+    ? sameBank.filter((account) => account.currency.toUpperCase() === parsed.currencyHint?.toUpperCase())
+    : sameBank;
+  const candidates = sameCurrency.length ? sameCurrency : sameBank;
+
+  if (parsedNumber) {
+    const numberMatches = candidates.filter((account) => {
+      const knownNumbers = [account.accountNumberFull, account.accountNumberMasked, account.last4]
+        .map(accountDigits)
+        .filter(Boolean);
+      return knownNumbers.some((known) => known === parsedNumber || known.endsWith(parsedNumber) || parsedNumber.endsWith(known));
+    });
+    if (numberMatches.length === 1) return numberMatches[0];
+  }
+
+  return candidates.length === 1 ? candidates[0] : null;
+};
+
 const parseNumber = (value: unknown): number => {
   if (typeof value === "number") return value;
   if (value == null) return 0;

@@ -2163,6 +2163,7 @@
       "import": {
         "noRows": "No se encontraron movimientos en el archivo.",
         "failed": "No se pudo importar el estado de cuenta.",
+        "accountNotDetected": "No pudimos identificar una cuenta única para este estado. Revisa el número o elige la cuenta en el filtro e inténtalo de nuevo.",
         "mismatch": "Este archivo parece de la cuenta {{fileAccount}} ({{fileCurrency}}), pero lo estás importando en \"{{accountLabel}}\" ({{accountCurrency}}). ¿Importar de todos modos?",
         "mismatchBlocked": "Import bloqueado: el archivo parece de la cuenta {{fileAccount}} ({{fileCurrency}}), pero seleccionaste \"{{accountLabel}}\" ({{accountCurrency}}). Elige o crea la cuenta bancaria correcta."
       },
@@ -4527,6 +4528,12 @@
         "notLinked": "Sin vincular",
         "preproduction": "Preproducción"
       },
+      "dateCascade": {
+        "title": "¿Actualizar también unidades y crew?",
+        "body": "Cambiaste las fechas del proyecto. Podemos adaptar en un solo paso las unidades y las asignaciones de crew vinculadas.",
+        "details": "La preproducción conservará su duración cuando no la hayas editado manualmente. Las fechas hijas se desplazarán y quedarán dentro de la nueva ventana.",
+        "confirm": "Actualizar todo"
+      },
       "toasts": {
         "savedTitle": "Proyecto guardado",
         "savedBody": "Detalles del proyecto actualizados.",
@@ -4697,6 +4704,12 @@
         "removeRow": "Quitar fila",
         "confirm": "Asignar crew"
       },
+      "dateCascade": {
+        "title": "¿Actualizar el crew de {{name}}?",
+        "body": "Cambiaste las fechas de esta unidad. Podemos adaptar automáticamente las fechas del crew asignado.",
+        "details": "Se actualizarán {{count}} asignaciones, conservando su posición relativa y limitándolas a la nueva ventana de la unidad.",
+        "confirm": "Actualizar unidad y crew"
+      },
       "actions": {
         "edit": "Editar unidad",
         "editAria": "Editar {{name}}",
@@ -4746,7 +4759,7 @@
         "deleteTitle": "¿Eliminar la unidad \"{{name}}\"?",
         "wrapTitle": "¿Marcar \"{{name}}\" como cerrada?",
         "deleteBody": "Solo funciona si la unidad no tiene registros operativos vinculados. Esta acción no se puede deshacer.",
-        "wrapBody": "La fecha de cierre de la unidad se pondrá en hoy.",
+        "wrapBody": "La fecha de cierre de la unidad se pondrá en hoy y el crew asignado se adaptará a esa nueva ventana.",
         "deleteConfirm": "Eliminar unidad",
         "wrapConfirm": "Marcar cerrada",
         "removeDepartmentTitle": "¿Eliminar {{department}} de {{unit}}?",
@@ -5175,6 +5188,14 @@
           "label": "Productoras",
           "detail": "Catálogo de productoras"
         },
+        "crew_members": {
+          "label": "Crew",
+          "detail": "Catálogo de colaboradores"
+        },
+        "departments": {
+          "label": "Departamentos",
+          "detail": "Departamentos operativos"
+        },
         "projects": {
           "label": "Proyectos",
           "detail": "Proyectos, unidades y asignaciones de crew"
@@ -5222,6 +5243,10 @@
         "currency_settings": {
           "label": "Config. de moneda",
           "detail": "Series NCF y configuración de tasas"
+        },
+        "sync_tombstones": {
+          "label": "Borrados remotos",
+          "detail": "Eliminaciones confirmadas entre máquinas"
         }
       },
       "coverageRowsLatest": "{{count}} filas en la última bajada",

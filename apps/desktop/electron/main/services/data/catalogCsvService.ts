@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
@@ -27,6 +28,43 @@ const normalizeOptional = (value: string | undefined) => {
   return nextValue ? nextValue : null;
 };
 const normalizeKey = (value: string) => trimValue(value).replace(/\s+/g, " ").toLowerCase();
+const syncedImportEntityTypes = new Set<CatalogEntityType>([
+  "location",
+  "department",
+  "crew",
+  "client",
+  "production_company",
+  "manufacturer",
+  "category",
+]);
+
+const enqueueImportedCatalogRows = (
+  db: DatabaseSync,
+  workspaceId: string,
+  entityType: CatalogEntityType,
+  entityIds: string[],
+  now: string,
+) => {
+  if (!syncedImportEntityTypes.has(entityType)) return;
+  const insert = db.prepare(
+    `INSERT INTO sync_outbox (
+       id, workspace_id, entity_type, entity_id, operation_type, payload_json,
+       status, attempt_count, last_error, next_retry_at, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, 'upsert', ?, 'pending', 0, NULL, ?, ?, ?)`,
+  );
+  entityIds.forEach((entityId) => {
+    insert.run(
+      `sync-${entityType}-${entityId}-${randomUUID().slice(0, 8)}`,
+      workspaceId,
+      entityType,
+      entityId,
+      JSON.stringify({ id: entityId, source: "csv_import" }),
+      now,
+      now,
+      now,
+    );
+  });
+};
 
 const expectedHeadersByEntity: Record<CatalogEntityType, string[]> = {
   location: ["code", "name", "locationType", "description", "isActive"],
@@ -816,8 +854,10 @@ const runImportRow = (
             WHERE id = ?
           `,
         ).run(row.payload.code, row.payload.name, row.payload.locationType, row.payload.description, row.payload.isActive ? 1 : 0, row.existingId);
-        return;
+        return row.existingId;
       }
+
+      const locationId = `location-${slugify(row.payload.code)}-${Date.now().toString(36)}-${row.rowNumber}`;
 
       db.prepare(
         `
@@ -825,7 +865,7 @@ const runImportRow = (
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `,
       ).run(
-        `location-${slugify(row.payload.code)}-${Date.now().toString(36)}-${row.rowNumber}`,
+        locationId,
         workspaceId,
         row.payload.code,
         row.payload.name,
@@ -834,7 +874,7 @@ const runImportRow = (
         row.payload.isActive ? 1 : 0,
         now,
       );
-      return;
+      return locationId;
     }
     case "department": {
       if (row.existingId) {
@@ -845,8 +885,10 @@ const runImportRow = (
             WHERE id = ?
           `,
         ).run(row.payload.code, row.payload.name, row.payload.description, row.payload.isActive ? 1 : 0, row.existingId);
-        return;
+        return row.existingId;
       }
+
+      const departmentId = `department-${slugify(row.payload.code)}-${Date.now().toString(36)}-${row.rowNumber}`;
 
       db.prepare(
         `
@@ -854,7 +896,7 @@ const runImportRow = (
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `,
       ).run(
-        `department-${slugify(row.payload.code)}-${Date.now().toString(36)}-${row.rowNumber}`,
+        departmentId,
         workspaceId,
         row.payload.code,
         row.payload.name,
@@ -862,7 +904,7 @@ const runImportRow = (
         row.payload.isActive ? 1 : 0,
         now,
       );
-      return;
+      return departmentId;
     }
     case "crew": {
       if (row.existingId) {
@@ -885,7 +927,7 @@ const runImportRow = (
           row.existingId,
         );
         replaceCrewBankAccounts(db, row.existingId, row.payload.bankAccounts, now);
-        return;
+        return row.existingId;
       }
 
       const crewId = `crew-${slugify(row.payload.fullName)}-${Date.now().toString(36)}-${row.rowNumber}`;
@@ -911,7 +953,7 @@ const runImportRow = (
         now,
       );
       replaceCrewBankAccounts(db, crewId, row.payload.bankAccounts, now);
-      return;
+      return crewId;
     }
     case "client": {
       if (row.existingId) {
@@ -933,8 +975,10 @@ const runImportRow = (
           row.existingId,
         );
         db.prepare("UPDATE projects SET client_name = ? WHERE client_id = ?").run(row.payload.name, row.existingId);
-        return;
+        return row.existingId;
       }
+
+      const clientId = `client-${slugify(row.payload.name)}-${Date.now().toString(36)}-${row.rowNumber}`;
 
       db.prepare(
         `
@@ -942,7 +986,7 @@ const runImportRow = (
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
       ).run(
-        `client-${slugify(row.payload.name)}-${Date.now().toString(36)}-${row.rowNumber}`,
+        clientId,
         workspaceId,
         row.payload.name,
         row.payload.contactName,
@@ -954,7 +998,7 @@ const runImportRow = (
         now,
         now,
       );
-      return;
+      return clientId;
     }
     case "production_company": {
       if (row.existingId) {
@@ -976,8 +1020,10 @@ const runImportRow = (
           row.existingId,
         );
         db.prepare("UPDATE projects SET production_company_name = ? WHERE production_company_id = ?").run(row.payload.name, row.existingId);
-        return;
+        return row.existingId;
       }
+
+      const productionCompanyId = `production-company-${slugify(row.payload.name)}-${Date.now().toString(36)}-${row.rowNumber}`;
 
       db.prepare(
         `
@@ -985,7 +1031,7 @@ const runImportRow = (
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
       ).run(
-        `production-company-${slugify(row.payload.name)}-${Date.now().toString(36)}-${row.rowNumber}`,
+        productionCompanyId,
         workspaceId,
         row.payload.name,
         row.payload.contactName,
@@ -997,7 +1043,7 @@ const runImportRow = (
         now,
         now,
       );
-      return;
+      return productionCompanyId;
     }
     case "manufacturer": {
       if (row.existingId) {
@@ -1020,8 +1066,10 @@ const runImportRow = (
         db.prepare(
           "UPDATE rma_cases SET support_email = COALESCE(?, support_email) WHERE manufacturer_id = ? AND (support_email IS NULL OR trim(support_email) = '')",
         ).run(row.payload.supportEmail, row.existingId);
-        return;
+        return row.existingId;
       }
+
+      const manufacturerId = `manufacturer-${slugify(row.payload.name)}-${Date.now().toString(36)}-${row.rowNumber}`;
 
       db.prepare(
         `
@@ -1029,7 +1077,7 @@ const runImportRow = (
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
       ).run(
-        `manufacturer-${slugify(row.payload.name)}-${Date.now().toString(36)}-${row.rowNumber}`,
+        manufacturerId,
         workspaceId,
         row.payload.name,
         row.payload.contactName,
@@ -1040,7 +1088,7 @@ const runImportRow = (
         now,
         now,
       );
-      return;
+      return manufacturerId;
     }
     case "category": {
       if (row.existingId) {
@@ -1051,8 +1099,10 @@ const runImportRow = (
             WHERE id = ?
           `,
         ).run(row.payload.code, row.payload.name, row.payload.description, row.payload.isActive ? 1 : 0, row.existingId);
-        return;
+        return row.existingId;
       }
+
+      const categoryId = `category-${slugify(row.payload.code)}-${Date.now().toString(36)}-${row.rowNumber}`;
 
       db.prepare(
         `
@@ -1060,7 +1110,7 @@ const runImportRow = (
           VALUES (?, ?, NULL, ?, ?, ?, ?, ?)
         `,
       ).run(
-        `category-${slugify(row.payload.code)}-${Date.now().toString(36)}-${row.rowNumber}`,
+        categoryId,
         workspaceId,
         row.payload.code,
         row.payload.name,
@@ -1068,7 +1118,7 @@ const runImportRow = (
         now,
         row.payload.isActive ? 1 : 0,
       );
-      return;
+      return categoryId;
     }
     case "kit": {
       const kitId = row.existingId ?? `kit-${slugify(row.payload.code)}-${Date.now().toString(36)}-${row.rowNumber}`;
@@ -1118,6 +1168,7 @@ const runImportRow = (
         entityId: kitId,
         preferredCodeValue: `KIT-${row.payload.code}`,
       });
+      return kitId;
     }
   }
 };
@@ -1403,9 +1454,8 @@ export const createCatalogCsvService = (db: DatabaseSync, codeService: CodeGener
     db.exec("BEGIN");
 
     try {
-      analysis.rows.forEach((row) => {
-        runImportRow(db, codeService, workspaceId, row, now);
-      });
+      const importedIds = analysis.rows.map((row) => runImportRow(db, codeService, workspaceId, row, now));
+      enqueueImportedCatalogRows(db, workspaceId, input.entityType, importedIds, now);
       if (input.strategy === "replace") {
         deactivateMissingRows(db, input.entityType, analysis.missingActiveIds, now);
       }

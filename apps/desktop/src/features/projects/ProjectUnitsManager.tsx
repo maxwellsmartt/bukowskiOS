@@ -144,6 +144,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
   } | null>(null);
   const [crewAssignmentDrafts, setCrewAssignmentDrafts] = useState<CrewAssignmentDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [dateChangeConfirmOpen, setDateChangeConfirmOpen] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const toast = useToast();
@@ -275,7 +276,16 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
     setWarning(null);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (cascadeCrewDates = false) => {
+    const draftBounds = deriveWindowBounds(unitDraft.windows);
+    const datesChanged =
+      editorMode === "edit" &&
+      editingUnit &&
+      (draftBounds.startDate !== (editingUnit.startDate ?? undefined) || draftBounds.endDate !== (editingUnit.endDate ?? undefined));
+    if (datesChanged && editingUnit.crewAssignments.length && !cascadeCrewDates) {
+      setDateChangeConfirmOpen(true);
+      return;
+    }
     try {
       setIsSubmitting(true);
       let nextSnapshot: ProjectDetailSnapshot | null = null;
@@ -315,6 +325,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
           windows,
           notes: normalizeOptional(unitDraft.notes),
           statusAction: "none",
+          cascadeCrewDates,
         });
       }
 
@@ -376,6 +387,7 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
           })),
           notes: unit.notes || undefined,
           statusAction: action,
+          cascadeCrewDates: action === "mark_wrapped",
         });
         await Promise.resolve(onChanged(nextSnapshot));
       }
@@ -1137,6 +1149,21 @@ export const ProjectUnitsManager = ({ crewMembers, departments, focusedUnitId = 
         onCancel={() => setPendingUnitAction(null)}
       />
     ) : null}
+
+    <ConfirmDialog
+      isOpen={dateChangeConfirmOpen}
+      title={t("projects.units.dateCascade.title", { name: editingUnit?.name ?? unitDraft.name })}
+      body={t("projects.units.dateCascade.body")}
+      details={t("projects.units.dateCascade.details", { count: editingUnit?.crewAssignments.length ?? 0 })}
+      confirmLabel={t("projects.units.dateCascade.confirm")}
+      cancelLabel={t("common.cancel")}
+      isSubmitting={isSubmitting}
+      onConfirm={async () => {
+        setDateChangeConfirmOpen(false);
+        await handleSave(true);
+      }}
+      onCancel={() => setDateChangeConfirmOpen(false)}
+    />
 
     {pendingDepartmentAction ? (
       <ConfirmDialog

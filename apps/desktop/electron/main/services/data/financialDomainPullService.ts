@@ -295,14 +295,14 @@ const sanitizeTreasuryRow = (
   if (table === "transaction_annotations" && !rowExists(db, "bank_transactions", next.transaction_id)) return null;
   if (table === "transaction_project_allocations") {
     if (!rowExists(db, "bank_transactions", next.transaction_id)) return null;
-    if (next.project_id && !rowExists(db, "projects", next.project_id)) next.project_id = null;
+    if (next.project_id && !rowExists(db, "projects", next.project_id)) return null;
   }
   if (table === "transaction_links") {
     if (next.transaction_id && !rowExists(db, "bank_transactions", next.transaction_id)) return null;
     if (next.payment_instrument_id && !rowExists(db, "bank_accounts", next.payment_instrument_id)) return null;
   }
   if (table === "counterparty_rules" && next.default_project_id && !rowExists(db, "projects", next.default_project_id)) {
-    next.default_project_id = null;
+    return null;
   }
   return next;
 };
@@ -316,13 +316,13 @@ const sanitizeCollaboratorRow = (
   const next = toRecord(row);
   const updatedAt = String(next.updated_at ?? next.created_at ?? new Date().toISOString());
   if (table === "collaborator_fees") {
-    ensureCrewMember(db, workspaceId, next.crew_member_id, updatedAt);
-    if (next.project_id && !rowExists(db, "projects", next.project_id)) next.project_id = null;
-    if (next.project_unit_id && !rowExists(db, "project_units", next.project_unit_id)) next.project_unit_id = null;
-    if (next.department_id && !rowExists(db, "departments", next.department_id)) next.department_id = null;
+    if (next.project_id && !rowExists(db, "projects", next.project_id)) return null;
+    if (next.project_unit_id && !rowExists(db, "project_units", next.project_unit_id)) return null;
+    if (next.department_id && !rowExists(db, "departments", next.department_id)) return null;
     if (next.source_assignment_id && !rowExists(db, "project_unit_crew_assignments", next.source_assignment_id)) {
-      next.source_assignment_id = null;
+      return null;
     }
+    ensureCrewMember(db, workspaceId, next.crew_member_id, updatedAt);
   }
   if (table === "collaborator_payment_batches") {
     ensureCrewMember(db, workspaceId, next.crew_member_id, updatedAt);
@@ -348,7 +348,7 @@ const sanitizeFinanceBusinessRow = (
   }
 
   if (table === "quotes") {
-    if (next.project_id && !rowExists(db, "projects", next.project_id)) next.project_id = null;
+    if (next.project_id && !rowExists(db, "projects", next.project_id)) return null;
     if (next.created_by_user_id) ensureUser(db, next.created_by_user_id, updatedAt);
     if (next.updated_by_user_id) ensureUser(db, next.updated_by_user_id, updatedAt);
   }
@@ -360,8 +360,8 @@ const sanitizeFinanceBusinessRow = (
   }
 
   if (table === "invoices") {
-    if (next.source_quote_id && !rowExists(db, "quotes", next.source_quote_id)) next.source_quote_id = null;
-    if (next.project_id && !rowExists(db, "projects", next.project_id)) next.project_id = null;
+    if (next.source_quote_id && !rowExists(db, "quotes", next.source_quote_id)) return null;
+    if (next.project_id && !rowExists(db, "projects", next.project_id)) return null;
     if (next.created_by_user_id) ensureUser(db, next.created_by_user_id, updatedAt);
     if (next.updated_by_user_id) ensureUser(db, next.updated_by_user_id, updatedAt);
   }
@@ -376,18 +376,18 @@ const sanitizeFinanceBusinessRow = (
     if (next.uploaded_by_user_id) ensureUser(db, next.uploaded_by_user_id, updatedAt);
     if (next.linked_user_id) ensureUser(db, next.linked_user_id, updatedAt);
     if (next.applied_transaction_id && !rowExists(db, "bank_transactions", next.applied_transaction_id)) {
-      next.applied_transaction_id = null;
+      return null;
     }
     if (next.suggested_transaction_id && !rowExists(db, "bank_transactions", next.suggested_transaction_id)) {
-      next.suggested_transaction_id = null;
+      return null;
     }
   }
 
   if (table === "financial_entries") {
-    if (next.project_id && !rowExists(db, "projects", next.project_id)) next.project_id = null;
-    if (next.project_unit_id && !rowExists(db, "project_units", next.project_unit_id)) next.project_unit_id = null;
-    if (next.asset_id && !rowExists(db, "assets", next.asset_id)) next.asset_id = null;
-    if (next.incident_id && !rowExists(db, "incidents", next.incident_id)) next.incident_id = null;
+    if (next.project_id && !rowExists(db, "projects", next.project_id)) return null;
+    if (next.project_unit_id && !rowExists(db, "project_units", next.project_unit_id)) return null;
+    if (next.asset_id && !rowExists(db, "assets", next.asset_id)) return null;
+    if (next.incident_id && !rowExists(db, "incidents", next.incident_id)) return null;
     next.created_by_user_id = next.created_by_user_id || "user-ops";
     ensureUser(db, next.created_by_user_id, updatedAt);
   }

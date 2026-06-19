@@ -89,6 +89,7 @@ import { createRuntimeDiagnosticsService, type RuntimeDiagnosticsService } from 
 import { applySchedulingFoundationMigration, bootstrapSchedulingFoundation } from "./schedulingFoundationBootstrap";
 import { createSupportDiagnosticsService, type SupportDiagnosticsService } from "./supportDiagnosticsService";
 import { createSyncOutboxWorkerService, summarizeSyncOutboxWorker } from "./syncOutboxWorkerService";
+import { createSyncTombstonePullService } from "./syncTombstonePullService";
 import { createUserAdminService, type UserAdminService } from "./userAdminService";
 import { createLocalDatabaseKeyStore, DatabaseKeyIntegrityError } from "../auth/databaseKeyStore";
 import { getFreshStoredAccessToken } from "../auth/supabaseAuthBridge";
@@ -239,6 +240,9 @@ type LocalDatabaseRuntime = {
   applyRemoteCatalogRows: (
     input: import("@contracts").AppApplyRemoteCatalogRowsCommand,
   ) => import("@contracts").AppApplyRemoteCatalogRowsResult;
+  applyRemoteSyncTombstones: (
+    input: import("@contracts").AppApplyRemoteSyncTombstonesCommand,
+  ) => import("@contracts").AppApplyRemoteSyncTombstonesResult;
   applyRemoteExchangeRates: (
     input: import("@contracts").AppApplyRemoteExchangeRatesCommand,
   ) => import("@contracts").AppApplyRemoteExchangeRatesResult;
@@ -1419,6 +1423,14 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         );
         return rows.length ? [{ table: "exchange_rates", onConflict: "id", rows }] : [];
       }
+      case "location": {
+        const rows = selectAll("SELECT * FROM locations WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "locations", onConflict: "id", rows }] : [];
+      }
+      case "category": {
+        const rows = selectAll("SELECT * FROM asset_categories WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "asset_categories", onConflict: "id", rows }] : [];
+      }
       case "client": {
         const rows = selectAll("SELECT * FROM clients WHERE id = ?", row.entity_id);
         return rows.length ? [{ table: "clients", onConflict: "id", rows }] : [];
@@ -1671,6 +1683,10 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         return [{ table: "manufacturers", column: "id", value: row.entity_id }];
       case "production_company":
         return [{ table: "production_companies", column: "id", value: row.entity_id }];
+      case "location":
+        return [{ table: "locations", column: "id", value: row.entity_id }];
+      case "category":
+        return [{ table: "asset_categories", column: "id", value: row.entity_id }];
       case "crew":
         return [{ table: "crew_members", column: "id", value: row.entity_id }];
       case "department":
@@ -1688,6 +1704,10 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     getTokens: async () => ({ accessToken: await getFreshStoredAccessToken() }),
   });
   const syncOutboxWorker = createSyncOutboxWorkerService(database, {
+    // Keep cross-machine latency low and drain normal bulk operations in one
+    // pass. The worker has its own single-flight guard, so overlapping ticks are
+    // harmless and the 20s-era queue backlog no longer accumulates.
+    batchSize: 100,
     transport: isSupabaseSyncEnabled()
       ? createSupabaseOutboxTransport({
           supabaseUrl: process.env.VITE_SUPABASE_URL ?? "",
@@ -2169,7 +2189,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       lastSyncSummary = "The scheduled local sync pass failed.";
       logger.warn("Scheduled local sync pass failed.");
     });
-  }, 20 * 1000);
+  }, 2 * 1000);
   syncOutboxTimer.unref();
 
   return {
@@ -2204,6 +2224,8 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     rmaMutations,
     applyRemoteCatalogRows: (input: import("@contracts").AppApplyRemoteCatalogRowsCommand) =>
       createCatalogPullService(database).applyRemoteRows(input.workspaceId, input.entityType, input.rows),
+    applyRemoteSyncTombstones: (input: import("@contracts").AppApplyRemoteSyncTombstonesCommand) =>
+      createSyncTombstonePullService(database).apply(input.workspaceId, input.rows),
     applyRemoteExchangeRates: (input: import("@contracts").AppApplyRemoteExchangeRatesCommand) => {
       const result = createCatalogPullService(database).applyRemoteExchangeRates(input.workspaceId, input.rows);
       return { workspaceId: input.workspaceId, ...result };

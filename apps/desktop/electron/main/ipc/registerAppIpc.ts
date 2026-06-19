@@ -63,6 +63,9 @@ type RegisterAppIpcOptions = {
   applyRemoteCatalogRows: (
     input: import("@contracts").AppApplyRemoteCatalogRowsCommand,
   ) => import("@contracts").AppApplyRemoteCatalogRowsResult;
+  applyRemoteSyncTombstones: (
+    input: import("@contracts").AppApplyRemoteSyncTombstonesCommand,
+  ) => import("@contracts").AppApplyRemoteSyncTombstonesResult;
   applyRemoteExchangeRates: (
     input: import("@contracts").AppApplyRemoteExchangeRatesCommand,
   ) => import("@contracts").AppApplyRemoteExchangeRatesResult;
@@ -242,6 +245,18 @@ const applyRemoteCatalogRowsSchema = z.object({
       default_weekly_rate: z.number().nullable().optional(),
       default_overtime_rate: z.number().nullable().optional(),
       rate_currency: z.string().nullable().optional(),
+    }),
+  ),
+});
+
+const applyRemoteSyncTombstonesSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  rows: z.array(
+    z.object({
+      workspace_id: z.string().trim().min(1),
+      table_name: z.string().trim().min(1),
+      entity_id: z.string().trim().min(1),
+      deleted_at: z.string().trim().min(1),
     }),
   ),
 });
@@ -489,6 +504,7 @@ export const registerAppIpc = ({
   exportRecentLogs,
   exportSupportBundle,
   applyRemoteCatalogRows,
+  applyRemoteSyncTombstones,
   applyRemoteExchangeRates,
   applyRemoteAssetSnapshots,
   applyRemoteOperationalSnapshots,
@@ -1073,6 +1089,13 @@ export const registerAppIpc = ({
     applyRemoteCatalogRowsSchema,
     (_event, input) => applyRemoteCatalogRows(input),
     "The app could not apply remote catalog updates.",
+  );
+  safeHandle(
+    ipcChannels.app.applyRemoteSyncTombstones,
+    applyRemoteSyncTombstonesSchema,
+    (_event, input) =>
+      applyRemoteSyncTombstones(input as import("@contracts").AppApplyRemoteSyncTombstonesCommand),
+    "The app could not apply remote deletion markers.",
   );
   safeHandle(
     ipcChannels.app.applyRemoteExchangeRates,

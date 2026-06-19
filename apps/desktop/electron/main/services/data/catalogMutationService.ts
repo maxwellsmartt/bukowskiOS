@@ -378,10 +378,17 @@ const replaceKitAssets = (
   });
 };
 
-// Business catalogs that sync local-first to Supabase (clients/manufacturers/
-// production_companies). asset_categories/locations/kits/etc. are NOT here —
-// they either ship as a static seed or are not yet mirrored.
-const SYNCED_CATALOG_ENTITIES = new Set(["client", "manufacturer", "production_company", "crew", "department"]);
+// Catalogs with a verified Supabase mirror. Kits remain local-only until their
+// parent/child aggregate has a transactional remote contract.
+const SYNCED_CATALOG_ENTITIES = new Set([
+  "location",
+  "category",
+  "client",
+  "manufacturer",
+  "production_company",
+  "crew",
+  "department",
+]);
 
 export const createCatalogMutationService = (db: DatabaseSync) => {
   const codeService = createCodeGenerationService(db);
@@ -426,6 +433,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
         if (!result.changes) {
           throw new Error("Location not found.");
         }
+        enqueueCatalogOutbox(input.workspaceId, "location", input.id, "delete");
         break;
       }
       case "department": {
@@ -473,6 +481,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
         if (!result.changes) {
           throw new Error("Category not found.");
         }
+        enqueueCatalogOutbox(input.workspaceId, "category", input.id, "delete");
         break;
       }
       case "kit": {
@@ -499,6 +508,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
           case "location": {
             const code = ensureValue(input.code, "Location code").toUpperCase();
             assertUniqueCode(db, "locations", workspaceId, code);
+            const locationId = `location-${slugify(code)}-${Date.now().toString(36)}`;
 
             db.prepare(
               `
@@ -506,7 +516,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
                 VALUES (?, ?, ?, ?, ?, ?, 1, ?)
               `,
             ).run(
-              `location-${slugify(code)}-${Date.now().toString(36)}`,
+              locationId,
               workspaceId,
               code,
               ensureValue(input.name, "Location name"),
@@ -514,6 +524,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               optionalValue(input.description),
               now,
             );
+            enqueueCatalogOutbox(workspaceId, "location", locationId, "upsert");
             break;
           }
 
@@ -521,19 +532,21 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             const code = ensureValue(input.code, "Department code").toUpperCase();
             assertUniqueCode(db, "departments", workspaceId, code);
 
+            const departmentId = `department-${slugify(code)}-${Date.now().toString(36)}`;
             db.prepare(
               `
                 INSERT INTO departments (id, workspace_id, code, name, description, is_active, created_at)
                 VALUES (?, ?, ?, ?, ?, 1, ?)
               `,
             ).run(
-              `department-${slugify(code)}-${Date.now().toString(36)}`,
+              departmentId,
               workspaceId,
               code,
               ensureValue(input.name, "Department name"),
               optionalValue(input.description),
               now,
             );
+            enqueueCatalogOutbox(workspaceId, "department", departmentId, "upsert");
             break;
           }
 
@@ -563,6 +576,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               now,
             );
             replaceCrewBankAccounts(db, crewId, input.bankAccounts, now);
+            enqueueCatalogOutbox(workspaceId, "crew", crewId, "upsert");
             break;
           }
 
@@ -653,19 +667,21 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             const code = ensureValue(input.code, "Category code").toUpperCase();
             assertUniqueCode(db, "asset_categories", workspaceId, code);
 
+            const categoryId = `category-${slugify(code)}-${Date.now().toString(36)}`;
             db.prepare(
               `
                 INSERT INTO asset_categories (id, workspace_id, parent_category_id, code, name, description, created_at, is_active)
                 VALUES (?, ?, NULL, ?, ?, ?, ?, 1)
               `,
             ).run(
-              `category-${slugify(code)}-${Date.now().toString(36)}`,
+              categoryId,
               workspaceId,
               code,
               ensureValue(input.name, "Category name"),
               optionalValue(input.description),
               now,
             );
+            enqueueCatalogOutbox(workspaceId, "category", categoryId, "upsert");
             break;
           }
 
@@ -740,6 +756,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             if (!result.changes) {
               throw new Error("Location not found.");
             }
+            enqueueCatalogOutbox(workspaceId, "location", input.id, "upsert");
             break;
           }
 
@@ -756,6 +773,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             if (!result.changes) {
               throw new Error("Department not found.");
             }
+            enqueueCatalogOutbox(workspaceId, "department", input.id, "upsert");
             break;
           }
 
@@ -784,6 +802,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               throw new Error("Crew member not found.");
             }
             replaceCrewBankAccounts(db, input.id, input.bankAccounts, now);
+            enqueueCatalogOutbox(workspaceId, "crew", input.id, "upsert");
             break;
           }
 
@@ -897,6 +916,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             if (!result.changes) {
               throw new Error("Category not found.");
             }
+            enqueueCatalogOutbox(workspaceId, "category", input.id, "upsert");
             break;
           }
 

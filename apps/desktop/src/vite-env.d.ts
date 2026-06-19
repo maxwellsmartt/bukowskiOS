@@ -223,6 +223,9 @@ declare global {
       applyRemoteCatalogRows: (
         input: AppApplyRemoteCatalogRowsCommand,
       ) => Promise<AppApplyRemoteCatalogRowsResult>;
+      applyRemoteSyncTombstones: (
+        input: import("@contracts").AppApplyRemoteSyncTombstonesCommand,
+      ) => Promise<import("@contracts").AppApplyRemoteSyncTombstonesResult>;
       applyRemoteExchangeRates: (
         input: import("@contracts").AppApplyRemoteExchangeRatesCommand,
       ) => Promise<import("@contracts").AppApplyRemoteExchangeRatesResult>;

@@ -2161,6 +2161,7 @@
       "import": {
         "noRows": "No movements were found in the file.",
         "failed": "Could not import the statement.",
+        "accountNotDetected": "We could not identify one account for this statement. Check the account number or select the account filter and try again.",
         "mismatch": "This file looks like account {{fileAccount}} ({{fileCurrency}}), but you're importing into \"{{accountLabel}}\" ({{accountCurrency}}). Import anyway?",
         "mismatchBlocked": "Import blocked: this file looks like account {{fileAccount}} ({{fileCurrency}}), but you selected \"{{accountLabel}}\" ({{accountCurrency}}). Choose or create the correct bank account."
       },
@@ -4523,6 +4524,12 @@
         "notLinked": "Not linked",
         "preproduction": "Pre-production"
       },
+      "dateCascade": {
+        "title": "Update units and crew too?",
+        "body": "You changed the project dates. We can adapt linked units and crew assignments in one step.",
+        "details": "Pre-production keeps its duration when you did not edit it manually. Child dates shift and remain inside the new window.",
+        "confirm": "Update everything"
+      },
       "toasts": {
         "savedTitle": "Project saved",
         "savedBody": "Project details updated.",
@@ -4693,6 +4700,12 @@
         "removeRow": "Remove row",
         "confirm": "Assign crew"
       },
+      "dateCascade": {
+        "title": "Update the crew for {{name}}?",
+        "body": "You changed this unit's dates. We can automatically adapt the assigned crew dates.",
+        "details": "{{count}} assignments will update while preserving their relative timing and staying inside the unit's new window.",
+        "confirm": "Update unit and crew"
+      },
       "actions": {
         "edit": "Edit unit",
         "editAria": "Edit {{name}}",
@@ -4742,7 +4755,7 @@
         "deleteTitle": "Delete unit \"{{name}}\"?",
         "wrapTitle": "Mark \"{{name}}\" as wrapped?",
         "deleteBody": "This only works if the unit has no linked operational records. Action cannot be undone.",
-        "wrapBody": "The unit's end date will be set to today.",
+        "wrapBody": "The unit's end date will be set to today and assigned crew will adapt to the new window.",
         "deleteConfirm": "Delete unit",
         "wrapConfirm": "Mark wrapped",
         "removeDepartmentTitle": "Remove {{department}} from {{unit}}?",
@@ -5171,6 +5184,14 @@
           "label": "Production companies",
           "detail": "Production company catalog"
         },
+        "crew_members": {
+          "label": "Crew",
+          "detail": "Collaborator catalog"
+        },
+        "departments": {
+          "label": "Departments",
+          "detail": "Operational departments"
+        },
         "projects": {
           "label": "Projects",
           "detail": "Project shells, units and crew assignments"
@@ -5218,6 +5239,10 @@
         "currency_settings": {
           "label": "Currency settings",
           "detail": "NCF series and exchange-rate config"
+        },
+        "sync_tombstones": {
+          "label": "Remote deletions",
+          "detail": "Confirmed deletions across machines"
         }
       },
       "coverageRowsLatest": "{{count}} rows in latest pull",

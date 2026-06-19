@@ -14,6 +14,7 @@ import { useOperationalSnapshotPull } from "@shared/hooks/useOperationalSnapshot
 import { useRealtimeWorkspaceSync } from "@shared/hooks/useRealtimeWorkspaceSync";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useTreasuryPull } from "@shared/hooks/useTreasuryPull";
+import { useSyncTombstonePull } from "@shared/hooks/useSyncTombstonePull";
 import { notifyWorkspaceDataChanged } from "@shared/hooks/useWorkspaceDataRefresh";
 import { useSession } from "@app/providers/SessionProvider";
 import { useToast } from "@app/providers/ToastProvider";
@@ -58,6 +59,7 @@ export const AppShell = () => {
   const { activeMembership, activeWorkspaceId } = useWorkspace();
   useAutoLogout();
   useAutomationControlPlanePull();
+  useSyncTombstonePull();
   useCatalogPull();
   useAssetSnapshotPull();
   useOperationalSnapshotPull();

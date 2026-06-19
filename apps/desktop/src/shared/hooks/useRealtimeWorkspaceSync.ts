@@ -6,6 +6,9 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { requestImmediatePull } from "./useWorkspaceDataRefresh";
 
 const WORKSPACE_MEMBERSHIPS_CHANGED_EVENT = "bukowski:workspace-memberships-changed";
+export const realtimeSyncStatusEvent = "bukowski:realtime-sync-status";
+export const realtimeSyncStatusKey = "bukowski:realtime-sync-status";
+export type RealtimeSyncStatus = "SUBSCRIBED" | "CHANNEL_ERROR" | "TIMED_OUT" | "CLOSED" | "CONNECTING";
 // Coalesce bursts (a multi-row push emits one event per row) into a single pull.
 const COALESCE_MS = 250;
 
@@ -29,6 +32,15 @@ export const useRealtimeWorkspaceSync = () => {
     }
 
     let coalesceTimer: number | null = null;
+    const publishStatus = (nextStatus: RealtimeSyncStatus) => {
+      try {
+        window.localStorage.setItem(realtimeSyncStatusKey, nextStatus);
+      } catch {
+        // UI status remains available through the event when storage is unavailable.
+      }
+      window.dispatchEvent(new CustomEvent<RealtimeSyncStatus>(realtimeSyncStatusEvent, { detail: nextStatus }));
+    };
+    publishStatus("CONNECTING");
     const triggerPull = () => {
       if (coalesceTimer != null) {
         return;
@@ -45,17 +57,26 @@ export const useRealtimeWorkspaceSync = () => {
         // Workspace identity (name/avatar/currency/accent) is fetched by the
         // workspace provider, not the pull hooks — nudge it so renames and brand
         // changes from another machine appear instantly.
-        if ((payload as { table?: string }).table === "workspaces") {
+        const table = (payload as { table?: string }).table;
+        if (["workspaces", "workspace_memberships", "roles", "role_permissions", "permissions"].includes(table ?? "")) {
           window.dispatchEvent(new Event(WORKSPACE_MEMBERSHIPS_CHANGED_EVENT));
         }
         triggerPull();
       })
-      .subscribe();
+      .subscribe((nextStatus) => {
+        publishStatus(nextStatus as RealtimeSyncStatus);
+        if (nextStatus === "SUBSCRIBED") {
+          // Always catch up after a reconnect because events may have been
+          // missed while the channel was unavailable.
+          triggerPull();
+        }
+      });
 
     return () => {
       if (coalesceTimer != null) {
         window.clearTimeout(coalesceTimer);
       }
+      publishStatus("CLOSED");
       void Promise.resolve(supabase.removeChannel(channel));
     };
   }, [supabase, isLocalFallback, status, isWorkspaceReady, activeWorkspaceId]);

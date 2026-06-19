@@ -1,10 +1,21 @@
 import * as XLSX from "xlsx";
 import { describe, expect, it } from "vitest";
 
-import { parseBancoPopularCsv, parseBancoSantaCruzXlsx } from "../features/finance/treasury/bankStatementParsers";
+import { parseBancoPopularCsv, parseBancoSantaCruzXlsx, resolveStatementAccount } from "../features/finance/treasury/bankStatementParsers";
 import { MAX_XLSX_SHEETS } from "../shared/lib/xlsxSafety";
 
 describe("bank statement parsers", () => {
+  it("resolves the statement account independently from the visible account filter", () => {
+    const account = resolveStatementAccount(
+      { bankName: "santa_cruz", accountNumber: "123456789", currencyHint: "USD" },
+      [
+        { id: "bsc-dop", bankName: "santa_cruz", currency: "DOP", accountNumberFull: "987654321" },
+        { id: "bsc-usd", bankName: "santa_cruz", currency: "USD", accountNumberMasked: "•••• 6789", last4: "6789" },
+      ],
+    );
+
+    expect(account?.id).toBe("bsc-usd");
+  });
   it("extracts Banco Popular account metadata without needing full account persistence", () => {
     const parsed = parseBancoPopularCsv(`METADATA CINE SRL
 Banco Popular Dominicano

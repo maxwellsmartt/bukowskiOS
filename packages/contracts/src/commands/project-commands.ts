@@ -34,6 +34,7 @@ export type UpdateProjectInput = {
   preproductionStartDate?: string;
   preproductionEndDate?: string;
   colorKey?: string;
+  cascadeDates?: boolean;
 };
 
 export type DeleteProjectInput = {
@@ -73,6 +74,7 @@ export type UpdateProjectUnitInput = {
   windows?: ProjectBlueprintUnitWindowInput[];
   notes?: string;
   statusAction?: "none" | "mark_wrapped" | "cancel" | "reactivate";
+  cascadeCrewDates?: boolean;
 };
 
 export type DeleteProjectUnitInput = {

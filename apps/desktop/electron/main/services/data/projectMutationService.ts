@@ -99,6 +99,62 @@ const normalizeOptionalText = (value?: string | null) => {
   return nextValue ? nextValue : null;
 };
 
+const dateDeltaDays = (from: string | null, to: string | null) => {
+  if (!from || !to) return 0;
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+};
+
+const shiftDateOnly = (value: string | null, days: number) => {
+  if (!value || !days) return value;
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+};
+
+const clampDateOnly = (value: string | null, minimum: string | null, maximum: string | null) => {
+  if (!value) return value;
+  if (minimum && value < minimum) return minimum;
+  if (maximum && value > maximum) return maximum;
+  return value;
+};
+
+const cascadeDateWindow = (
+  startDate: string | null,
+  endDate: string | null,
+  deltaDays: number,
+  parentStartDate: string | null,
+  parentEndDate: string | null,
+) => {
+  let nextStart = clampDateOnly(shiftDateOnly(startDate, deltaDays), parentStartDate, parentEndDate);
+  let nextEnd = clampDateOnly(shiftDateOnly(endDate, deltaDays), parentStartDate, parentEndDate);
+  if (nextStart && nextEnd && nextStart > nextEnd) {
+    nextStart = parentStartDate ?? nextEnd;
+    nextEnd = parentEndDate ?? nextStart;
+  }
+  return { startDate: nextStart, endDate: nextEnd };
+};
+
+const cascadeCrewForUnit = (
+  db: DatabaseSync,
+  unitId: string,
+  oldUnitStartDate: string | null,
+  newUnitStartDate: string | null,
+  newUnitEndDate: string | null,
+  now: string,
+) => {
+  const deltaDays = dateDeltaDays(oldUnitStartDate, newUnitStartDate);
+  const assignments = db
+    .prepare(`SELECT id, start_date, end_date FROM project_unit_crew_assignments WHERE project_unit_id = ?`)
+    .all(unitId) as Array<{ id: string; start_date: string | null; end_date: string | null }>;
+  const update = db.prepare(
+    `UPDATE project_unit_crew_assignments SET start_date = ?, end_date = ?, updated_at = ? WHERE id = ?`,
+  );
+  assignments.forEach((assignment) => {
+    const next = cascadeDateWindow(assignment.start_date, assignment.end_date, deltaDays, newUnitStartDate, newUnitEndDate);
+    update.run(next.startDate, next.endDate, now, assignment.id);
+  });
+};
+
 type NormalizedUnitWindow = {
   id: string;
   startDate: string | null;
@@ -1899,21 +1955,58 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
     const endDate = input.endDate === undefined ? currentProject.end_date : normalizeDateOnly(input.endDate);
     const hasPreproduction =
       input.hasPreproduction === undefined ? Boolean(currentProject.has_preproduction) : Boolean(input.hasPreproduction);
-    const preproductionStartDate =
+    let preproductionStartDate =
       input.preproductionStartDate === undefined
         ? currentProject.preproduction_start_date
         : normalizeDateOnly(input.preproductionStartDate);
-    const preproductionEndDate =
+    let preproductionEndDate =
       input.preproductionEndDate === undefined
         ? currentProject.preproduction_end_date
         : normalizeDateOnly(input.preproductionEndDate);
     const colorKey = input.colorKey === undefined ? currentProject.color_key : normalizeColorKey(input.colorKey);
 
+    const projectDeltaDays = dateDeltaDays(currentProject.start_date, startDate);
+    const preproductionWasNotManuallyChanged =
+      preproductionStartDate === currentProject.preproduction_start_date &&
+      preproductionEndDate === currentProject.preproduction_end_date;
+    if (input.cascadeDates && projectDeltaDays && hasPreproduction && preproductionWasNotManuallyChanged) {
+      preproductionStartDate = shiftDateOnly(preproductionStartDate, projectDeltaDays);
+      preproductionEndDate = shiftDateOnly(preproductionEndDate, projectDeltaDays);
+    }
+
     assertDateWindow(startDate, endDate, "Project");
     assertPreproductionWindow(hasPreproduction, preproductionStartDate, preproductionEndDate, startDate);
-    assertExistingUnitsWithinProjectWindow(db, input.projectId, startDate, endDate);
+    if (!input.cascadeDates) {
+      assertExistingUnitsWithinProjectWindow(db, input.projectId, startDate, endDate);
+    }
 
-    const result = db.prepare(
+    db.exec("BEGIN");
+    try {
+      if (input.cascadeDates) {
+        const units = db
+          .prepare(`SELECT id, start_date, end_date FROM project_units WHERE project_id = ? ORDER BY sort_order, id`)
+          .all(input.projectId) as Array<{ id: string; start_date: string | null; end_date: string | null }>;
+        const updateUnit = db.prepare(
+          `UPDATE project_units SET start_date = ?, end_date = ?, updated_at = ? WHERE id = ?`,
+        );
+        const updateWindow = db.prepare(
+          `UPDATE project_unit_windows SET start_date = ?, end_date = ?, updated_at = ? WHERE id = ?`,
+        );
+        for (const unit of units) {
+          const nextUnit = cascadeDateWindow(unit.start_date, unit.end_date, projectDeltaDays, startDate, endDate);
+          const windows = db
+            .prepare(`SELECT id, start_date, end_date FROM project_unit_windows WHERE project_unit_id = ?`)
+            .all(unit.id) as Array<{ id: string; start_date: string | null; end_date: string | null }>;
+          windows.forEach((window) => {
+            const nextWindow = cascadeDateWindow(window.start_date, window.end_date, projectDeltaDays, startDate, endDate);
+            updateWindow.run(nextWindow.startDate, nextWindow.endDate, now, window.id);
+          });
+          cascadeCrewForUnit(db, unit.id, unit.start_date, nextUnit.startDate, nextUnit.endDate, now);
+          updateUnit.run(nextUnit.startDate, nextUnit.endDate, now, unit.id);
+        }
+      }
+
+      const result = db.prepare(
       `
         UPDATE projects
         SET
@@ -1934,7 +2027,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
           updated_at = ?
         WHERE id = ?
       `,
-    ).run(
+      ).run(
       code,
       name,
       client?.id ?? null,
@@ -1953,17 +2046,22 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
       input.projectId,
     );
 
-    if (!result.changes) {
-      throw new Error("Project not found.");
-    }
+      if (!result.changes) {
+        throw new Error("Project not found.");
+      }
 
-    enqueueOperationalSnapshotOutbox(db, {
-      workspaceId,
-      entityType: "project",
-      entityId: input.projectId,
-      updatedAt: now,
-      payload: { projectId: input.projectId, operation: "update" },
-    });
+      enqueueOperationalSnapshotOutbox(db, {
+        workspaceId,
+        entityType: "project",
+        entityId: input.projectId,
+        updatedAt: now,
+        payload: { projectId: input.projectId, operation: input.cascadeDates ? "update_dates_cascade" : "update" },
+      });
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
   },
 
   archiveProject(input: ArchiveProjectInput) {
@@ -2223,12 +2321,20 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
 
     insertProjectUnitWindows(db, input.unitId, unitWindows, now);
 
+    if (input.cascadeCrewDates) {
+      cascadeCrewForUnit(db, input.unitId, currentUnit.start_date, startDate, endDate, now);
+    }
+
     enqueueOperationalSnapshotOutbox(db, {
       workspaceId: project.workspace_id,
       entityType: "project",
       entityId: input.projectId,
       updatedAt: now,
-      payload: { projectId: input.projectId, unitId: input.unitId, operation: "update_unit" },
+      payload: {
+        projectId: input.projectId,
+        unitId: input.unitId,
+        operation: input.cascadeCrewDates ? "update_unit_dates_cascade" : "update_unit",
+      },
     });
   },
 

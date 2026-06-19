@@ -1,9 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import { createOperationalSnapshotService } from "../../electron/main/services/data/operationalSnapshotService";
+import { createOperationalSnapshotService, resolveOperationalSnapshot } from "../../electron/main/services/data/operationalSnapshotService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("operational snapshot service", () => {
+  it("makes project snapshots self-contained for crew assignments", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-crew-catalog");
+    try {
+      const snapshot = resolveOperationalSnapshot(database, {
+        workspace_id: "workspace-metadata",
+        entity_type: "project",
+        entity_id: "project-aurora",
+        updated_at: "2026-06-19T12:00:00.000Z",
+      });
+      const crewMembers = snapshot?.snapshot_json.crewMembers as Array<{ id: string; full_name: string }>;
+      expect(crewMembers.map((row) => row.id)).toEqual(expect.arrayContaining(["crew-user-paola", "crew-user-luis"]));
+      expect(crewMembers.every((row) => Boolean(row.full_name))).toBe(true);
+    } finally {
+      cleanup();
+    }
+  });
   it("queues historical operational snapshots idempotently", () => {
     const { cleanup, database } = createTestDatabase("bukowski-operational-snapshots");
 
@@ -101,7 +117,7 @@ describe("operational snapshot service", () => {
     }
   });
 
-  it("applies project snapshots even when optional catalog references are missing", () => {
+  it("defers project snapshots when catalog references have not arrived yet", () => {
     const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-fk");
 
     try {
@@ -150,15 +166,17 @@ describe("operational snapshot service", () => {
         },
       ]);
 
-      expect(result.errors).toEqual([]);
-      expect(result.appliedCount).toBe(1);
+      expect(result.errors).toEqual([
+        "project-remote-missing-catalog: Project references unavailable client client-not-local-yet; snapshot deferred.",
+      ]);
+      expect(result.appliedCount).toBe(0);
+      expect(result.cursorAfter).toBeNull();
 
       const project = database
         .prepare("SELECT client_id, production_company_id FROM projects WHERE id = ?")
-        .get("project-remote-missing-catalog") as { client_id: string | null; production_company_id: string | null };
+        .get("project-remote-missing-catalog");
 
-      expect(project.client_id).toBeNull();
-      expect(project.production_company_id).toBeNull();
+      expect(project).toBeUndefined();
     } finally {
       cleanup();
     }

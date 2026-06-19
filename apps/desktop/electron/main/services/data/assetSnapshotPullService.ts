@@ -101,27 +101,11 @@ const existsById = (db: DatabaseSync, table: string, id: string | null | undefin
   return row?.id ? id : null;
 };
 
-const ensureCategory = (db: DatabaseSync, workspaceId: string, categoryId: string, updatedAt: string) => {
-  const existing = existsById(db, "asset_categories", categoryId);
-  if (existing) return categoryId;
-
-  // The placeholder code must be unique per (workspace, code). Deriving it from
-  // a short prefix of the id collides for every "category-…" id: the first
-  // placeholder wins, INSERT OR IGNORE swallows the rest (OR IGNORE does not
-  // apply to FK failures, but it does to UNIQUE), and every asset in those
-  // categories then dies on the assets.category_id FK — permanently, because
-  // the pull cursor advances past them. Use the full sanitized id instead.
-  const suffix = categoryId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() || "REMOTE";
-  const code = `REMOTE-${suffix}`;
-  db
-    .prepare(
-      `
-        INSERT OR IGNORE INTO asset_categories (id, workspace_id, parent_category_id, code, name, description, created_at, updated_at)
-        VALUES (?, ?, NULL, ?, 'Remote category', 'Created locally because this asset arrived before its category.', ?, ?)
-      `,
-    )
-    .run(categoryId, workspaceId, code, updatedAt, updatedAt);
-  return categoryId;
+const requireReference = (db: DatabaseSync, table: string, id: string | null | undefined, label: string) => {
+  if (!id) return null;
+  const existing = existsById(db, table, id);
+  if (!existing) throw new Error(`${label} ${id} is not available locally yet; snapshot deferred.`);
+  return existing;
 };
 
 const ensureHydrationEvent = (db: DatabaseSync, workspaceId: string, assetId: string, stateUpdatedAt: string) => {
@@ -157,8 +141,8 @@ const ensureHydrationEvent = (db: DatabaseSync, workspaceId: string, assetId: st
 };
 
 const upsertAsset = (db: DatabaseSync, asset: RemoteAssetSnapshotRow) => {
-  const categoryId = ensureCategory(db, asset.workspace_id, asset.category_id, asset.updated_at);
-  const defaultLocationId = existsById(db, "locations", asset.default_location_id);
+  const categoryId = requireReference(db, "asset_categories", asset.category_id, "Category");
+  const defaultLocationId = requireReference(db, "locations", asset.default_location_id, "Default location");
 
   db
     .prepare(
@@ -219,12 +203,14 @@ const upsertAsset = (db: DatabaseSync, asset: RemoteAssetSnapshotRow) => {
 };
 
 const upsertState = (db: DatabaseSync, state: RemoteAssetCurrentStateRow) => {
+  // Validate every relationship before writing anything. Missing parents are a
+  // retryable ordering condition, never a reason to erase a business link.
+  const currentLocationId = requireReference(db, "locations", state.current_location_id, "Current location");
+  const currentProjectId = requireReference(db, "projects", state.current_project_id, "Current project");
+  const currentDepartmentId = requireReference(db, "departments", state.current_department_id, "Current department");
+  const currentResponsibleUserId = requireReference(db, "users", state.current_responsible_user_id, "Responsible user");
+  const projectUnitId = requireReference(db, "project_units", state.project_unit_id, "Project unit");
   const hydrationEventId = ensureHydrationEvent(db, state.workspace_id, state.asset_id, state.updated_at);
-  const currentLocationId = existsById(db, "locations", state.current_location_id);
-  const currentProjectId = existsById(db, "projects", state.current_project_id);
-  const currentDepartmentId = existsById(db, "departments", state.current_department_id);
-  const currentResponsibleUserId = existsById(db, "users", state.current_responsible_user_id);
-  const projectUnitId = existsById(db, "project_units", state.project_unit_id);
 
   db
     .prepare(

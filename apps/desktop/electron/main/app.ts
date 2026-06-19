@@ -553,6 +553,7 @@ app.whenReady().then(async () => {
     exportRecentLogs: localDatabase.exportRecentLogs,
     exportSupportBundle: localDatabase.exportSupportBundle,
     applyRemoteCatalogRows: localDatabase.applyRemoteCatalogRows,
+    applyRemoteSyncTombstones: localDatabase.applyRemoteSyncTombstones,
     applyRemoteExchangeRates: localDatabase.applyRemoteExchangeRates,
     applyRemoteAssetSnapshots: localDatabase.applyRemoteAssetSnapshots,
     applyRemoteOperationalSnapshots: localDatabase.applyRemoteOperationalSnapshots,

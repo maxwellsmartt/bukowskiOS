@@ -82,6 +82,61 @@ describe("project mutation service", () => {
     cleanup();
   });
 
+  it("cascades project date changes to units and crew atomically", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-date-cascade-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createProjectMutationService(database);
+
+    mutations.updateProject({
+      projectId: "project-aurora",
+      code: "AURORA",
+      name: "Aurora Campaign",
+      status: "Active",
+      startDate: "2026-04-05",
+      endDate: "2026-04-22",
+      cascadeDates: true,
+    });
+
+    const detail = reads.getProjectDetail("project-aurora");
+    const main = detail.units.find((unit) => unit.id === "unit-aurora-main");
+    expect(main?.startDate).toBe("2026-04-05");
+    expect(main?.endDate).toBe("2026-04-22");
+    expect(main?.crewAssignments.find((assignment) => assignment.id === "unit-aurora-main-crew-paola")).toMatchObject({
+      startDate: "2026-04-05",
+      endDate: "2026-04-22",
+    });
+    expect(main?.crewAssignments.find((assignment) => assignment.id === "unit-aurora-main-crew-luis")).toMatchObject({
+      startDate: "2026-04-07",
+      endDate: "2026-04-22",
+    });
+    cleanup();
+  });
+
+  it("cascades unit date changes to assigned crew", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-unit-date-cascade-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createProjectMutationService(database);
+
+    mutations.updateProjectUnit({
+      projectId: "project-aurora",
+      unitId: "unit-aurora-main",
+      code: "MAIN",
+      name: "Main Unit",
+      sortOrder: 1,
+      startDate: "2026-04-03",
+      endDate: "2026-04-16",
+      cascadeCrewDates: true,
+      statusAction: "none",
+    });
+
+    const main = reads.getProjectDetail("project-aurora").units.find((unit) => unit.id === "unit-aurora-main");
+    expect(main?.crewAssignments.find((assignment) => assignment.id === "unit-aurora-main-crew-paola")).toMatchObject({
+      startDate: "2026-04-03",
+      endDate: "2026-04-16",
+    });
+    cleanup();
+  });
+
   it("flags crew overlaps as warnings instead of blocking the assignment", () => {
     const { cleanup, database } = createTestDatabase("bukowski-project-conflict-test");
     const reads = createFoundationReadService(database);
