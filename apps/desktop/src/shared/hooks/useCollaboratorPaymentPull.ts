@@ -4,7 +4,7 @@ import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { CollaboratorPaymentPullTable } from "@contracts";
 import { canReadCollaboratorPayments } from "@shared/lib/financeAccess";
-import { applyCompositePullCursor, cursorFromRow, readCompositePullCursor, writeCompositePullCursor } from "@shared/lib/compositePullCursor";
+import { applyCompositePullCursor, canAdvanceCompositePullCursor, cursorFromRow, readCompositePullCursor, writeCompositePullCursor } from "@shared/lib/compositePullCursor";
 import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
 const POLL_INTERVAL_MS = 20_000;
@@ -77,7 +77,7 @@ export const useCollaboratorPaymentPull = () => {
             table,
             rows,
           });
-          if (result.errors.length === 0) {
+          if (canAdvanceCompositePullCursor(result)) {
             const nextCursor = cursorFromRow(rows[rows.length - 1], cursorColumn, "id");
             if (nextCursor) writeCompositePullCursor(key, nextCursor);
           }

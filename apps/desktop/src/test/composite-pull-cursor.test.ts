@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { applyCompositePullCursor, cursorFromRow } from "@shared/lib/compositePullCursor";
+import {
+  applyCompositePullCursor,
+  canAdvanceCompositePullCursor,
+  cursorFromRow,
+} from "@shared/lib/compositePullCursor";
 
 describe("composite pull cursor", () => {
   it("keeps paging rows that share the same timestamp", () => {
@@ -36,5 +40,37 @@ describe("composite pull cursor", () => {
       timestamp: "2026-06-19T12:00:00.000Z",
       id: "row-250",
     });
+  });
+
+  it("advances after a fully consumed apply", () => {
+    expect(
+      canAdvanceCompositePullCursor({
+        errors: [],
+        skippedDueToOutboxCount: 0,
+        skippedDueToDependencyCount: 0,
+        missingAssetCount: 0,
+      }),
+    ).toBe(true);
+  });
+
+  it("allows older-only skips because the rows are already consumed", () => {
+    expect(
+      canAdvanceCompositePullCursor({
+        errors: [],
+        skippedDueToOutboxCount: 0,
+        skippedDueToDependencyCount: 0,
+        missingAssetCount: 0,
+        skippedDueToOlderCount: 2,
+      }),
+    ).toBe(true);
+  });
+
+  it.each([
+    ["apply errors", { errors: ["failed"] }],
+    ["outbox deferrals", { errors: [], skippedDueToOutboxCount: 1 }],
+    ["dependency deferrals", { errors: [], skippedDueToDependencyCount: 1 }],
+    ["missing assets", { errors: [], missingAssetCount: 1 }],
+  ])("blocks cursor advancement for %s", (_label, result) => {
+    expect(canAdvanceCompositePullCursor(result)).toBe(false);
   });
 });

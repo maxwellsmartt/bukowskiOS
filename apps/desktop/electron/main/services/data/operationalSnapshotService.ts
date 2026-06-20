@@ -817,11 +817,7 @@ const applyPackingSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown
   upsertRow(db, "packing_slips", safeSlip);
   for (const row of (snapshot.items as Record<string, unknown>[] | undefined) ?? []) {
     if (!rowExists(db, "assets", row.asset_id)) {
-      logger.warn("Skipped remote packing item because related asset is unavailable.", {
-        packingSlipId: row.packing_slip_id,
-        assetId: row.asset_id,
-      });
-      continue;
+      throw new Error(`Packing item references unavailable asset ${String(row.asset_id)}; snapshot deferred.`);
     }
     upsertRowWithConflict(db, "packing_slip_items", row, ["packing_slip_id", "asset_id"]);
   }
@@ -930,24 +926,26 @@ export const createOperationalSnapshotService = (db: DatabaseSync) => ({
           continue;
         }
 
+        db.exec("SAVEPOINT operational_snapshot_row");
         try {
           if (row.deleted_at) {
             deleteOperationalSnapshotLocally(db, entityType, row.entity_id);
-            result.appliedCount += 1;
-            result.cursorAfter = row.updated_at;
-            continue;
+          } else {
+            if (entityType === "project") applyProjectSnapshot(db, row.snapshot_json, {
+              workspaceId: row.workspace_id,
+              projectId: row.entity_id,
+            });
+            if (entityType === "packing_slip") applyPackingSnapshot(db, row.snapshot_json);
+            if (entityType === "incident") applyIncidentSnapshot(db, row.snapshot_json);
+            if (entityType === "rma_case") applyRmaSnapshot(db, row.snapshot_json);
           }
 
-          if (entityType === "project") applyProjectSnapshot(db, row.snapshot_json, {
-            workspaceId: row.workspace_id,
-            projectId: row.entity_id,
-          });
-          if (entityType === "packing_slip") applyPackingSnapshot(db, row.snapshot_json);
-          if (entityType === "incident") applyIncidentSnapshot(db, row.snapshot_json);
-          if (entityType === "rma_case") applyRmaSnapshot(db, row.snapshot_json);
+          db.exec("RELEASE SAVEPOINT operational_snapshot_row");
           result.appliedCount += 1;
           result.cursorAfter = row.updated_at;
         } catch (error) {
+          db.exec("ROLLBACK TO SAVEPOINT operational_snapshot_row");
+          db.exec("RELEASE SAVEPOINT operational_snapshot_row");
           const message = error instanceof Error ? error.message : "Unknown operational snapshot error.";
           result.errors.push(`${row.entity_id}: ${message}`);
           logger.warn("Operational snapshot row failed.", { entityType, id: row.entity_id, error: message });

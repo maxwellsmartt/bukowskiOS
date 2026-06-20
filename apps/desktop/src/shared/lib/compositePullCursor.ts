@@ -3,6 +3,20 @@ export type CompositePullCursor = {
   id: string | null;
 };
 
+type CompositePullApplyResult = {
+  errors: readonly unknown[];
+  skippedDueToOutboxCount?: number;
+  skippedDueToOlderCount?: number;
+  skippedDueToDependencyCount?: number;
+  missingAssetCount?: number;
+};
+
+export const canAdvanceCompositePullCursor = (result: CompositePullApplyResult): boolean =>
+  result.errors.length === 0 &&
+  (result.skippedDueToOutboxCount ?? 0) === 0 &&
+  (result.skippedDueToDependencyCount ?? 0) === 0 &&
+  (result.missingAssetCount ?? 0) === 0;
+
 export const readCompositePullCursor = (key: string): CompositePullCursor | null => {
   try {
     const raw = window.localStorage.getItem(key);

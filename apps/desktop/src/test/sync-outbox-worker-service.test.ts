@@ -821,4 +821,39 @@ describe("sync outbox worker service", () => {
     // Delete ops must not run the upsert resolvers (no resurrecting rows).
     expect(upsertResolverCalled).toBe(false);
   });
+
+  it.each([
+    { label: "an absent resolver", resolver: undefined },
+    { label: "a null resolver result", resolver: () => null },
+    { label: "an empty resolver result", resolver: () => [] },
+  ])("rejects a delete with $label without recording the remote outbox", async ({ resolver }) => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const transport = createSupabaseOutboxTransport({
+      supabaseUrl: "https://bukowski.test/",
+      anonKey: "anon-test-key",
+      getAccessToken: async () => "access-test-token",
+      resolveDomainDeletes: resolver,
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(null, { status: 200 });
+      }) as typeof fetch,
+    });
+
+    await expect(
+      transport({
+        id: "outbox-del-without-target",
+        workspace_id: "11111111-1111-4111-8111-111111111111",
+        entity_type: "bank_statement_import",
+        entity_id: "import-without-target",
+        event_id: null,
+        operation_type: "delete",
+        payload_json: JSON.stringify({ deleted: true }),
+        attempt_count: 0,
+        created_at: "2026-04-12T18:00:00.000Z",
+        updated_at: "2026-04-12T18:01:00.000Z",
+      }),
+    ).rejects.toThrow("Supabase delete targets unavailable for outbox row outbox-del-without-target.");
+
+    expect(requests).toEqual([]);
+  });
 });

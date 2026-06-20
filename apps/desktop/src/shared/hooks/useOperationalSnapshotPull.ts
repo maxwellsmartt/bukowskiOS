@@ -5,6 +5,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { AppRemoteOperationalSnapshotRow, OperationalSnapshotEntityType } from "@contracts";
 import {
   applyCompositePullCursor,
+  canAdvanceCompositePullCursor,
   cursorFromRow,
   readCompositePullCursor,
   writeCompositePullCursor,
@@ -94,7 +95,8 @@ export const useOperationalSnapshotPull = () => {
               rows,
             });
 
-            if (result.errors.length === 0) {
+            const canAdvanceCursor = canAdvanceCompositePullCursor(result);
+            if (canAdvanceCursor) {
               const nextCursor = cursorFromRow(rawRows[rawRows.length - 1], "updated_at", "entity_id");
               if (nextCursor) {
                 cursor = nextCursor;
@@ -103,7 +105,7 @@ export const useOperationalSnapshotPull = () => {
             }
             if (result.appliedCount > 0) appliedAny = true;
 
-            if (rows.length < PULL_BATCH_SIZE || result.errors.length > 0) {
+            if (rows.length < PULL_BATCH_SIZE || !canAdvanceCursor) {
               break;
             }
           }

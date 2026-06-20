@@ -9,6 +9,7 @@ import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import {
   applyCompositePullCursor,
+  canAdvanceCompositePullCursor,
   cursorFromRow,
   readCompositePullCursor,
   writeCompositePullCursor,
@@ -122,7 +123,7 @@ export const useCatalogPull = () => {
             rows,
           });
 
-          if (result.errors.length === 0) {
+          if (canAdvanceCompositePullCursor(result)) {
             const nextCursor = cursorFromRow(rows[rows.length - 1] as unknown as Record<string, unknown>, "updated_at", "id");
             if (nextCursor) writeCompositePullCursor(cursorKey, nextCursor);
           }
@@ -151,7 +152,7 @@ export const useCatalogPull = () => {
               workspaceId: activeWorkspaceId,
               rows,
             });
-            if (result.errors.length === 0) {
+            if (canAdvanceCompositePullCursor(result)) {
               const nextCursor = cursorFromRow(rows[rows.length - 1] as unknown as Record<string, unknown>, "created_at", "id");
               if (nextCursor) writeCompositePullCursor(ratesCursorKey, nextCursor);
             }

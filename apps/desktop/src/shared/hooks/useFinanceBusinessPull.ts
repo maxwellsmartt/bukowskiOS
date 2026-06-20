@@ -4,7 +4,7 @@ import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { FinanceBusinessPullTable } from "@contracts";
 import { canReadFinanceBusiness } from "@shared/lib/financeAccess";
-import { applyCompositePullCursor, cursorFromRow, readCompositePullCursor, writeCompositePullCursor } from "@shared/lib/compositePullCursor";
+import { applyCompositePullCursor, canAdvanceCompositePullCursor, cursorFromRow, readCompositePullCursor, writeCompositePullCursor } from "@shared/lib/compositePullCursor";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
@@ -93,6 +93,7 @@ export const useFinanceBusinessPull = () => {
           // never reach other machines).
           let childRows: Array<Record<string, unknown>> | undefined;
           if (table === "invoice_extractions") {
+            childRows = [];
             const ids = rows.map((extraction) => extraction.id).filter(Boolean);
             if (ids.length) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -109,6 +110,7 @@ export const useFinanceBusinessPull = () => {
                   )}`,
                   tagError,
                 );
+                continue;
               } else {
                 childRows = (tagData ?? []) as Array<Record<string, unknown>>;
               }
@@ -121,7 +123,7 @@ export const useFinanceBusinessPull = () => {
             rows,
             childRows,
           });
-          if (result.errors.length === 0) {
+          if (canAdvanceCompositePullCursor(result)) {
             const nextCursor = cursorFromRow(rows[rows.length - 1], cursorColumn, "id");
             if (nextCursor) writeCompositePullCursor(key, nextCursor);
           }

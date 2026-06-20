@@ -259,6 +259,9 @@ export const createSupabaseOutboxTransport = ({
     // second machine's pull won't resurrect them. We skip the upsert resolvers.
     if (row.operation_type === "delete") {
       const deletes = resolveDomainDeletes ? (await resolveDomainDeletes(row)) ?? [] : [];
+      if (!deletes.length) {
+        throw new Error(`Supabase delete targets unavailable for outbox row ${row.id}.`);
+      }
       for (const target of deletes) {
         await deleteSupabaseRows({
           accessToken,

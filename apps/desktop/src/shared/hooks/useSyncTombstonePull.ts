@@ -5,6 +5,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { AppRemoteSyncTombstone } from "@contracts";
 import {
   applyCompositePullCursor,
+  canAdvanceCompositePullCursor,
   cursorFromRow,
   readCompositePullCursor,
   writeCompositePullCursor,
@@ -77,6 +78,8 @@ export const useSyncTombstonePull = () => {
           if (result.appliedCount > 0) appliedAny = true;
           if (result.errors.length > 0) {
             console.warn("[sync-tombstone-pull] Apply had errors", result.errors);
+          }
+          if (!canAdvanceCompositePullCursor(result)) {
             break;
           }
           const nextCursor = cursorFromRow(rawRows[rawRows.length - 1], "deleted_at", "cursor_key");

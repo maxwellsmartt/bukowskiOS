@@ -5,6 +5,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { AppRemoteAssetCurrentStateRow, AppRemoteAssetSnapshotRow } from "@contracts";
 import {
   applyCompositePullCursor,
+  canAdvanceCompositePullCursor,
   cursorFromRow,
   readCompositePullCursor,
   writeCompositePullCursor,
@@ -168,7 +169,8 @@ export const useAssetSnapshotPull = () => {
             states,
           });
 
-          if (result.errors.length === 0) {
+          const canAdvanceCursor = canAdvanceCompositePullCursor(result);
+          if (canAdvanceCursor) {
             const nextCursor = cursorFromRow(rawStateRows[rawStateRows.length - 1], "updated_at", "asset_id");
             if (nextCursor) {
               cursor = nextCursor;
@@ -177,7 +179,7 @@ export const useAssetSnapshotPull = () => {
           }
           if (result.appliedCount > 0) appliedAny = true;
 
-          if (states.length < PULL_BATCH_SIZE || result.errors.length > 0) {
+          if (states.length < PULL_BATCH_SIZE || !canAdvanceCursor) {
             break;
           }
         }

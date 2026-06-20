@@ -4,7 +4,7 @@ import type { AppRemoteAutomationControlPlaneRow, AutomationControlPlanePullEnti
 import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
-import { applyCompositePullCursor, cursorFromRow, readCompositePullCursor, writeCompositePullCursor } from "@shared/lib/compositePullCursor";
+import { applyCompositePullCursor, canAdvanceCompositePullCursor, cursorFromRow, readCompositePullCursor, writeCompositePullCursor } from "@shared/lib/compositePullCursor";
 
 import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
@@ -81,7 +81,7 @@ export const useAutomationControlPlanePull = () => {
             entityType,
             rows,
           });
-          if (result.errors.length === 0) {
+          if (canAdvanceCompositePullCursor(result)) {
             const nextCursor = cursorFromRow(rows[rows.length - 1] as unknown as Record<string, unknown>, "updated_at", "id");
             if (nextCursor) writeCompositePullCursor(key, nextCursor);
           }

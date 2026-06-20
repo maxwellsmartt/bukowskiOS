@@ -5,7 +5,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { TreasuryPullTable } from "@contracts";
 import { canReadTreasury } from "@shared/lib/financeAccess";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
-import { applyCompositePullCursor, cursorFromRow, readCompositePullCursor, writeCompositePullCursor } from "@shared/lib/compositePullCursor";
+import { applyCompositePullCursor, canAdvanceCompositePullCursor, cursorFromRow, readCompositePullCursor, writeCompositePullCursor } from "@shared/lib/compositePullCursor";
 import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
 const POLL_INTERVAL_MS = 20_000;
@@ -93,7 +93,8 @@ export const useTreasuryPull = () => {
               table,
               rows,
             });
-            if (result.errors.length === 0) {
+            const canAdvanceCursor = canAdvanceCompositePullCursor(result);
+            if (canAdvanceCursor) {
               const nextCursor = cursorFromRow(rows[rows.length - 1], cursorColumn, idColumn);
               if (nextCursor) {
                 cursor = nextCursor;
@@ -103,6 +104,8 @@ export const useTreasuryPull = () => {
             if (result.appliedCount > 0) appliedAny = true;
             if (result.errors.length > 0) {
               console.warn(`[treasury-pull] ${table} apply had errors: ${result.errors.join("; ")}`, result.errors);
+            }
+            if (!canAdvanceCursor) {
               break;
             }
             if (rows.length < PULL_BATCH_SIZE) break;

@@ -483,6 +483,102 @@ describe("operational snapshot service", () => {
     }
   });
 
+  it("rolls back project mutations and deletions when a remote snapshot fails", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-row-rollback");
+
+    try {
+      const service = createOperationalSnapshotService(database);
+      const projectId = "project-remote-rollback";
+      const unitId = "unit-remote-rollback";
+      const localUpdatedAt = "2026-05-06T12:20:00.000Z";
+      const remoteUpdatedAt = "2026-05-06T12:21:00.000Z";
+
+      database
+        .prepare(
+          `
+            INSERT INTO projects (
+              id, workspace_id, code, name, client_id, client_name, production_company_id,
+              production_company_name, status, start_date, end_date, has_preproduction,
+              preproduction_start_date, preproduction_end_date, color_key, description,
+              archived_at, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, NULL, NULL, NULL, NULL, 'Prep', ?, ?, 0, NULL, NULL, NULL, NULL, NULL, ?, ?)
+          `,
+        )
+        .run(
+          projectId,
+          "workspace-metadata",
+          "ROLLBACK",
+          "Original Project Name",
+          "2026-06-01",
+          "2026-06-10",
+          localUpdatedAt,
+          localUpdatedAt,
+        );
+      database
+        .prepare(
+          `
+            INSERT INTO project_units (
+              id, workspace_id, project_id, code, name, sort_order, status, status_source,
+              color_key, start_date, end_date, notes, created_at, updated_at
+            )
+            VALUES (?, ?, ?, 'MAIN', 'Original Unit', 0, 'planned', 'derived', NULL, ?, ?, NULL, ?, ?)
+          `,
+        )
+        .run(unitId, "workspace-metadata", projectId, "2026-06-01", "2026-06-10", localUpdatedAt, localUpdatedAt);
+
+      const result = service.applyRemoteSnapshots("workspace-metadata", "project", [
+        {
+          workspace_id: "workspace-metadata",
+          entity_type: "project",
+          entity_id: projectId,
+          updated_at: remoteUpdatedAt,
+          deleted_at: null,
+          snapshot_json: {
+            project: {
+              id: projectId,
+              workspace_id: "workspace-metadata",
+              code: "ROLLBACK",
+              name: "Partially Applied Remote Name",
+              client_id: null,
+              client_name: null,
+              production_company_id: null,
+              production_company_name: null,
+              status: "Prep",
+              start_date: "2026-06-01",
+              end_date: "2026-06-10",
+              has_preproduction: 0,
+              preproduction_start_date: null,
+              preproduction_end_date: null,
+              color_key: null,
+              description: null,
+              archived_at: null,
+              created_at: localUpdatedAt,
+              updated_at: remoteUpdatedAt,
+            },
+            units: [],
+            unitWindows: [],
+            projectDepartments: [
+              { project_id: projectId, department_id: "department-not-local-yet", created_at: remoteUpdatedAt },
+            ],
+            unitDepartments: [],
+            crewAssignments: [],
+          },
+        },
+      ]);
+
+      expect(result.appliedCount).toBe(0);
+      expect(result.errors[0]).toContain("department-not-local-yet");
+      expect(database.prepare("SELECT name, updated_at FROM projects WHERE id = ?").get(projectId)).toEqual({
+        name: "Original Project Name",
+        updated_at: localUpdatedAt,
+      });
+      expect(database.prepare("SELECT name FROM project_units WHERE id = ?").get(unitId)).toEqual({ name: "Original Unit" });
+    } finally {
+      cleanup();
+    }
+  });
+
   it("ignores project snapshot children outside the synced project scope", () => {
     const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-child-scope");
 
@@ -772,6 +868,77 @@ describe("operational snapshot service", () => {
       expect(item.id).toBe("packing-item-remote-id");
       expect(item.quantity).toBe(2);
       expect(item.notes).toBe("Remote quantity changed.");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("defers a packing snapshot with a missing asset without leaving a partial slip", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-packing-rollback");
+
+    try {
+      const service = createOperationalSnapshotService(database);
+      const packingSlipId = "packing-remote-missing-asset";
+      const updatedAt = "2026-05-06T12:12:00.000Z";
+      const result = service.applyRemoteSnapshots("workspace-metadata", "packing_slip", [
+        {
+          workspace_id: "workspace-metadata",
+          entity_type: "packing_slip",
+          entity_id: packingSlipId,
+          updated_at: updatedAt,
+          deleted_at: null,
+          snapshot_json: {
+            packingSlip: {
+              id: packingSlipId,
+              workspace_id: "workspace-metadata",
+              project_id: "project-archipielago",
+              project_unit_id: "unit-arch-main",
+              department_id: null,
+              prepared_by_user_id: "user-ops",
+              approved_by_user_id: null,
+              responsible_user_id: "user-ops",
+              lifecycle_state: "operational",
+              status: "Issued",
+              issue_date: updatedAt,
+              return_due_date: null,
+              notes: "Must roll back",
+              created_at: updatedAt,
+              updated_at: updatedAt,
+            },
+            items: [
+              {
+                id: "packing-item-before-missing-asset",
+                packing_slip_id: packingSlipId,
+                asset_id: "asset-smallhd-cine7",
+                quantity: 1,
+                condition_out: "Good",
+                condition_in: null,
+                returned_at: null,
+                notes: null,
+                source_flow: "available",
+              },
+              {
+                id: "packing-item-missing-asset",
+                packing_slip_id: packingSlipId,
+                asset_id: "asset-not-local-yet",
+                quantity: 1,
+                condition_out: "Good",
+                condition_in: null,
+                returned_at: null,
+                notes: null,
+                source_flow: "available",
+              },
+            ],
+          },
+        },
+      ]);
+
+      expect(result.appliedCount).toBe(0);
+      expect(result.errors).toEqual([
+        `${packingSlipId}: Packing item references unavailable asset asset-not-local-yet; snapshot deferred.`,
+      ]);
+      expect(database.prepare("SELECT COUNT(*) AS count FROM packing_slips WHERE id = ?").get(packingSlipId)).toEqual({ count: 0 });
+      expect(database.prepare("SELECT COUNT(*) AS count FROM packing_slip_items WHERE packing_slip_id = ?").get(packingSlipId)).toEqual({ count: 0 });
     } finally {
       cleanup();
     }
