@@ -325,8 +325,8 @@ export const AgentsMissionControlPage = () => {
   );
   const missionPanelButtons = useMemo(
     () => [
-      { key: "queue" as const, icon: History, label: t("agents.runs.recentActivity") },
-      { key: "activity" as const, icon: BellDot, label: t("agents.mission.updates") },
+      { key: "activity" as const, icon: History, label: t("agents.runs.recentActivity") },
+      { key: "queue" as const, icon: BellDot, label: t("agents.mission.queueAndReviews", { defaultValue: "Cola operativa" }) },
       { key: "models" as const, icon: Bot, label: t("agents.models.title") },
       { key: "connectors" as const, icon: PlugZap, label: t("agents.connectors.title") },
     ],
@@ -458,14 +458,19 @@ export const AgentsMissionControlPage = () => {
             <div className="table-filter-select-row mission-panel-filter-select-row">
               <CompactSelect<MissionQueueFilter>
                 ariaLabel={t("agents.runs.filters.all")}
-                className="table-filter-select mission-panel-filter-select"
+                className="table-filter-select mission-panel-filter-select mission-panel-filter-select-compact"
                 onChange={setQueueFilter}
                 options={queueFilterOptions}
-                popupMinWidth={228}
+                popupMinWidth={188}
                 value={queueFilter}
               />
             </div>
             <div className="agent-support-list agent-support-list-scroll mission-panel-scroll">
+              {filteredQueue.length === 0 ? (
+                <div className="empty-state compact-empty-state">
+                  {t("agents.runs.empty", { defaultValue: "No hay filas pendientes en esta vista." })}
+                </div>
+              ) : null}
               {filteredQueue.map((run) => (
                 <button
                   key={run.id}
@@ -494,6 +499,11 @@ export const AgentsMissionControlPage = () => {
       case "activity":
         return (
           <div className="agent-support-list agent-support-list-scroll mission-panel-scroll">
+            {data.activity.length === 0 ? (
+              <div className="empty-state compact-empty-state">
+                {t("agents.mission.noRecentActivity", { defaultValue: "No hay actividad reciente visible ahora mismo." })}
+              </div>
+            ) : null}
             {data.activity.map((activity) => (
               <button
                 key={activity.id}

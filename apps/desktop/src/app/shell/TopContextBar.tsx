@@ -9,9 +9,10 @@ import { useShellContext } from "@shared/hooks/useShellContext";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import { requestImmediatePull } from "@shared/hooks/useWorkspaceDataRefresh";
 import {
+  parseRealtimeSyncStatusSnapshot,
   realtimeSyncStatusEvent,
   realtimeSyncStatusKey,
-  type RealtimeSyncStatus,
+  type RealtimeSyncStatusSnapshot,
 } from "@shared/hooks/useRealtimeWorkspaceSync";
 import { useLocale } from "@shared/hooks/useLocale";
 import { resolveProjectColor } from "@shared/lib/projectColors";
@@ -24,6 +25,21 @@ type TopContextBarProps = {
 };
 
 const syncButtonReleaseMs = 5_000;
+const realtimeFreshWindowMs = 10 * 60 * 1_000;
+const syncFreshWindowMs = 3 * 60 * 1_000;
+
+const isFreshTimestamp = (value: string | null | undefined, windowMs: number) => {
+  if (!value) {
+    return false;
+  }
+
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) {
+    return false;
+  }
+
+  return Date.now() - timestamp <= windowMs;
+};
 
 export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const { activeProject, scopeChipLabel } = useShellContext();
@@ -39,9 +55,9 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const [syncActionNotice, setSyncActionNotice] = useState<string | null>(null);
   const [hasLoadedSyncSnapshot, setHasLoadedSyncSnapshot] = useState(false);
   const [isLoadingSyncSnapshot, setIsLoadingSyncSnapshot] = useState(false);
-  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeSyncStatus | null>(() => {
+  const [realtimeSnapshot, setRealtimeSnapshot] = useState<RealtimeSyncStatusSnapshot | null>(() => {
     try {
-      return window.localStorage.getItem(realtimeSyncStatusKey) as RealtimeSyncStatus | null;
+      return parseRealtimeSyncStatusSnapshot(window.localStorage.getItem(realtimeSyncStatusKey));
     } catch {
       return null;
     }
@@ -153,7 +169,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
 
   useEffect(() => {
     const handleRealtimeStatus = (event: Event) => {
-      setRealtimeStatus((event as CustomEvent<RealtimeSyncStatus>).detail);
+      setRealtimeSnapshot((event as CustomEvent<RealtimeSyncStatusSnapshot>).detail);
     };
     window.addEventListener(realtimeSyncStatusEvent, handleRealtimeStatus);
     return () => window.removeEventListener(realtimeSyncStatusEvent, handleRealtimeStatus);
@@ -171,6 +187,13 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const latestSyncActivity = diagnostics?.lastSyncRunAt ?? latestInboundCheck;
   const outboundFailedCount = diagnostics?.syncOutboxFailedCount ?? 0;
   const hasRetryableOutboundFailures = outboundFailedCount > 0;
+  const realtimeStatus = realtimeSnapshot?.status ?? null;
+  const hasFreshRealtimeEvidence =
+    isFreshTimestamp(realtimeSnapshot?.confirmedAt, realtimeFreshWindowMs) ||
+    isFreshTimestamp(realtimeSnapshot?.lastEventAt, realtimeFreshWindowMs);
+  const hasFreshSyncEvidence =
+    isFreshTimestamp(latestSyncActivity, syncFreshWindowMs) ||
+    isFreshTimestamp(latestInboundCheck, syncFreshWindowMs);
 
   const syncState = useMemo(() => {
     if (!hasLoadedSyncSnapshot) {
@@ -208,7 +231,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       };
     }
 
-    if (realtimeStatus !== "SUBSCRIBED") {
+    if (isOnline && (realtimeStatus === "CHANNEL_ERROR" || realtimeStatus === "TIMED_OUT") && !hasFreshRealtimeEvidence) {
       return {
         label: t("shell.topBar.syncPopover.realtimeUnavailable", { defaultValue: "Tiempo real no confirmado" }),
         className: "sync-control-missing",
@@ -226,13 +249,33 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       };
     }
 
+    if (isOnline && realtimeStatus !== "SUBSCRIBED" && !hasFreshRealtimeEvidence && !hasFreshSyncEvidence) {
+      return {
+        label: t("shell.topBar.syncPopover.realtimeChecking", { defaultValue: "Verificando tiempo real" }),
+        className: "sync-control-review",
+        icon: RefreshCw,
+        badge: null as number | null,
+      };
+    }
+
     return {
       label: t("shell.topBar.upToDate"),
       className: "sync-control-healthy",
       icon: CheckCircle2,
       badge: null as number | null,
     };
-  }, [diagnostics, hasLoadedSyncSnapshot, inboundFailedCount, latestSyncActivity, outboundFailedCount, realtimeStatus, t]);
+  }, [
+    diagnostics,
+    hasFreshRealtimeEvidence,
+    hasFreshSyncEvidence,
+    hasLoadedSyncSnapshot,
+    inboundFailedCount,
+    isOnline,
+    latestSyncActivity,
+    outboundFailedCount,
+    realtimeStatus,
+    t,
+  ]);
   const SyncStatusIcon = syncState.icon;
 
   const refreshDiagnostics = () => loadSyncSnapshot({ showLoading: true });

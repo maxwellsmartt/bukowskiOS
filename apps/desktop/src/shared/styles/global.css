@@ -12934,6 +12934,10 @@ button.timeline-signal-chip:focus-visible {
   width: min(228px, 100%);
 }
 
+.mission-panel-filter-select-compact {
+  width: min(188px, 100%);
+}
+
 .mission-panel-scroll {
   min-height: 0;
   max-height: min(340px, calc(100vh - 200px));
@@ -16549,15 +16553,36 @@ select.field-input {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   background:
-    radial-gradient(ellipse 92% 62% at 74% 0%, rgba(118, 145, 176, 0.042) 0%, rgba(118, 145, 176, 0.018) 46%, transparent 82%),
-    linear-gradient(180deg, rgba(190, 205, 222, 0.02), rgba(255, 255, 255, 0.006)),
-    #141922;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+    radial-gradient(ellipse 92% 62% at 74% 0%, rgba(118, 145, 176, 0.08) 0%, rgba(118, 145, 176, 0.025) 48%, transparent 82%),
+    linear-gradient(180deg, rgba(214, 226, 240, 0.045), rgba(255, 255, 255, 0.008)),
+    rgba(20, 25, 34, 0.94);
+  box-shadow:
+    0 26px 56px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transform: scale(var(--assistant-chat-scale, 1));
+  transform-origin: bottom right;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 140ms ease;
+  will-change: transform;
 }
 
 .assistant-chat-panel.is-sidebar-collapsed {
   grid-template-columns: minmax(0, 1fr);
   width: min(530px, calc(100vw - 40px));
+}
+
+.assistant-chat-panel.is-resizing {
+  transition: none;
+}
+
+.assistant-chat-resize-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 34px;
+  height: 34px;
+  z-index: 3;
+  cursor: nwse-resize;
+  background: transparent;
 }
 
 .assistant-chat-sidebar,
@@ -16905,6 +16930,8 @@ select.field-input {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .assistant-chat-thread {
@@ -17657,6 +17684,8 @@ select.field-input {
 .assistant-chat-composer {
   display: grid;
   gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .assistant-chat-attachments {

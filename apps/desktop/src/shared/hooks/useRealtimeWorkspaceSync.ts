@@ -9,8 +9,53 @@ const WORKSPACE_MEMBERSHIPS_CHANGED_EVENT = "bukowski:workspace-memberships-chan
 export const realtimeSyncStatusEvent = "bukowski:realtime-sync-status";
 export const realtimeSyncStatusKey = "bukowski:realtime-sync-status";
 export type RealtimeSyncStatus = "SUBSCRIBED" | "CHANNEL_ERROR" | "TIMED_OUT" | "CLOSED" | "CONNECTING";
+export type RealtimeSyncStatusSnapshot = {
+  status: RealtimeSyncStatus;
+  updatedAt: string;
+  confirmedAt: string | null;
+  lastEventAt: string | null;
+};
 // Coalesce bursts (a multi-row push emits one event per row) into a single pull.
 const COALESCE_MS = 250;
+const SUBSCRIBE_TIMEOUT_MS = 8_000;
+
+const isRealtimeStatus = (value: unknown): value is RealtimeSyncStatus =>
+  value === "SUBSCRIBED" ||
+  value === "CHANNEL_ERROR" ||
+  value === "TIMED_OUT" ||
+  value === "CLOSED" ||
+  value === "CONNECTING";
+
+export const parseRealtimeSyncStatusSnapshot = (rawValue: string | null): RealtimeSyncStatusSnapshot | null => {
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as Partial<RealtimeSyncStatusSnapshot>;
+    if (!isRealtimeStatus(parsed.status)) {
+      return null;
+    }
+
+    return {
+      status: parsed.status,
+      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
+      confirmedAt: typeof parsed.confirmedAt === "string" ? parsed.confirmedAt : null,
+      lastEventAt: typeof parsed.lastEventAt === "string" ? parsed.lastEventAt : null,
+    };
+  } catch {
+    if (!isRealtimeStatus(rawValue)) {
+      return null;
+    }
+
+    return {
+      status: rawValue,
+      updatedAt: new Date().toISOString(),
+      confirmedAt: rawValue === "SUBSCRIBED" ? new Date().toISOString() : null,
+      lastEventAt: null,
+    };
+  }
+};
 
 /**
  * Listens to Supabase Realtime for the whole `public` schema and, whenever any
@@ -32,15 +77,29 @@ export const useRealtimeWorkspaceSync = () => {
     }
 
     let coalesceTimer: number | null = null;
-    const publishStatus = (nextStatus: RealtimeSyncStatus) => {
+    let subscribeTimeout: number | null = null;
+    let confirmedAt: string | null = null;
+    let lastEventAt: string | null = null;
+    const publishStatus = (nextStatus: RealtimeSyncStatus, { persist = true }: { persist?: boolean } = {}) => {
+      const snapshot: RealtimeSyncStatusSnapshot = {
+        status: nextStatus,
+        updatedAt: new Date().toISOString(),
+        confirmedAt,
+        lastEventAt,
+      };
       try {
-        window.localStorage.setItem(realtimeSyncStatusKey, nextStatus);
+        if (persist) {
+          window.localStorage.setItem(realtimeSyncStatusKey, JSON.stringify(snapshot));
+        }
       } catch {
         // UI status remains available through the event when storage is unavailable.
       }
-      window.dispatchEvent(new CustomEvent<RealtimeSyncStatus>(realtimeSyncStatusEvent, { detail: nextStatus }));
+      window.dispatchEvent(new CustomEvent<RealtimeSyncStatusSnapshot>(realtimeSyncStatusEvent, { detail: snapshot }));
     };
     publishStatus("CONNECTING");
+    subscribeTimeout = window.setTimeout(() => {
+      publishStatus("TIMED_OUT");
+    }, SUBSCRIBE_TIMEOUT_MS);
     const triggerPull = () => {
       if (coalesceTimer != null) {
         return;
@@ -54,6 +113,12 @@ export const useRealtimeWorkspaceSync = () => {
     const channel = supabase
       .channel(`workspace-sync:${activeWorkspaceId}`)
       .on("postgres_changes", { event: "*", schema: "public" }, (payload) => {
+        const eventAt = new Date().toISOString();
+        if (!confirmedAt) {
+          confirmedAt = eventAt;
+        }
+        lastEventAt = eventAt;
+        publishStatus("SUBSCRIBED");
         // Workspace identity (name/avatar/currency/accent) is fetched by the
         // workspace provider, not the pull hooks — nudge it so renames and brand
         // changes from another machine appear instantly.
@@ -64,6 +129,13 @@ export const useRealtimeWorkspaceSync = () => {
         triggerPull();
       })
       .subscribe((nextStatus) => {
+        if (nextStatus === "SUBSCRIBED") {
+          confirmedAt = new Date().toISOString();
+          if (subscribeTimeout != null) {
+            window.clearTimeout(subscribeTimeout);
+            subscribeTimeout = null;
+          }
+        }
         publishStatus(nextStatus as RealtimeSyncStatus);
         if (nextStatus === "SUBSCRIBED") {
           // Always catch up after a reconnect because events may have been
@@ -76,7 +148,10 @@ export const useRealtimeWorkspaceSync = () => {
       if (coalesceTimer != null) {
         window.clearTimeout(coalesceTimer);
       }
-      publishStatus("CLOSED");
+      if (subscribeTimeout != null) {
+        window.clearTimeout(subscribeTimeout);
+      }
+      publishStatus("CLOSED", { persist: false });
       void Promise.resolve(supabase.removeChannel(channel));
     };
   }, [supabase, isLocalFallback, status, isWorkspaceReady, activeWorkspaceId]);

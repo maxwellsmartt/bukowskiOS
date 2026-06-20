@@ -52,6 +52,14 @@ type ThreadMenuState = {
   top: number;
   left: number;
 } | null;
+type ChatPanelResizeState = {
+  maxScale: number;
+  startHeight: number;
+  startScale: number;
+  startWidth: number;
+  startX: number;
+  startY: number;
+};
 
 const threadSourceFilterOptions: Array<{ label: string; value: ThreadSourceFilter }> = [
   { label: "App", value: "app" },
@@ -608,6 +616,8 @@ export const GlobalAssistantChat = () => {
   const [selectedModel, setSelectedModel] = useState("GPT-5.4");
   const [selectedReasoning, setSelectedReasoning] = useState("High");
   const [selectedApproval, setSelectedApproval] = useState<AssistantApprovalPreference>("unsupervised");
+  const [panelScale, setPanelScale] = useState(1);
+  const [isPanelResizing, setIsPanelResizing] = useState(false);
   const [attachments, setAttachments] = useState<AssistantGatewayAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [activeSelector, setActiveSelector] = useState<ActiveSelector>(null);
@@ -636,6 +646,7 @@ export const GlobalAssistantChat = () => {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const threadEndRef = useRef<HTMLDivElement | null>(null);
+  const panelResizeStateRef = useRef<ChatPanelResizeState | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const voiceChunksRef = useRef<Blob[]>([]);
@@ -846,6 +857,7 @@ export const GlobalAssistantChat = () => {
 
   useEffect(
     () => () => {
+      document.body.style.userSelect = "";
       if (voiceStopTimeoutRef.current) {
         window.clearTimeout(voiceStopTimeoutRef.current);
       }
@@ -1291,6 +1303,71 @@ export const GlobalAssistantChat = () => {
     );
   };
 
+  const handlePanelResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!panelRef.current || event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const currentScale = panelScale;
+    const rect = panelRef.current.getBoundingClientRect();
+    const baseWidth = rect.width / currentScale;
+    const baseHeight = rect.height / currentScale;
+    const maxScale = Math.max(
+      1,
+      Math.min(
+        1.5,
+        (window.innerWidth - 32) / baseWidth,
+        (window.innerHeight - 32) / baseHeight,
+      ),
+    );
+
+    panelResizeStateRef.current = {
+      maxScale,
+      startHeight: rect.height,
+      startScale: currentScale,
+      startWidth: rect.width,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    setIsPanelResizing(true);
+    document.body.style.userSelect = "none";
+
+    const handle = event.currentTarget;
+    handle.setPointerCapture(event.pointerId);
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const state = panelResizeStateRef.current;
+      if (!state) {
+        return;
+      }
+
+      const nextWidth = state.startWidth + (state.startX - moveEvent.clientX);
+      const nextHeight = state.startHeight + (state.startY - moveEvent.clientY);
+      const widthScale = nextWidth / baseWidth;
+      const heightScale = nextHeight / baseHeight;
+      const nextScale = Math.min(Math.max(Math.max(widthScale, heightScale), 1), state.maxScale);
+      setPanelScale(nextScale);
+    };
+
+    const finish = (endEvent: PointerEvent) => {
+      handle.removeEventListener("pointermove", handlePointerMove);
+      handle.removeEventListener("pointerup", finish);
+      handle.removeEventListener("pointercancel", finish);
+      if (handle.hasPointerCapture(endEvent.pointerId)) {
+        handle.releasePointerCapture(endEvent.pointerId);
+      }
+      panelResizeStateRef.current = null;
+      setIsPanelResizing(false);
+      document.body.style.userSelect = "";
+    };
+
+    handle.addEventListener("pointermove", handlePointerMove);
+    handle.addEventListener("pointerup", finish);
+    handle.addEventListener("pointercancel", finish);
+  };
+
   return (
     <div
       ref={shellRef}
@@ -1299,9 +1376,15 @@ export const GlobalAssistantChat = () => {
       {isOpen ? (
         <section
           ref={panelRef}
-          className={`assistant-chat-panel${isSidebarCollapsed ? " is-sidebar-collapsed" : ""}`}
+          className={`assistant-chat-panel${isSidebarCollapsed ? " is-sidebar-collapsed" : ""}${isPanelResizing ? " is-resizing" : ""}`}
           aria-label="Global assistant chat"
+          style={{ "--assistant-chat-scale": panelScale } as CSSProperties}
         >
+          <div
+            aria-hidden="true"
+            className="assistant-chat-resize-corner"
+            onPointerDown={handlePanelResizeStart}
+          />
           <aside className="assistant-chat-sidebar">
             <div className="assistant-chat-sidebar-header">
               <div>
