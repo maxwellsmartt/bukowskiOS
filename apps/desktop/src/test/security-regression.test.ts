@@ -520,4 +520,27 @@ describe("security regression checks", () => {
     expect(missingGuards).toEqual([]);
     expect(source).toContain("assertToolPermission(tool, context)");
   });
+
+  it("hardens tombstone recreation for all 30 synchronized targets", () => {
+    const migration = readText(
+      "supabase/migrations/20260621152401_sync_tombstone_recreation_hardening.sql",
+    );
+    const targetArray = migration.match(/target_tables CONSTANT text\[\] := ARRAY\[([\s\S]*?)\];/)?.[1] ?? "";
+    const targetNames = Array.from(targetArray.matchAll(/'([a-z_]+)'/g), (match) => match[1]);
+
+    expect(targetNames).toHaveLength(30);
+    expect(new Set(targetNames).size).toBe(30);
+    expect(targetNames).toEqual(expect.arrayContaining(["exchange_rates", "todos", "reminders"]));
+    expect(migration).toContain("CREATE OR REPLACE FUNCTION public.clear_sync_tombstone_on_recreation()");
+    expect(migration).toContain("SECURITY DEFINER");
+    expect(migration).toContain("SET search_path = ''");
+    expect(migration).toContain(
+      "REVOKE ALL ON FUNCTION public.clear_sync_tombstone_on_recreation() FROM PUBLIC, anon, authenticated;",
+    );
+    expect(migration).toContain("CREATE TRIGGER record_sync_tombstone_after_delete AFTER DELETE");
+    expect(migration).toContain("CREATE TRIGGER clear_sync_tombstone_after_insert AFTER INSERT");
+    expect(migration).toContain("DELETE FROM public.sync_tombstones AS tombstone");
+    expect(migration).toContain("to_regclass(format('%I.%I', 'public', target_table))");
+    expect(migration).toContain("live.%I::text = tombstone.entity_id");
+  });
 });

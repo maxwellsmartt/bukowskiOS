@@ -15,7 +15,11 @@ import {
   type EnsureLocalWorkspaceInput,
 } from "@contracts";
 import { foundationMigrations } from "@db";
-import { createSupabaseOutboxTransport, type SupabaseDomainUpsert } from "@sync";
+import {
+  createSupabaseOutboxTransport,
+  type SupabaseDomainDelete,
+  type SupabaseDomainUpsert,
+} from "@sync";
 
 import { createAssistantGatewayService } from "../ai/assistantGatewayService";
 import { createAssistantMemoryService } from "../ai/assistantMemoryService";
@@ -1637,60 +1641,63 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   // are listed before parents because bank_transactions.import_id is ON DELETE
   // SET NULL (not cascade), so deleting only the import would orphan its rows.
   const resolveSupabaseDomainDeletes = (row: {
+    workspace_id: string;
     entity_type: string;
     entity_id: string;
-  }): Array<{ table: string; column: string; value: string }> | null => {
+  }): SupabaseDomainDelete[] | null => {
     switch (row.entity_type) {
       case "bank_statement_import":
         return [
-          { table: "bank_transactions", column: "import_id", value: row.entity_id },
-          { table: "bank_statement_imports", column: "id", value: row.entity_id },
+          { table: "bank_transactions", filters: [{ column: "import_id", value: row.entity_id }] },
+          { table: "bank_statement_imports", filters: [{ column: "id", value: row.entity_id }] },
         ];
       case "bank_account":
-        return [{ table: "bank_accounts", column: "id", value: row.entity_id }];
+        return [{ table: "bank_accounts", filters: [{ column: "id", value: row.entity_id }] }];
       case "bank_transaction":
-        return [{ table: "bank_transactions", column: "id", value: row.entity_id }];
+        return [{ table: "bank_transactions", filters: [{ column: "id", value: row.entity_id }] }];
       case "transaction_annotation":
-        return [{ table: "transaction_annotations", column: "transaction_id", value: row.entity_id }];
+        return [{ table: "transaction_annotations", filters: [{ column: "transaction_id", value: row.entity_id }] }];
       case "transaction_link":
-        return [{ table: "transaction_links", column: "id", value: row.entity_id }];
+        return [{ table: "transaction_links", filters: [{ column: "id", value: row.entity_id }] }];
       case "counterparty_rule":
-        return [{ table: "counterparty_rules", column: "id", value: row.entity_id }];
+        return [{ table: "counterparty_rules", filters: [{ column: "id", value: row.entity_id }] }];
+      case "exchange_rate":
+        return [{ table: "exchange_rates", filters: [{ column: "id", value: row.entity_id }] }];
       case "invoice":
-        return [{ table: "invoices", column: "id", value: row.entity_id }];
+        return [{ table: "invoices", filters: [{ column: "id", value: row.entity_id }] }];
       case "quote":
-        return [{ table: "quotes", column: "id", value: row.entity_id }];
+        return [{ table: "quotes", filters: [{ column: "id", value: row.entity_id }] }];
       case "collaborator_fee":
-        return [{ table: "collaborator_fees", column: "id", value: row.entity_id }];
+        return [{ table: "collaborator_fees", filters: [{ column: "id", value: row.entity_id }] }];
       case "financial_entry":
-        return [{ table: "financial_entries", column: "id", value: row.entity_id }];
+        return [{ table: "financial_entries", filters: [{ column: "id", value: row.entity_id }] }];
       case "invoice_extraction":
         return [
-          { table: "invoice_extraction_projects", column: "invoice_extraction_id", value: row.entity_id },
-          { table: "invoice_extractions", column: "id", value: row.entity_id },
+          { table: "invoice_extraction_projects", filters: [{ column: "invoice_extraction_id", value: row.entity_id }] },
+          { table: "invoice_extractions", filters: [{ column: "id", value: row.entity_id }] },
         ];
       case "software_license":
-        return [{ table: "software_licenses", column: "id", value: row.entity_id }];
+        return [{ table: "software_licenses", filters: [{ column: "id", value: row.entity_id }] }];
       case "notification":
-        return [{ table: "notifications", column: "id", value: row.entity_id }];
+        return [{ table: "notifications", filters: [{ column: "id", value: row.entity_id }] }];
       case "todo":
-        return [{ table: "todos", column: "id", value: row.entity_id }];
+        return [{ table: "todos", filters: [{ column: "id", value: row.entity_id }] }];
       case "reminder":
-        return [{ table: "reminders", column: "id", value: row.entity_id }];
+        return [{ table: "reminders", filters: [{ column: "id", value: row.entity_id }] }];
       case "client":
-        return [{ table: "clients", column: "id", value: row.entity_id }];
+        return [{ table: "clients", filters: [{ column: "id", value: row.entity_id }] }];
       case "manufacturer":
-        return [{ table: "manufacturers", column: "id", value: row.entity_id }];
+        return [{ table: "manufacturers", filters: [{ column: "id", value: row.entity_id }] }];
       case "production_company":
-        return [{ table: "production_companies", column: "id", value: row.entity_id }];
+        return [{ table: "production_companies", filters: [{ column: "id", value: row.entity_id }] }];
       case "location":
-        return [{ table: "locations", column: "id", value: row.entity_id }];
+        return [{ table: "locations", filters: [{ column: "id", value: row.entity_id }] }];
       case "category":
-        return [{ table: "asset_categories", column: "id", value: row.entity_id }];
+        return [{ table: "asset_categories", filters: [{ column: "id", value: row.entity_id }] }];
       case "crew":
-        return [{ table: "crew_members", column: "id", value: row.entity_id }];
+        return [{ table: "crew_members", filters: [{ column: "id", value: row.entity_id }] }];
       case "department":
-        return [{ table: "departments", column: "id", value: row.entity_id }];
+        return [{ table: "departments", filters: [{ column: "id", value: row.entity_id }] }];
       default:
         return null;
     }

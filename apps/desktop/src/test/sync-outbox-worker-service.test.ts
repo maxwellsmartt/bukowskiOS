@@ -770,7 +770,7 @@ describe("sync outbox worker service", () => {
 
     expect(requests.map((request) => `${request.init.method ?? "POST"} ${request.url}`)).toEqual([
       "POST https://bukowski.test/rest/v1/quotes?on_conflict=id",
-      "DELETE https://bukowski.test/rest/v1/quote_items?quote_id=eq.quote-1",
+      "DELETE https://bukowski.test/rest/v1/quote_items?quote_id=eq.quote-1&workspace_id=eq.11111111-1111-4111-8111-111111111111",
       "POST https://bukowski.test/rest/v1/quote_items?on_conflict=id",
       "POST https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
     ]);
@@ -790,8 +790,8 @@ describe("sync outbox worker service", () => {
       resolveDomainDeletes: (row) =>
         row.entity_type === "bank_statement_import"
           ? [
-              { table: "bank_transactions", column: "import_id", value: row.entity_id },
-              { table: "bank_statement_imports", column: "id", value: row.entity_id },
+              { table: "bank_transactions", filters: [{ column: "import_id", value: row.entity_id }] },
+              { table: "bank_statement_imports", filters: [{ column: "id", value: row.entity_id }] },
             ]
           : null,
       fetchImpl: (async (url, init) => {
@@ -804,7 +804,7 @@ describe("sync outbox worker service", () => {
       id: "outbox-del-1",
       workspace_id: "11111111-1111-4111-8111-111111111111",
       entity_type: "bank_statement_import",
-      entity_id: "import-9",
+      entity_id: "import/9 ?",
       event_id: null,
       operation_type: "delete",
       payload_json: JSON.stringify({ deleted: true }),
@@ -814,12 +814,105 @@ describe("sync outbox worker service", () => {
     });
 
     expect(requests.map((request) => `${request.init.method ?? "POST"} ${request.url}`)).toEqual([
-      "DELETE https://bukowski.test/rest/v1/bank_transactions?import_id=eq.import-9",
-      "DELETE https://bukowski.test/rest/v1/bank_statement_imports?id=eq.import-9",
+      "DELETE https://bukowski.test/rest/v1/bank_transactions?import_id=eq.import%2F9%20%3F&workspace_id=eq.11111111-1111-4111-8111-111111111111",
+      "DELETE https://bukowski.test/rest/v1/bank_statement_imports?id=eq.import%2F9%20%3F&workspace_id=eq.11111111-1111-4111-8111-111111111111",
       "POST https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
     ]);
     // Delete ops must not run the upsert resolvers (no resurrecting rows).
     expect(upsertResolverCalled).toBe(false);
+  });
+
+  it("records an operational project tombstone instead of hard-deleting the project", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    let deleteResolverCalled = false;
+    const transport = createSupabaseOutboxTransport({
+      supabaseUrl: "https://bukowski.test/",
+      anonKey: "anon-test-key",
+      getAccessToken: async () => "access-test-token",
+      resolveOperationalSnapshot: (row) => ({
+        workspace_id: row.workspace_id,
+        entity_type: "project",
+        entity_id: row.entity_id,
+        snapshot_json: {},
+        updated_at: row.updated_at,
+        deleted_at: row.updated_at,
+      }),
+      resolveDomainDeletes: () => {
+        deleteResolverCalled = true;
+        return [{ table: "projects", filters: [{ column: "id", value: "project-1" }] }];
+      },
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(null, { status: 201 });
+      }) as typeof fetch,
+    });
+
+    await transport({
+      id: "outbox-project-delete",
+      workspace_id: "11111111-1111-4111-8111-111111111111",
+      entity_type: "project",
+      entity_id: "project-1",
+      event_id: null,
+      operation_type: "delete",
+      payload_json: JSON.stringify({ deleted: true }),
+      attempt_count: 0,
+      created_at: "2026-04-12T18:00:00.000Z",
+      updated_at: "2026-04-12T18:01:00.000Z",
+    });
+
+    expect(requests.map((request) => `${request.init.method ?? "POST"} ${request.url}`)).toEqual([
+      "POST https://bukowski.test/rest/v1/operational_snapshots?on_conflict=workspace_id,entity_type,entity_id",
+      "POST https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
+    ]);
+    expect(JSON.parse(String(requests[0]?.init.body))).toMatchObject({
+      workspace_id: "11111111-1111-4111-8111-111111111111",
+      entity_type: "project",
+      entity_id: "project-1",
+      snapshot_json: {},
+      deleted_at: "2026-04-12T18:01:00.000Z",
+    });
+    expect(deleteResolverCalled).toBe(false);
+  });
+
+  it.each([
+    { label: "empty filters", filters: [] },
+    { label: "an empty column", filters: [{ column: " ", value: "import-9" }] },
+    { label: "an invalid column", filters: [{ column: "id&workspace_id", value: "import-9" }] },
+    { label: "a resolver workspace filter", filters: [{ column: "workspace_id", value: "other-workspace" }] },
+  ])("rejects $label before deleting or acknowledging", async ({ filters }) => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const transport = createSupabaseOutboxTransport({
+      supabaseUrl: "https://bukowski.test/",
+      anonKey: "anon-test-key",
+      getAccessToken: async () => "access-test-token",
+      resolveDomainDeletes: () => [
+        {
+          table: "bank_statement_imports",
+          filters: filters as [{ column: string; value: string }],
+        },
+      ],
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(null, { status: 200 });
+      }) as typeof fetch,
+    });
+
+    await expect(
+      transport({
+        id: "outbox-invalid-delete-filter",
+        workspace_id: "11111111-1111-4111-8111-111111111111",
+        entity_type: "bank_statement_import",
+        entity_id: "import-9",
+        event_id: null,
+        operation_type: "delete",
+        payload_json: JSON.stringify({ deleted: true }),
+        attempt_count: 0,
+        created_at: "2026-04-12T18:00:00.000Z",
+        updated_at: "2026-04-12T18:01:00.000Z",
+      }),
+    ).rejects.toThrow(/Supabase delete/);
+
+    expect(requests).toEqual([]);
   });
 
   it.each([

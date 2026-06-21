@@ -71,8 +71,10 @@ export type SupabaseOutboxTransportOptions = {
 
 export type SupabaseDomainDelete = {
   table: string;
-  column: string;
-  value: string;
+  filters: [
+    { column: string; value: string },
+    ...Array<{ column: string; value: string }>,
+  ];
 };
 
 const normalizeUrl = (value: string) => value.trim().replace(/\/+$/, "");
@@ -191,6 +193,43 @@ const filterParam = (column: string, value: unknown) => {
   return `${encodedColumn}=eq.${encodeURIComponent(String(value))}`;
 };
 
+const scopedDeleteEndpoint = (
+  normalizedUrl: string,
+  table: string,
+  filters: Array<{ column: string; value: string }>,
+  workspaceId: string,
+) => {
+  const normalizedTable = table.trim();
+  if (!/^[a-z_][a-z0-9_]*$/.test(normalizedTable)) {
+    throw new Error(`Supabase delete target table is invalid: ${table}.`);
+  }
+  if (!filters.length) {
+    throw new Error(`Supabase delete filters cannot be empty for table ${table}.`);
+  }
+  if (!workspaceId.trim()) {
+    throw new Error(`Supabase delete workspace_id cannot be empty for table ${table}.`);
+  }
+
+  const validatedFilters = filters.map(({ column, value }) => {
+    const normalizedColumn = column.trim();
+    if (!/^[a-z_][a-z0-9_]*$/.test(normalizedColumn)) {
+      throw new Error(`Supabase delete filter column is invalid for table ${table}.`);
+    }
+    if (normalizedColumn === "workspace_id") {
+      throw new Error(`Supabase delete filters cannot provide workspace_id for table ${table}.`);
+    }
+    if (typeof value !== "string" || !value.trim()) {
+      throw new Error(`Supabase delete filter value cannot be empty for ${table}.${normalizedColumn}.`);
+    }
+    return { column: normalizedColumn, value };
+  });
+
+  const query = [...validatedFilters, { column: "workspace_id", value: workspaceId }]
+    .map(({ column, value }) => filterParam(column, value))
+    .join("&");
+  return `${normalizedUrl}/rest/v1/${normalizedTable}?${query}`;
+};
+
 const transactionLinkDedupeEndpoint = (normalizedUrl: string, record: Record<string, unknown>) => {
   const filters = [
     filterParam("workspace_id", requireFilterValue(record, "workspace_id")),
@@ -258,15 +297,34 @@ export const createSupabaseOutboxTransport = ({
     // Delete-propagation: a local deletion removes the matching cloud rows so a
     // second machine's pull won't resurrect them. We skip the upsert resolvers.
     if (row.operation_type === "delete") {
+      if (["project", "packing_slip", "incident", "rma_case"].includes(row.entity_type)) {
+        const snapshot = resolveOperationalSnapshot ? await resolveOperationalSnapshot(row) : null;
+        if (!snapshot) {
+          throw new Error(`Supabase operational snapshot unavailable for outbox row ${row.id}.`);
+        }
+        await upsertSupabaseRow({
+          accessToken,
+          anonKey,
+          endpoint: `${normalizedUrl}/rest/v1/operational_snapshots?on_conflict=workspace_id,entity_type,entity_id`,
+          payload: snapshot,
+          fetchImpl,
+        });
+        await recordOutboxRow(row, accessToken, payload);
+        return;
+      }
+
       const deletes = resolveDomainDeletes ? (await resolveDomainDeletes(row)) ?? [] : [];
       if (!deletes.length) {
         throw new Error(`Supabase delete targets unavailable for outbox row ${row.id}.`);
       }
-      for (const target of deletes) {
+      const endpoints = deletes.map((target) =>
+        scopedDeleteEndpoint(normalizedUrl, target.table, target.filters, row.workspace_id),
+      );
+      for (const endpoint of endpoints) {
         await deleteSupabaseRows({
           accessToken,
           anonKey,
-          endpoint: `${normalizedUrl}/rest/v1/${target.table}?${encodeURIComponent(target.column)}=eq.${encodeURIComponent(target.value)}`,
+          endpoint,
           fetchImpl,
         });
       }
@@ -332,7 +390,12 @@ export const createSupabaseOutboxTransport = ({
             await deleteSupabaseRows({
               accessToken,
               anonKey,
-              endpoint: `${normalizedUrl}/rest/v1/${upsert.table}?${encodeURIComponent(column)}=eq.${encodeURIComponent(value)}`,
+              endpoint: scopedDeleteEndpoint(
+                normalizedUrl,
+                upsert.table,
+                [{ column, value }],
+                row.workspace_id,
+              ),
               fetchImpl,
             });
           }
