@@ -51,6 +51,25 @@ const parentExists = (db: DatabaseSync, row: RemoteWorkspaceFileRow) => {
   ).get(row.entity_id, row.workspace_id));
 };
 
+const updatePullCursor = (
+  db: DatabaseSync,
+  workspaceId: string,
+  cursorAfter: string | null,
+  appliedCount: number,
+  errorMessage: string | null,
+) => {
+  db.prepare(
+    `INSERT INTO sync_pull_cursors (
+       workspace_id, entity_type, last_synced_at, last_pulled_count, last_error, updated_at
+     ) VALUES (?, 'workspace_files', ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+     ON CONFLICT(workspace_id, entity_type) DO UPDATE SET
+       last_synced_at = COALESCE(excluded.last_synced_at, sync_pull_cursors.last_synced_at),
+       last_pulled_count = excluded.last_pulled_count,
+       last_error = excluded.last_error,
+       updated_at = excluded.updated_at`,
+  ).run(workspaceId, cursorAfter, appliedCount, errorMessage);
+};
+
 const mirrorDomainFile = (db: DatabaseSync, row: RemoteWorkspaceFileRow) => {
   const nextStatus = row.deleted_at || row.status === "deleted" ? "deleted" : "available";
   if (row.domain === "assets") {
@@ -113,7 +132,11 @@ export const createWorkspaceFilePullService = (
   db: DatabaseSync,
   options?: { getStorageRoot?: () => string; fileSystem?: Pick<typeof fs, "existsSync" | "unlinkSync"> },
 ) => ({
-  applyRemoteRows(workspaceId: string, rows: RemoteWorkspaceFileRow[]): WorkspaceFilePullResult {
+  applyRemoteRows(
+    workspaceId: string,
+    rows: RemoteWorkspaceFileRow[],
+    pullError: string | null = null,
+  ): WorkspaceFilePullResult {
     const result: WorkspaceFilePullResult = {
       workspaceId,
       appliedCount: 0,
@@ -121,6 +144,8 @@ export const createWorkspaceFilePullService = (
       errors: [],
       cursorAfter: null,
     };
+
+    if (pullError) result.errors.push(pullError);
 
     db.exec("BEGIN");
     try {
@@ -181,6 +206,13 @@ export const createWorkspaceFilePullService = (
       db.exec("ROLLBACK");
       result.errors.push(error instanceof Error ? error.message : "Workspace file pull failed");
     }
+    updatePullCursor(
+      db,
+      workspaceId,
+      result.cursorAfter,
+      result.appliedCount,
+      result.errors.length ? result.errors.join(" | ") : null,
+    );
     return result;
   },
 });

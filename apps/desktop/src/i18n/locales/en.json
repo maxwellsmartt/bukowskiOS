@@ -53,6 +53,8 @@
       "syncIdle": "Sync",
       "syncFailed": "Sync needs attention",
       "syncFailedWithCount": "Sync needs attention · {{count}} failed",
+      "syncStaleWithCount_one": "{{count}} stale area",
+      "syncStaleWithCount_other": "{{count}} stale areas",
       "syncing": "Syncing · {{count}} queued",
       "upToDate": "Up to date",
       "online": "Online",
@@ -5125,6 +5127,9 @@
         "active": "Downloads active",
         "activeDetail_one": "{{count}} inbound source checked.",
         "activeDetail_other": "{{count}} inbound sources checked.",
+        "stale": "Data is stale",
+        "staleDetail_one": "{{count}} source has not been checked for several minutes.",
+        "staleDetail_other": "{{count}} sources have not been checked for several minutes.",
         "waiting": "Waiting for first download",
         "waitingDetail": "Open a remote workspace and the app will start pulling supported data.",
         "metrics": {
@@ -5240,15 +5245,21 @@
           "label": "Currency settings",
           "detail": "NCF series and exchange-rate config"
         },
+        "workspace_files": {
+          "label": "Workspace files",
+          "detail": "PDFs, images, and attachments across devices"
+        },
         "sync_tombstones": {
           "label": "Remote deletions",
           "detail": "Confirmed deletions across machines"
         }
       },
       "coverageRowsLatest": "{{count}} rows in latest pull",
+      "coverageStale": "Last checked: {{value}}",
       "coverageBadge": {
         "error": "Error",
         "active": "Active",
+        "stale": "Stale",
         "ready": "Available",
         "planned": "Planned"
       },

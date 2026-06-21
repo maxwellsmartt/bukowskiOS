@@ -431,6 +431,7 @@ export type AppRemoteWorkspaceFileRow = {
 export type AppApplyRemoteWorkspaceFilesCommand = {
   workspaceId: string;
   rows: AppRemoteWorkspaceFileRow[];
+  pullError?: string | null;
 };
 
 export type AppApplyRemoteWorkspaceFilesResult = {

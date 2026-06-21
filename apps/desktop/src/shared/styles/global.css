@@ -9557,6 +9557,12 @@ button.project-budget-command-metric {
   color: rgba(250, 214, 143, 0.96);
 }
 
+.sync-coverage-icon.is-stale {
+  border-color: rgba(245, 197, 107, 0.24);
+  background: rgba(245, 197, 107, 0.09);
+  color: rgba(250, 214, 143, 0.96);
+}
+
 .sync-direction-icon-critical,
 .sync-coverage-icon.is-error {
   border-color: rgba(255, 116, 116, 0.28);

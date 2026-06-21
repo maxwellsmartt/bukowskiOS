@@ -2311,7 +2311,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     applyRemoteWorkspaceFiles: (input: import("@contracts").AppApplyRemoteWorkspaceFilesCommand) =>
       createWorkspaceFilePullService(database, {
         getStorageRoot: () => appSettings.getDocumentsRoot(),
-      }).applyRemoteRows(input.workspaceId, input.rows),
+      }).applyRemoteRows(input.workspaceId, input.rows, input.pullError ?? null),
     applyRemoteTreasuryRows: (input: import("@contracts").AppApplyRemoteTreasuryRowsCommand) =>
       createFinancialDomainPullService(database).applyRemoteTreasuryRows(input.workspaceId, input.table, input.rows),
     applyRemoteCollaboratorPaymentRows: (input: import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand) =>

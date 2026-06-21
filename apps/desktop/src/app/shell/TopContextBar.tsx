@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { HelpMenu } from "@features/onboarding/HelpMenu";
 import { useConnectivity } from "@shared/hooks/useConnectivity";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import { requestImmediatePull } from "@shared/hooks/useWorkspaceDataRefresh";
@@ -16,6 +17,7 @@ import {
 } from "@shared/hooks/useRealtimeWorkspaceSync";
 import { useLocale } from "@shared/hooks/useLocale";
 import { resolveProjectColor } from "@shared/lib/projectColors";
+import { isSyncCursorStale, parseSyncTimestamp } from "@shared/lib/syncHealth";
 import type { AppDiagnosticsSnapshot, AppSyncPullCursorRow, AppSyncStatusSnapshot } from "@contracts";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { NotificationsButton } from "./NotificationsTray";
@@ -29,20 +31,13 @@ const realtimeFreshWindowMs = 10 * 60 * 1_000;
 const syncFreshWindowMs = 3 * 60 * 1_000;
 
 const isFreshTimestamp = (value: string | null | undefined, windowMs: number) => {
-  if (!value) {
-    return false;
-  }
-
-  const timestamp = new Date(value).getTime();
-  if (!Number.isFinite(timestamp)) {
-    return false;
-  }
-
-  return Date.now() - timestamp <= windowMs;
+  const timestamp = parseSyncTimestamp(value);
+  return timestamp !== null && Date.now() - timestamp <= windowMs;
 };
 
 export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const { activeProject, scopeChipLabel } = useShellContext();
+  const { activeWorkspaceId } = useWorkspace();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { formatDateTime } = useLocale();
@@ -182,8 +177,14 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     { intervalMs: 15_000 },
   );
 
-  const inboundFailedCount = pullCursors.filter((cursor) => cursor.lastError).length;
-  const latestInboundCheck = pullCursors[0]?.updatedAt ?? null;
+  const workspacePullCursors = pullCursors.filter(
+    (cursor) => !activeWorkspaceId || cursor.workspaceId === activeWorkspaceId,
+  );
+  const inboundFailedCount = workspacePullCursors.filter((cursor) => cursor.lastError).length;
+  const inboundStaleCount = workspacePullCursors.filter(
+    (cursor) => !cursor.lastError && isSyncCursorStale(cursor),
+  ).length;
+  const latestInboundCheck = workspacePullCursors[0]?.updatedAt ?? null;
   const latestSyncActivity = diagnostics?.lastSyncRunAt ?? latestInboundCheck;
   const outboundFailedCount = diagnostics?.syncOutboxFailedCount ?? 0;
   const hasRetryableOutboundFailures = outboundFailedCount > 0;
@@ -217,6 +218,18 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
         className: "sync-control-review",
         icon: AlertTriangle,
         badge: failedCount,
+      };
+    }
+
+    if (inboundStaleCount > 0) {
+      return {
+        label: t("shell.topBar.syncStaleWithCount", {
+          count: inboundStaleCount,
+          defaultValue: `${inboundStaleCount} áreas desactualizadas`,
+        }),
+        className: "sync-control-review",
+        icon: AlertTriangle,
+        badge: inboundStaleCount,
       };
     }
 
@@ -270,6 +283,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     hasFreshSyncEvidence,
     hasLoadedSyncSnapshot,
     inboundFailedCount,
+    inboundStaleCount,
     isOnline,
     latestSyncActivity,
     outboundFailedCount,

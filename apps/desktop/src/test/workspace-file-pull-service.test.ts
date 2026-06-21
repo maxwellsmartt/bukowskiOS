@@ -111,4 +111,45 @@ describe("workspace file pull service", () => {
       fs.rmSync(storageRoot, { recursive: true, force: true });
     }
   });
+
+  it("records pull failures and clears them after a healthy heartbeat", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-workspace-file-pull-health");
+    try {
+      const service = createWorkspaceFilePullService(database);
+      service.applyRemoteRows("workspace-metadata", [], "workspace_files is unavailable remotely");
+
+      const failed = database.prepare(
+        `SELECT last_synced_at, last_pulled_count, last_error, updated_at
+         FROM sync_pull_cursors
+         WHERE workspace_id = ? AND entity_type = 'workspace_files'`,
+      ).get("workspace-metadata") as {
+        last_synced_at: string | null;
+        last_pulled_count: number;
+        last_error: string | null;
+        updated_at: string;
+      };
+      expect(failed.last_synced_at).toBeNull();
+      expect(failed.last_pulled_count).toBe(0);
+      expect(failed.last_error).toContain("unavailable remotely");
+      expect(failed.updated_at).toMatch(/Z$/);
+
+      service.applyRemoteRows("workspace-metadata", [remoteAssetFile]);
+      service.applyRemoteRows("workspace-metadata", []);
+
+      const recovered = database.prepare(
+        `SELECT last_synced_at, last_pulled_count, last_error
+         FROM sync_pull_cursors
+         WHERE workspace_id = ? AND entity_type = 'workspace_files'`,
+      ).get("workspace-metadata") as {
+        last_synced_at: string | null;
+        last_pulled_count: number;
+        last_error: string | null;
+      };
+      expect(recovered.last_synced_at).toBe(remoteAssetFile.updated_at);
+      expect(recovered.last_pulled_count).toBe(0);
+      expect(recovered.last_error).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
 });

@@ -53,6 +53,8 @@
       "syncIdle": "Sincronización",
       "syncFailed": "La sincronización necesita atención",
       "syncFailedWithCount": "Sincronización con errores · {{count}} fallidos",
+      "syncStaleWithCount_one": "{{count}} área desactualizada",
+      "syncStaleWithCount_other": "{{count}} áreas desactualizadas",
       "syncing": "Sincronizando · {{count}} en cola",
       "upToDate": "Al día",
       "online": "En línea",
@@ -5129,6 +5131,9 @@
         "active": "Bajadas activas",
         "activeDetail_one": "{{count}} fuente entrante revisada.",
         "activeDetail_other": "{{count}} fuentes entrantes revisadas.",
+        "stale": "Datos desactualizados",
+        "staleDetail_one": "{{count}} fuente no se verifica desde hace varios minutos.",
+        "staleDetail_other": "{{count}} fuentes no se verifican desde hace varios minutos.",
         "waiting": "Esperando la primera bajada",
         "waitingDetail": "Abre un workspace remoto y la app empezará a traer los datos soportados.",
         "metrics": {
@@ -5244,15 +5249,21 @@
           "label": "Config. de moneda",
           "detail": "Series NCF y configuración de tasas"
         },
+        "workspace_files": {
+          "label": "Archivos del workspace",
+          "detail": "PDFs, imágenes y adjuntos entre máquinas"
+        },
         "sync_tombstones": {
           "label": "Borrados remotos",
           "detail": "Eliminaciones confirmadas entre máquinas"
         }
       },
       "coverageRowsLatest": "{{count}} filas en la última bajada",
+      "coverageStale": "Última verificación: {{value}}",
       "coverageBadge": {
         "error": "Error",
         "active": "Activa",
+        "stale": "Desactualizada",
         "ready": "Disponible",
         "planned": "Planeada"
       },

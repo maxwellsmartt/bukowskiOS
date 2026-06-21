@@ -51,13 +51,26 @@ export const useWorkspaceFilePull = () => {
           query = applyCompositePullCursor(query, cursor, "updated_at", "id");
           const { data, error } = await query;
           if (error) {
-            if ((error as { code?: string }).code !== "PGRST205") {
-              console.warn("[workspace-file-pull] Metadata pull failed", error);
-            }
+            const code = (error as { code?: string }).code;
+            const message = code === "PGRST205"
+              ? "workspace_files is not available remotely; apply the pending Supabase migration."
+              : `Workspace file metadata pull failed: ${(error as { message?: string }).message ?? "unknown error"}`;
+            await window.bukowskiApp!.applyRemoteWorkspaceFiles({
+              workspaceId: activeWorkspaceId,
+              rows: [],
+              pullError: message,
+            });
+            console.warn("[workspace-file-pull] Metadata pull failed", error);
             break;
           }
           const rawRows = (data ?? []) as Array<Record<string, unknown>>;
-          if (!rawRows.length) break;
+          if (!rawRows.length) {
+            await window.bukowskiApp!.applyRemoteWorkspaceFiles({
+              workspaceId: activeWorkspaceId,
+              rows: [],
+            });
+            break;
+          }
           const rows = rawRows as AppRemoteWorkspaceFileRow[];
           const result = await window.bukowskiApp!.applyRemoteWorkspaceFiles({
             workspaceId: activeWorkspaceId,

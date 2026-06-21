@@ -14,6 +14,7 @@ import { useToast } from "@app/providers/ToastProvider";
 import { useLocale } from "@shared/hooks/useLocale";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { isSyncCursorStale } from "@shared/lib/syncHealth";
 import { getSyncOutboxStatusLabel } from "@shared/labels/statusLabels";
 
 import { SettingsLayout } from "./SettingsLayout";
@@ -97,6 +98,7 @@ const INBOUND_COVERAGE = [
   "collaborator_fees",
   "financial_entries",
   "currency_settings",
+  "workspace_files",
   "sync_tombstones",
 ] as const;
 
@@ -141,7 +143,8 @@ const resolveOutboundStatus = (diagnostics: AppDiagnosticsSnapshot) => {
 
 const resolveInboundStatus = (pullCursors: AppSyncPullCursorRow[]) => {
   const failed = pullCursors.filter((row) => row.lastError);
-  const activeCursors = pullCursors.filter((row) => !row.lastError);
+  const stale = pullCursors.filter((row) => !row.lastError && isSyncCursorStale(row));
+  const activeCursors = pullCursors.filter((row) => !row.lastError && !isSyncCursorStale(row));
   const latest = activeCursors[0]?.updatedAt ?? pullCursors[0]?.updatedAt ?? null;
 
   if (failed.length > 0) {
@@ -150,6 +153,16 @@ const resolveInboundStatus = (pullCursors: AppSyncPullCursorRow[]) => {
       labelKey: "settings.sync.inbound.needsAttention",
       detailKey: "settings.sync.inbound.needsAttentionDetail",
       detailCount: failed.length,
+      latest,
+    };
+  }
+
+  if (stale.length > 0) {
+    return {
+      tone: "warning" as const,
+      labelKey: "settings.sync.inbound.stale",
+      detailKey: "settings.sync.inbound.staleDetail",
+      detailCount: stale.length,
       latest,
     };
   }
@@ -290,10 +303,14 @@ export const SyncOutboxPage = () => {
 
   const activeRow = useMemo(() => visibleRows.find((row) => row.id === activeRowId) ?? null, [activeRowId, visibleRows]);
   const outboundStatus = useMemo(() => resolveOutboundStatus(diagnostics), [diagnostics]);
-  const inboundStatus = useMemo(() => resolveInboundStatus(pullCursors), [pullCursors]);
+  const workspacePullCursors = useMemo(
+    () => pullCursors.filter((cursor) => !activeWorkspaceId || cursor.workspaceId === activeWorkspaceId),
+    [activeWorkspaceId, pullCursors],
+  );
+  const inboundStatus = useMemo(() => resolveInboundStatus(workspacePullCursors), [workspacePullCursors]);
   const pullCursorByEntity = useMemo(
-    () => new Map(pullCursors.map((cursor) => [cursor.entityType, cursor])),
-    [pullCursors],
+    () => new Map(workspacePullCursors.map((cursor) => [cursor.entityType, cursor])),
+    [workspacePullCursors],
   );
   const visibleRetryableRows = useMemo(
     () => visibleRows.filter((row) => row.status === "failed" || row.status === "processing"),
@@ -441,9 +458,9 @@ export const SyncOutboxPage = () => {
             </div>
           </div>
           <div className="sync-metric-row">
-            <span><strong>{pullCursors.length}</strong> {t("settings.sync.inbound.metrics.sources", { count: pullCursors.length })}</span>
-            <span><strong>{pullCursors.reduce((sum, row) => sum + row.lastPulledCount, 0)}</strong> {t("settings.sync.inbound.metrics.latest", { count: pullCursors.reduce((sum, row) => sum + row.lastPulledCount, 0) })}</span>
-            <span><strong>{pullCursors.filter((row) => row.lastError).length}</strong> {t("settings.sync.inbound.metrics.errors", { count: pullCursors.filter((row) => row.lastError).length })}</span>
+            <span><strong>{workspacePullCursors.length}</strong> {t("settings.sync.inbound.metrics.sources", { count: workspacePullCursors.length })}</span>
+            <span><strong>{workspacePullCursors.reduce((sum, row) => sum + row.lastPulledCount, 0)}</strong> {t("settings.sync.inbound.metrics.latest", { count: workspacePullCursors.reduce((sum, row) => sum + row.lastPulledCount, 0) })}</span>
+            <span><strong>{workspacePullCursors.filter((row) => row.lastError || isSyncCursorStale(row)).length}</strong> {t("settings.sync.inbound.metrics.errors", { count: workspacePullCursors.filter((row) => row.lastError || isSyncCursorStale(row)).length })}</span>
           </div>
           <small>{t("settings.sync.inbound.lastCheck", { value: formatDateLabel(inboundStatus.latest) })}</small>
         </SurfaceCard>
@@ -500,20 +517,21 @@ export const SyncOutboxPage = () => {
         title={t("settings.sync.coverageDisclosure.title")}
         summary={t("settings.sync.coverageDisclosure.summary", {
           count: INBOUND_COVERAGE.length,
-          errors: pullCursors.filter((row) => row.lastError).length,
+          errors: workspacePullCursors.filter((row) => row.lastError || isSyncCursorStale(row)).length,
         })}
       >
         <SurfaceCard title={t("settings.sync.coverageCard")}>
           <div className="sync-coverage-grid">
             {INBOUND_COVERAGE.map((entityType) => {
               const cursor = pullCursorByEntity.get(entityType);
-              const isActive = Boolean(cursor && !cursor.lastError);
+              const isStale = Boolean(cursor && !cursor.lastError && isSyncCursorStale(cursor));
+              const isActive = Boolean(cursor && !cursor.lastError && !isStale);
               const hasError = Boolean(cursor?.lastError);
               const label = t(`settings.sync.coverage.${entityType}.label`);
               const detail = t(`settings.sync.coverage.${entityType}.detail`);
               return (
                 <div className="sync-coverage-item" key={entityType}>
-                  <span className={`sync-coverage-icon${hasError ? " is-error" : isActive ? " is-active" : ""}`}>
+                  <span className={`sync-coverage-icon${hasError ? " is-error" : isStale ? " is-stale" : isActive ? " is-active" : ""}`}>
                     {hasError ? <AlertTriangle size={14} /> : isActive ? <CheckCircle2 size={14} /> : <CloudDownload size={14} />}
                   </span>
                   <div>
@@ -521,15 +539,19 @@ export const SyncOutboxPage = () => {
                     <small>
                       {hasError
                         ? cursor?.lastError
-                        : cursor
+                        : isStale
+                          ? t("settings.sync.coverageStale", { value: formatDateLabel(cursor?.updatedAt ?? null) })
+                          : cursor
                           ? t("settings.sync.coverageRowsLatest", { count: cursor.lastPulledCount })
                           : detail}
                     </small>
                   </div>
-                  <StatusBadge tone={hasError ? "critical" : isActive ? "success" : "neutral"}>
+                  <StatusBadge tone={hasError ? "critical" : isStale ? "warning" : isActive ? "success" : "neutral"}>
                     {hasError
                       ? t("settings.sync.coverageBadge.error")
-                      : isActive
+                      : isStale
+                        ? t("settings.sync.coverageBadge.stale")
+                        : isActive
                         ? t("settings.sync.coverageBadge.active")
                         : t("settings.sync.coverageBadge.ready")}
                   </StatusBadge>

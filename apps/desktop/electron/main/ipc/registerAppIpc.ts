@@ -340,6 +340,7 @@ const applyRemoteAssetSnapshotsSchema = z.object({
 
 const applyRemoteWorkspaceFilesSchema = z.object({
   workspaceId: z.string().trim().min(1),
+  pullError: z.string().trim().min(1).nullable().optional(),
   rows: z.array(z.object({
     id: z.string().trim().min(1),
     workspace_id: z.string().trim().min(1),
