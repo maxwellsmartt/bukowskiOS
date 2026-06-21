@@ -4,6 +4,43 @@ import { createOperationalSnapshotService, resolveOperationalSnapshot } from "..
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("operational snapshot service", () => {
+  it("never serializes machine-local incident file paths", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-file-paths");
+    try {
+      database.prepare(
+        `INSERT INTO incident_files (
+           id, incident_id, file_url, file_type, uploaded_by_user_id, created_at,
+           storage_path, original_name, byte_size, mime_type, status, deleted_at,
+           content_hash, storage_object_key, updated_at
+         ) VALUES (?, ?, ?, 'image', NULL, ?, ?, 'evidence.png', 10, 'image/png', 'available', NULL, ?, ?, ?)`,
+      ).run(
+        "incident-file-private-path",
+        "incident-cine7-scratch",
+        "/Users/operator/private/evidence.png",
+        "2026-06-21T20:30:00.000Z",
+        "/Users/operator/private/evidence.png",
+        "hash-private-path",
+        "workspace-metadata/incidents/incident-cine7-scratch/incident-file-private-path/evidence.png",
+        "2026-06-21T20:30:00.000Z",
+      );
+
+      const snapshot = resolveOperationalSnapshot(database, {
+        workspace_id: "workspace-metadata",
+        entity_type: "incident",
+        entity_id: "incident-cine7-scratch",
+        updated_at: "2026-06-21T20:30:00.000Z",
+      });
+      const files = snapshot?.snapshot_json.files as Array<Record<string, unknown>>;
+
+      expect(files[0]?.storage_path).toBeNull();
+      expect(files[0]?.file_url).toBeNull();
+      expect(JSON.stringify(snapshot)).not.toContain("/Users/operator/private");
+      expect(files[0]?.storage_object_key).toContain("workspace-metadata/incidents/");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("makes project snapshots self-contained for crew assignments", () => {
     const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-crew-catalog");
     try {

@@ -634,9 +634,18 @@ const resolvePackingSnapshot = (db: DatabaseSync, workspaceId: string, packingSl
 const resolveIncidentSnapshot = (db: DatabaseSync, workspaceId: string, incidentId: string) => {
   const incident = selectOne(db, "SELECT * FROM incidents WHERE id = ? AND workspace_id = ? LIMIT 1", incidentId, workspaceId);
   if (!incident) return null;
+  const files = selectMany(db, "SELECT * FROM incident_files WHERE incident_id = ? ORDER BY created_at, id", incidentId).map(
+    (file) => ({
+      ...file,
+      // Local absolute paths are machine-private implementation details. Only
+      // the canonical Storage object key may cross the sync boundary.
+      storage_path: null,
+      file_url: null,
+    }),
+  );
   return {
     incident,
-    files: selectMany(db, "SELECT * FROM incident_files WHERE incident_id = ? ORDER BY created_at, id", incidentId),
+    files,
   };
 };
 

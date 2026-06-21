@@ -104,13 +104,47 @@ export const applyOperationalFilesMigration = (db: DatabaseSync) => {
   // I3b: content hash for same-machine upload dedupe (skip re-attaching the
   // exact same file to the same entity).
   ensureColumn(db, "asset_files", "content_hash", "TEXT");
+  ensureColumn(db, "asset_files", "storage_object_key", "TEXT");
+  ensureColumn(db, "asset_files", "updated_at", "TEXT");
   ensureColumn(db, "incident_files", "content_hash", "TEXT");
+  ensureColumn(db, "incident_files", "storage_object_key", "TEXT");
+  ensureColumn(db, "incident_files", "updated_at", "TEXT");
   ensureColumn(db, "financial_documents", "content_hash", "TEXT");
+  ensureColumn(db, "financial_documents", "storage_object_key", "TEXT");
+  ensureColumn(db, "financial_documents", "updated_at", "TEXT");
   try {
     ensureColumn(db, "crew_documents", "content_hash", "TEXT");
+    ensureColumn(db, "crew_documents", "storage_object_key", "TEXT");
+    ensureColumn(db, "crew_documents", "updated_at", "TEXT");
   } catch {
     // crew_documents is created by another bootstrap; column added there/later.
   }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS workspace_files (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      domain TEXT NOT NULL CHECK (domain IN ('assets', 'incidents', 'finance', 'crew')),
+      entity_id TEXT NOT NULL,
+      storage_path TEXT,
+      storage_object_key TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      byte_size INTEGER NOT NULL DEFAULT 0 CHECK (byte_size >= 0),
+      content_hash TEXT,
+      status TEXT NOT NULL DEFAULT 'pending_upload' CHECK (status IN ('pending_upload', 'available', 'missing', 'deleted')),
+      created_by_user_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT,
+      UNIQUE (workspace_id, domain, entity_id, content_hash)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_workspace_files_entity
+      ON workspace_files(workspace_id, domain, entity_id, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_workspace_files_pull
+      ON workspace_files(workspace_id, updated_at, id);
+  `);
 };
 
 export const createFileUploadService = (db: DatabaseSync, options: FileUploadServiceOptions) => {
