@@ -543,4 +543,14 @@ describe("security regression checks", () => {
     expect(migration).toContain("to_regclass(format('%I.%I', 'public', target_table))");
     expect(migration).toContain("live.%I::text = tombstone.entity_id");
   });
+
+  it("pulls asset metadata with a cursor independent from current state", () => {
+    const source = readText("apps/desktop/src/shared/hooks/useAssetSnapshotPull.ts");
+
+    expect(source).toContain("bukowski:asset-metadata-pull-cursor:");
+    expect(source).toContain('.from("assets")');
+    expect(source).toContain('applyCompositePullCursor(assetQuery, assetCursor, "updated_at", "id")');
+    expect(source).toContain('.from("asset_current_state")');
+    expect(source).toContain('.in("asset_id", assetIds)');
+  });
 });

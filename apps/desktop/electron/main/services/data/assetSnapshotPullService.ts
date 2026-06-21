@@ -79,19 +79,17 @@ const hasOutboxPendingForAsset = (db: DatabaseSync, workspaceId: string, assetId
   return row.count > 0;
 };
 
-const readLocalUpdatedAt = (db: DatabaseSync, assetId: string) => {
-  const row = db
-    .prepare(
-      `
-        SELECT MAX(updated_at) AS updated_at
-        FROM (
-          SELECT updated_at FROM assets WHERE id = ?
-          UNION ALL
-          SELECT updated_at FROM asset_current_state WHERE asset_id = ?
-        )
-      `,
-    )
-    .get(assetId, assetId) as { updated_at?: string | null } | undefined;
+const readAssetUpdatedAt = (db: DatabaseSync, workspaceId: string, assetId: string) => {
+  const row = db.prepare("SELECT updated_at FROM assets WHERE id = ? AND workspace_id = ? LIMIT 1").get(assetId, workspaceId) as
+    | { updated_at?: string | null }
+    | undefined;
+  return isoOrNull(row?.updated_at);
+};
+
+const readStateUpdatedAt = (db: DatabaseSync, workspaceId: string, assetId: string) => {
+  const row = db.prepare("SELECT updated_at FROM asset_current_state WHERE asset_id = ? AND workspace_id = ? LIMIT 1").get(assetId, workspaceId) as
+    | { updated_at?: string | null }
+    | undefined;
   return isoOrNull(row?.updated_at);
 };
 
@@ -174,6 +172,7 @@ const upsertAsset = (db: DatabaseSync, asset: RemoteAssetSnapshotRow) => {
           notes = excluded.notes,
           is_active = excluded.is_active,
           updated_at = excluded.updated_at
+        WHERE assets.workspace_id = excluded.workspace_id
       `,
     )
     .run(
@@ -239,6 +238,7 @@ const upsertState = (db: DatabaseSync, state: RemoteAssetCurrentStateRow) => {
           available_quantity = excluded.available_quantity,
           assigned_quantity = excluded.assigned_quantity,
           checked_out_quantity = excluded.checked_out_quantity
+        WHERE asset_current_state.workspace_id = excluded.workspace_id
       `,
     )
     .run(
@@ -300,7 +300,28 @@ export const createAssetSnapshotPullService = (db: DatabaseSync) => ({
       cursorAfter: null,
     };
 
-    const assetsById = new Map(assets.filter((asset) => asset.workspace_id === workspaceId).map((asset) => [asset.id, asset]));
+    const workspaceAssets = assets.filter((asset) => asset.workspace_id === workspaceId);
+    const assetsById = new Map(workspaceAssets.map((asset) => [asset.id, asset]));
+    const processedAssetIds = new Set<string>();
+
+    const advanceDiagnosticCursor = (timestamp: string) => {
+      if (!result.cursorAfter || timestamp > result.cursorAfter) result.cursorAfter = timestamp;
+    };
+
+    const applyAtomically = (assetId: string, apply: () => boolean) => {
+      db.exec("SAVEPOINT asset_snapshot_row");
+      try {
+        const applied = apply();
+        db.exec("RELEASE SAVEPOINT asset_snapshot_row");
+        if (applied) result.appliedCount += 1;
+      } catch (error) {
+        db.exec("ROLLBACK TO SAVEPOINT asset_snapshot_row");
+        db.exec("RELEASE SAVEPOINT asset_snapshot_row");
+        const message = error instanceof Error ? error.message : "Unknown error applying remote asset snapshot.";
+        result.errors.push(`${assetId}: ${message}`);
+        logger.warn("Asset snapshot pull row failed.", { id: assetId, error: message });
+      }
+    };
 
     db.exec("BEGIN");
     try {
@@ -311,13 +332,13 @@ export const createAssetSnapshotPullService = (db: DatabaseSync) => ({
 
         const asset = assetsById.get(state.asset_id);
         const remoteUpdatedAt = asset?.updated_at && asset.updated_at > state.updated_at ? asset.updated_at : state.updated_at;
-        if (!asset) {
+        advanceDiagnosticCursor(remoteUpdatedAt);
+        processedAssetIds.add(state.asset_id);
+
+        const localAssetUpdatedAt = readAssetUpdatedAt(db, workspaceId, state.asset_id);
+        if (!asset && !localAssetUpdatedAt) {
           result.missingAssetCount += 1;
           continue;
-        }
-
-        if (!result.cursorAfter || remoteUpdatedAt > result.cursorAfter) {
-          result.cursorAfter = remoteUpdatedAt;
         }
 
         if (hasOutboxPendingForAsset(db, workspaceId, state.asset_id)) {
@@ -325,24 +346,49 @@ export const createAssetSnapshotPullService = (db: DatabaseSync) => ({
           continue;
         }
 
-        const localUpdatedAt = readLocalUpdatedAt(db, state.asset_id);
-        if (localUpdatedAt && localUpdatedAt >= remoteUpdatedAt) {
+        const localStateUpdatedAt = readStateUpdatedAt(db, workspaceId, state.asset_id);
+        const shouldApplyAsset = Boolean(asset && (!localAssetUpdatedAt || asset.updated_at > localAssetUpdatedAt));
+        const shouldApplyState = !localStateUpdatedAt || state.updated_at > localStateUpdatedAt;
+        if (!shouldApplyAsset && !shouldApplyState) {
           result.skippedDueToOlderCount += 1;
           continue;
         }
 
-        try {
-          upsertAsset(db, asset);
-          upsertState(db, state);
-          result.appliedCount += 1;
-          if (!result.cursorAfter || remoteUpdatedAt > result.cursorAfter) {
-            result.cursorAfter = remoteUpdatedAt;
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "Unknown error applying remote asset snapshot.";
-          result.errors.push(`${state.asset_id}: ${message}`);
-          logger.warn("Asset snapshot pull row failed.", { id: state.asset_id, error: message });
+        applyAtomically(state.asset_id, () => {
+          if (shouldApplyAsset && asset) upsertAsset(db, asset);
+          if (shouldApplyState) upsertState(db, state);
+          return true;
+        });
+      }
+
+      // Assets and current state are independent remote streams. Process rows
+      // that arrived without a state row so profile-only edits can converge.
+      for (const asset of workspaceAssets) {
+        if (processedAssetIds.has(asset.id)) continue;
+        advanceDiagnosticCursor(asset.updated_at);
+
+        if (hasOutboxPendingForAsset(db, workspaceId, asset.id)) {
+          result.skippedDueToOutboxCount += 1;
+          continue;
         }
+
+        const localAssetUpdatedAt = readAssetUpdatedAt(db, workspaceId, asset.id);
+        if (!localAssetUpdatedAt) {
+          // A brand-new asset must be hydrated together with its state. The
+          // remote transport writes asset first, so retry this boundary until
+          // asset_current_state becomes visible instead of creating half rows.
+          result.missingAssetCount += 1;
+          continue;
+        }
+        if (localAssetUpdatedAt >= asset.updated_at) {
+          result.skippedDueToOlderCount += 1;
+          continue;
+        }
+
+        applyAtomically(asset.id, () => {
+          upsertAsset(db, asset);
+          return true;
+        });
       }
 
       updateCursor(db, workspaceId, result.cursorAfter, result.appliedCount, result.errors[0] ?? null);

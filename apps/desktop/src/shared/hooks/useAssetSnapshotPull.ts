@@ -16,7 +16,8 @@ import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDa
 const POLL_INTERVAL_MS = 60_000;
 const PULL_BATCH_SIZE = 200;
 const MAX_BATCHES_PER_PASS = 5;
-const cursorKey = (workspaceId: string) => `bukowski:asset-snapshot-pull-cursor:${workspaceId}:v2`;
+const stateCursorKey = (workspaceId: string) => `bukowski:asset-snapshot-pull-cursor:${workspaceId}:v2`;
+const metadataCursorKey = (workspaceId: string) => `bukowski:asset-metadata-pull-cursor:${workspaceId}:v1`;
 
 const toNumberOrNull = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -124,7 +125,7 @@ export const useAssetSnapshotPull = () => {
       let appliedAny = false;
 
       try {
-        const key = cursorKey(activeWorkspaceId);
+        const key = stateCursorKey(activeWorkspaceId);
         let cursor = readCompositePullCursor(key);
 
         for (let batch = 0; batch < MAX_BATCHES_PER_PASS; batch += 1) {
@@ -183,6 +184,63 @@ export const useAssetSnapshotPull = () => {
             break;
           }
         }
+
+        // asset_current_state and assets have independent updated_at values.
+        // Poll metadata with its own cursor so profile-only edits are not lost
+        // when custody/quantity state did not change.
+        const assetKey = metadataCursorKey(activeWorkspaceId);
+        let assetCursor = readCompositePullCursor(assetKey);
+        for (let batch = 0; batch < MAX_BATCHES_PER_PASS; batch += 1) {
+          let assetQuery = (remote as any)
+            .from("assets")
+            .select("*")
+            .eq("workspace_id", activeWorkspaceId)
+            .order("updated_at", { ascending: true })
+            .order("id", { ascending: true })
+            .limit(PULL_BATCH_SIZE);
+          assetQuery = applyCompositePullCursor(assetQuery, assetCursor, "updated_at", "id");
+          const { data: assetRows, error: assetError } = await assetQuery;
+          if (assetError) {
+            console.warn("[asset-snapshot-pull] Metadata pull failed", assetError);
+            break;
+          }
+
+          const rawAssetRows = (assetRows ?? []) as Array<Record<string, unknown>>;
+          const assets = rawAssetRows
+            .map((row) => mapAsset(row))
+            .filter((asset) => asset.workspace_id === activeWorkspaceId);
+          if (!assets.length) break;
+
+          const assetIds = assets.map((asset) => asset.id);
+          const { data: stateRows, error: stateError } = await remote
+            .from("asset_current_state")
+            .select("*")
+            .in("asset_id", assetIds);
+          if (stateError) {
+            console.warn("[asset-snapshot-pull] Metadata state dependency pull failed", stateError);
+            break;
+          }
+
+          const states = (stateRows ?? [])
+            .map((row) => mapState(row as Record<string, unknown>))
+            .filter((state) => state.workspace_id === activeWorkspaceId);
+          const result = await appApi!.applyRemoteAssetSnapshots({
+            workspaceId: activeWorkspaceId,
+            assets,
+            states,
+          });
+          const canAdvanceCursor = canAdvanceCompositePullCursor(result);
+          if (canAdvanceCursor) {
+            const nextCursor = cursorFromRow(rawAssetRows[rawAssetRows.length - 1], "updated_at", "id");
+            if (nextCursor) {
+              assetCursor = nextCursor;
+              writeCompositePullCursor(assetKey, assetCursor);
+            }
+          }
+          if (result.appliedCount > 0) appliedAny = true;
+          if (assets.length < PULL_BATCH_SIZE || !canAdvanceCursor) break;
+        }
+
         if (appliedAny) {
           notifyWorkspaceDataChanged({ source: "sync", entities: ["assets"] });
         }
