@@ -100,6 +100,7 @@ import { createLocalDatabaseKeyStore, DatabaseKeyIntegrityError } from "../auth/
 import { getFreshStoredAccessToken } from "../auth/supabaseAuthBridge";
 import { createWorkspaceAccessGuard, type WorkspaceAccessGuard } from "../auth/workspaceAccessGuard";
 import { assertPathWithinRoot } from "../../security/pathSafety";
+import { createWorkspaceFilePullService } from "./workspaceFilePullService";
 import { createConnectorBridgeService } from "../connectors/connectorBridgeService";
 import { createTelegramConnectorService } from "../connectors/telegramConnectorService";
 import {
@@ -258,6 +259,9 @@ type LocalDatabaseRuntime = {
   applyRemoteOperationalSnapshots: (
     input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand,
   ) => import("@contracts").AppApplyRemoteOperationalSnapshotsResult;
+  applyRemoteWorkspaceFiles: (
+    input: import("@contracts").AppApplyRemoteWorkspaceFilesCommand,
+  ) => import("@contracts").AppApplyRemoteWorkspaceFilesResult;
   applyRemoteTreasuryRows: (
     input: import("@contracts").AppApplyRemoteTreasuryRowsCommand,
   ) => import("@contracts").AppApplyRemoteTreasuryRowsResult;
@@ -2066,14 +2070,15 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   });
   const softwareLicenses = createSoftwareLicenseService(database);
   const notifications = createNotificationLocalService(database);
-  const fileUploads = createFileUploadService(database, {
-    userDataPath: app.getPath("userData"),
-    getStorageRoot: () => appSettings.getDocumentsRoot(),
-  });
   const documentStorage = createSupabaseDocumentStorage({
     supabaseUrl: isSupabaseSyncEnabled() ? process.env.VITE_SUPABASE_URL : undefined,
     bucket: "workspace-documents",
     getAccessToken: getFreshStoredAccessToken,
+  });
+  const fileUploads = createFileUploadService(database, {
+    userDataPath: app.getPath("userData"),
+    getStorageRoot: () => appSettings.getDocumentsRoot(),
+    storage: documentStorage,
   });
   const brandingAssetStorage = createSupabaseDocumentStorage({
     supabaseUrl: isSupabaseSyncEnabled() ? process.env.VITE_SUPABASE_URL : undefined,
@@ -2303,6 +2308,10 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       createAssetSnapshotPullService(database).applyRemoteSnapshots(input.workspaceId, input.assets, input.states),
     applyRemoteOperationalSnapshots: (input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand) =>
       operationalSnapshots.applyRemoteSnapshots(input.workspaceId, input.entityType, input.rows),
+    applyRemoteWorkspaceFiles: (input: import("@contracts").AppApplyRemoteWorkspaceFilesCommand) =>
+      createWorkspaceFilePullService(database, {
+        getStorageRoot: () => appSettings.getDocumentsRoot(),
+      }).applyRemoteRows(input.workspaceId, input.rows),
     applyRemoteTreasuryRows: (input: import("@contracts").AppApplyRemoteTreasuryRowsCommand) =>
       createFinancialDomainPullService(database).applyRemoteTreasuryRows(input.workspaceId, input.table, input.rows),
     applyRemoteCollaboratorPaymentRows: (input: import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand) =>

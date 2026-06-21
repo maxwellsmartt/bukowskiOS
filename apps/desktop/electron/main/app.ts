@@ -557,6 +557,7 @@ app.whenReady().then(async () => {
     applyRemoteExchangeRates: localDatabase.applyRemoteExchangeRates,
     applyRemoteAssetSnapshots: localDatabase.applyRemoteAssetSnapshots,
     applyRemoteOperationalSnapshots: localDatabase.applyRemoteOperationalSnapshots,
+    applyRemoteWorkspaceFiles: localDatabase.applyRemoteWorkspaceFiles,
     applyRemoteTreasuryRows: localDatabase.applyRemoteTreasuryRows,
     applyRemoteCollaboratorPaymentRows: localDatabase.applyRemoteCollaboratorPaymentRows,
     applyRemoteFinanceBusinessRows: localDatabase.applyRemoteFinanceBusinessRows,

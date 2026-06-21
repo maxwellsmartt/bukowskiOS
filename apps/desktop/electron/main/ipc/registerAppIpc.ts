@@ -75,6 +75,9 @@ type RegisterAppIpcOptions = {
   applyRemoteOperationalSnapshots: (
     input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand,
   ) => import("@contracts").AppApplyRemoteOperationalSnapshotsResult;
+  applyRemoteWorkspaceFiles: (
+    input: import("@contracts").AppApplyRemoteWorkspaceFilesCommand,
+  ) => import("@contracts").AppApplyRemoteWorkspaceFilesResult;
   applyRemoteTreasuryRows: (
     input: import("@contracts").AppApplyRemoteTreasuryRowsCommand,
   ) => import("@contracts").AppApplyRemoteTreasuryRowsResult;
@@ -335,6 +338,26 @@ const applyRemoteAssetSnapshotsSchema = z.object({
   ),
 });
 
+const applyRemoteWorkspaceFilesSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  rows: z.array(z.object({
+    id: z.string().trim().min(1),
+    workspace_id: z.string().trim().min(1),
+    domain: z.enum(["assets", "incidents", "finance", "crew"]),
+    entity_id: z.string().trim().min(1),
+    storage_object_key: z.string().trim().min(1),
+    original_name: z.string().trim().min(1),
+    mime_type: z.string().trim().min(1),
+    byte_size: z.number().int().nonnegative(),
+    content_hash: z.string().nullable().optional(),
+    status: z.enum(["pending_upload", "available", "missing", "deleted"]),
+    created_by_user_id: z.string().nullable().optional(),
+    created_at: z.string().trim().min(1),
+    updated_at: z.string().trim().min(1),
+    deleted_at: z.string().nullable().optional(),
+  })),
+});
+
 const applyRemoteOperationalSnapshotsSchema = z.object({
   workspaceId: z.string().trim().min(1),
   entityType: z.enum(["project", "packing_slip", "incident", "rma_case"]),
@@ -508,6 +531,7 @@ export const registerAppIpc = ({
   applyRemoteExchangeRates,
   applyRemoteAssetSnapshots,
   applyRemoteOperationalSnapshots,
+  applyRemoteWorkspaceFiles,
   applyRemoteTreasuryRows,
   applyRemoteCollaboratorPaymentRows,
   applyRemoteFinanceBusinessRows,
@@ -1117,6 +1141,13 @@ export const registerAppIpc = ({
     (_event, input) =>
       applyRemoteOperationalSnapshots(input as import("@contracts").AppApplyRemoteOperationalSnapshotsCommand),
     "The app could not apply remote operational snapshots.",
+  );
+  safeHandle(
+    ipcChannels.app.applyRemoteWorkspaceFiles,
+    applyRemoteWorkspaceFilesSchema,
+    (_event, input) =>
+      applyRemoteWorkspaceFiles(input as import("@contracts").AppApplyRemoteWorkspaceFilesCommand),
+    "The app could not apply remote workspace files.",
   );
   safeHandle(
     ipcChannels.app.applyRemoteTreasuryRows,

@@ -13,8 +13,12 @@ type FileUploadServiceOptions = {
   userDataPath: string;
   /** Optional override for where new files are stored (configurable folder). */
   getStorageRoot?: () => string;
-  fileSystem?: Pick<typeof fs, "copyFileSync" | "existsSync" | "mkdirSync" | "readFileSync" | "statSync" | "unlinkSync">;
+  fileSystem?: Pick<typeof fs, "copyFileSync" | "existsSync" | "mkdirSync" | "readFileSync" | "statSync" | "unlinkSync" | "writeFileSync">;
   shellApi?: Pick<typeof shell, "openPath">;
+  storage?: {
+    enabled: boolean;
+    download: (objectKey: string) => Promise<Buffer | null>;
+  };
   now?: () => string;
 };
 
@@ -440,12 +444,49 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
     };
   };
 
+  const cacheRemoteFile = async (fileId: string, tableName: string): Promise<string | null> => {
+    if (!options.storage?.enabled) return null;
+    const remote = db.prepare(
+      `SELECT workspace_id, domain, entity_id, storage_object_key, original_name
+       FROM workspace_files
+       WHERE id = ? AND status <> 'deleted'
+       LIMIT 1`,
+    ).get(fileId) as {
+      workspace_id: string;
+      domain: "assets" | "incidents" | "finance" | "crew";
+      entity_id: string;
+      storage_object_key: string;
+      original_name: string;
+    } | undefined;
+    if (!remote) return null;
+    const bytes = await options.storage.download(remote.storage_object_key);
+    if (!bytes) return null;
+
+    const localDomain = remote.domain === "assets" ? "asset" : remote.domain === "incidents" ? "incident" : remote.domain;
+    const rootDirectory = path.join(getAllowedRoot(), `${localDomain}-files`, remote.workspace_id, remote.entity_id);
+    fileSystem.mkdirSync(rootDirectory, { recursive: true });
+    ensurePrivateDirectory(rootDirectory);
+    const storagePath = path.join(rootDirectory, `${fileId}${path.extname(remote.original_name)}`);
+    fileSystem.writeFileSync(storagePath, bytes);
+    ensurePrivateFile(storagePath);
+    db.prepare("UPDATE workspace_files SET storage_path = ?, status = 'available' WHERE id = ?").run(storagePath, fileId);
+    db.prepare(`UPDATE ${tableName} SET storage_path = ?, status = 'available' WHERE id = ?`).run(storagePath, fileId);
+    return storagePath;
+  };
+
   const openStoredRow = async (row: AssetFileRow | undefined, tableName: string, fileId: string) => {
-    if (!row?.storage_path) {
-      throw new Error("This file is no longer available.");
+    if (!row) throw new Error("This file is no longer available.");
+
+    const recoveredPath = !row.storage_path || !fileSystem.existsSync(ensureSafePath(row.storage_path))
+      ? await cacheRemoteFile(fileId, tableName)
+      : null;
+    const candidatePath = recoveredPath ?? row.storage_path;
+    if (!candidatePath) {
+      db.prepare(`UPDATE ${tableName} SET status = 'missing' WHERE id = ?`).run(fileId);
+      throw new Error("The file is not available offline and could not be downloaded.");
     }
 
-    const safePath = ensureSafePath(row.storage_path);
+    const safePath = ensureSafePath(candidatePath);
     if (!fileSystem.existsSync(safePath)) {
       db.prepare(`UPDATE ${tableName} SET status = 'missing' WHERE id = ?`).run(fileId);
       throw new Error("The stored file is missing from local storage.");

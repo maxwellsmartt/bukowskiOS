@@ -409,6 +409,38 @@ export type AppApplyRemoteOperationalSnapshotsResult = {
   cursorAfter: string | null;
 };
 
+export type WorkspaceFileDomain = "assets" | "incidents" | "finance" | "crew";
+
+export type AppRemoteWorkspaceFileRow = {
+  id: string;
+  workspace_id: string;
+  domain: WorkspaceFileDomain;
+  entity_id: string;
+  storage_object_key: string;
+  original_name: string;
+  mime_type: string;
+  byte_size: number;
+  content_hash?: string | null;
+  status: "pending_upload" | "available" | "missing" | "deleted";
+  created_by_user_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+};
+
+export type AppApplyRemoteWorkspaceFilesCommand = {
+  workspaceId: string;
+  rows: AppRemoteWorkspaceFileRow[];
+};
+
+export type AppApplyRemoteWorkspaceFilesResult = {
+  workspaceId: string;
+  appliedCount: number;
+  skippedDueToOutboxCount: number;
+  errors: string[];
+  cursorAfter: string | null;
+};
+
 export type TreasuryPullTable =
   | "bank_accounts"
   | "bank_statement_imports"

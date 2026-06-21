@@ -32,6 +32,8 @@ import type {
   AppApplyRemoteFinanceBusinessRowsResult,
   AppApplyRemoteAssetSnapshotsCommand,
   AppApplyRemoteAssetSnapshotsResult,
+  AppApplyRemoteWorkspaceFilesCommand,
+  AppApplyRemoteWorkspaceFilesResult,
   AppApplyRemoteCatalogRowsCommand,
   AppApplyRemoteCatalogRowsResult,
   AppApplyRemoteTreasuryRowsCommand,
@@ -235,6 +237,9 @@ declare global {
       applyRemoteOperationalSnapshots: (
         input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand,
       ) => Promise<import("@contracts").AppApplyRemoteOperationalSnapshotsResult>;
+      applyRemoteWorkspaceFiles: (
+        input: AppApplyRemoteWorkspaceFilesCommand,
+      ) => Promise<AppApplyRemoteWorkspaceFilesResult>;
       applyRemoteTreasuryRows: (
         input: AppApplyRemoteTreasuryRowsCommand,
       ) => Promise<AppApplyRemoteTreasuryRowsResult>;
