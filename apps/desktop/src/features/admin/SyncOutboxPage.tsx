@@ -531,7 +531,7 @@ export const SyncOutboxPage = () => {
                       ? t("settings.sync.coverageBadge.error")
                       : isActive
                         ? t("settings.sync.coverageBadge.active")
-                        : t("settings.sync.coverageBadge.planned")}
+                        : t("settings.sync.coverageBadge.ready")}
                   </StatusBadge>
                 </div>
               );

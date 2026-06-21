@@ -182,6 +182,66 @@ describe("operational snapshot service", () => {
     }
   });
 
+  it("adopts equivalent local catalog ids before applying a project snapshot", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-catalog-rekey");
+
+    try {
+      const localClient = database.prepare(
+        "SELECT id, name FROM clients WHERE workspace_id = 'workspace-metadata' ORDER BY id LIMIT 1",
+      ).get() as { id: string; name: string };
+
+      const result = createOperationalSnapshotService(database).applyRemoteSnapshots(
+        "workspace-metadata",
+        "project",
+        [{
+          workspace_id: "workspace-metadata",
+          entity_type: "project",
+          entity_id: "project-with-equivalent-client",
+          updated_at: "2026-05-06T12:05:00.000Z",
+          deleted_at: null,
+          snapshot_json: {
+            project: {
+              id: "project-with-equivalent-client",
+              workspace_id: "workspace-metadata",
+              code: "PEC",
+              name: "Project with equivalent client",
+              client_id: "client-server-canonical",
+              client_name: localClient.name.toUpperCase(),
+              production_company_id: null,
+              production_company_name: null,
+              status: "Prep",
+              start_date: "2026-06-01",
+              end_date: "2026-06-02",
+              description: null,
+              color_key: null,
+              has_preproduction: 0,
+              preproduction_start_date: null,
+              preproduction_end_date: null,
+              archived_at: null,
+              created_at: "2026-05-06T12:05:00.000Z",
+              updated_at: "2026-05-06T12:05:00.000Z",
+            },
+            units: [],
+            unitWindows: [],
+            projectDepartments: [],
+            unitDepartments: [],
+            crewAssignments: [],
+          },
+        }],
+      );
+
+      expect(result.errors).toEqual([]);
+      expect(result.appliedCount).toBe(1);
+      expect(database.prepare("SELECT 1 FROM clients WHERE id = ?").get(localClient.id)).toBeUndefined();
+      expect(database.prepare("SELECT 1 FROM clients WHERE id = 'client-server-canonical'").get()).toBeTruthy();
+      expect(
+        (database.prepare("SELECT client_id FROM projects WHERE id = 'project-with-equivalent-client'").get() as { client_id: string }).client_id,
+      ).toBe("client-server-canonical");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("reconciles removed project children from remote snapshots", () => {
     const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-reconcile");
 

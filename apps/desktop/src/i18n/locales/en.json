@@ -5249,6 +5249,7 @@
       "coverageBadge": {
         "error": "Error",
         "active": "Active",
+        "ready": "Available",
         "planned": "Planned"
       },
       "queueDisclosure": {

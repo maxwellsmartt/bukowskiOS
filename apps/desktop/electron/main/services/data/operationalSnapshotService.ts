@@ -1,9 +1,36 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 
 import { getDesktopLogger } from "../logger";
+import { adoptCanonicalCatalogId, type CatalogEntityType } from "./catalogPullService";
 import { isLocalTimestampAtLeastAsNew } from "./syncTimestampPolicy";
 
 const logger = getDesktopLogger("operational-snapshot-service");
+
+const adoptEquivalentCatalogReference = (
+  db: DatabaseSync,
+  input: {
+    workspaceId: string;
+    entityType: Extract<CatalogEntityType, "clients" | "production_companies">;
+    canonicalId: string;
+    naturalName: unknown;
+  },
+): boolean => {
+  if (typeof input.naturalName !== "string" || !input.naturalName.trim()) return false;
+  const local = db.prepare(
+    `SELECT id FROM ${input.entityType}
+     WHERE workspace_id = ? AND lower(name) = lower(?)
+     LIMIT 1`,
+  ).get(input.workspaceId, input.naturalName.trim()) as { id: string } | undefined;
+  if (!local) return false;
+
+  adoptCanonicalCatalogId(db, {
+    workspaceId: input.workspaceId,
+    entityType: input.entityType,
+    localId: local.id,
+    canonicalId: input.canonicalId,
+  });
+  return true;
+};
 
 export type OperationalSnapshotEntityType = "project" | "packing_slip" | "incident" | "rma_case";
 
@@ -603,10 +630,26 @@ const applyProjectSnapshot = (
 
   const safeProject = { ...project };
   if (safeProject.client_id && !rowExists(db, "clients", safeProject.client_id)) {
-    throw new Error(`Project references unavailable client ${String(safeProject.client_id)}; snapshot deferred.`);
+    const adopted = adoptEquivalentCatalogReference(db, {
+      workspaceId: context.workspaceId,
+      entityType: "clients",
+      canonicalId: String(safeProject.client_id),
+      naturalName: safeProject.client_name,
+    });
+    if (!adopted) {
+      throw new Error(`Project references unavailable client ${String(safeProject.client_id)}; snapshot deferred.`);
+    }
   }
   if (safeProject.production_company_id && !rowExists(db, "production_companies", safeProject.production_company_id)) {
-    throw new Error(`Project references unavailable production company ${String(safeProject.production_company_id)}; snapshot deferred.`);
+    const adopted = adoptEquivalentCatalogReference(db, {
+      workspaceId: context.workspaceId,
+      entityType: "production_companies",
+      canonicalId: String(safeProject.production_company_id),
+      naturalName: safeProject.production_company_name,
+    });
+    if (!adopted) {
+      throw new Error(`Project references unavailable production company ${String(safeProject.production_company_id)}; snapshot deferred.`);
+    }
   }
 
   const units = toRecordArray(snapshot.units).filter((row) => {

@@ -5253,6 +5253,7 @@
       "coverageBadge": {
         "error": "Error",
         "active": "Activa",
+        "ready": "Disponible",
         "planned": "Planeada"
       },
       "queueDisclosure": {

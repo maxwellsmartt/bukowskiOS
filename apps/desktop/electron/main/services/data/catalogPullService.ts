@@ -56,13 +56,130 @@ export type CatalogPullResult = {
   cursorAfter: string | null;
 };
 
+const outboxEntityTypeByCatalog: Record<CatalogEntityType, string> = {
+  asset_categories: "category",
+  locations: "location",
+  clients: "client",
+  manufacturers: "manufacturer",
+  production_companies: "production_company",
+  crew_members: "crew",
+  departments: "department",
+};
+
+const naturalKeyByCatalog: Partial<Record<CatalogEntityType, "code" | "name">> = {
+  asset_categories: "code",
+  locations: "code",
+  clients: "name",
+  manufacturers: "name",
+  production_companies: "name",
+  departments: "code",
+};
+
+const safeIdentifier = (value: string): string => {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
+    throw new Error(`Unsafe SQLite identifier: ${value}`);
+  }
+  return `"${value}"`;
+};
+
+type ForeignKeyReference = { table: string; from: string; to: string };
+
+const readForeignKeyReferences = (db: DatabaseSync, parentTable: string): ForeignKeyReference[] => {
+  const tables = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+  ).all() as Array<{ name: string }>;
+
+  return tables.flatMap(({ name }) => {
+    const table = safeIdentifier(name);
+    const foreignKeys = db.prepare(`PRAGMA foreign_key_list(${table})`).all() as Array<{
+      table: string;
+      from: string;
+      to: string;
+    }>;
+    return foreignKeys
+      .filter((foreignKey) => foreignKey.table === parentTable && foreignKey.to === "id")
+      .map((foreignKey) => ({ table: name, from: foreignKey.from, to: foreignKey.to }));
+  });
+};
+
+const mergeSafeRelationshipTables = new Set(["project_departments", "project_unit_departments"]);
+
+/**
+ * Replaces a workstation-local catalog id with the server-authoritative id.
+ * Every FK is discovered from SQLite so newly added dependent tables are not
+ * silently missed. The caller must already be inside a transaction.
+ */
+export const adoptCanonicalCatalogId = (
+  db: DatabaseSync,
+  input: {
+    workspaceId: string;
+    entityType: CatalogEntityType;
+    localId: string;
+    canonicalId: string;
+  },
+) => {
+  if (input.localId === input.canonicalId) return;
+
+  db.exec("PRAGMA defer_foreign_keys = ON");
+  for (const reference of readForeignKeyReferences(db, input.entityType)) {
+    const table = safeIdentifier(reference.table);
+    const column = safeIdentifier(reference.from);
+    if (mergeSafeRelationshipTables.has(reference.table)) {
+      db.prepare(`UPDATE OR IGNORE ${table} SET ${column} = ? WHERE ${column} = ?`)
+        .run(input.canonicalId, input.localId);
+      db.prepare(`DELETE FROM ${table} WHERE ${column} = ?`).run(input.localId);
+      continue;
+    }
+    db.prepare(`UPDATE ${table} SET ${column} = ? WHERE ${column} = ?`)
+      .run(input.canonicalId, input.localId);
+  }
+
+  db.prepare(`UPDATE ${safeIdentifier(input.entityType)} SET id = ? WHERE id = ? AND workspace_id = ?`)
+    .run(input.canonicalId, input.localId, input.workspaceId);
+  db.prepare(
+    `UPDATE sync_outbox
+     SET entity_id = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE workspace_id = ? AND entity_type = ? AND entity_id = ?
+       AND status IN ('pending', 'processing', 'failed')`,
+  ).run(
+    input.canonicalId,
+    input.workspaceId,
+    outboxEntityTypeByCatalog[input.entityType],
+    input.localId,
+  );
+};
+
+const reconcileNaturalKeyIdentity = (
+  db: DatabaseSync,
+  entityType: CatalogEntityType,
+  row: RemoteCatalogRow,
+) => {
+  const naturalKey = naturalKeyByCatalog[entityType];
+  const naturalValue = naturalKey ? row[naturalKey] : null;
+  if (!naturalKey || typeof naturalValue !== "string" || !naturalValue.trim()) return;
+
+  const collision = db.prepare(
+    `SELECT id FROM ${safeIdentifier(entityType)}
+     WHERE workspace_id = ? AND id <> ? AND lower(${safeIdentifier(naturalKey)}) = lower(?)
+     LIMIT 1`,
+  ).get(row.workspace_id, row.id, naturalValue.trim()) as { id: string } | undefined;
+  if (!collision) return;
+
+  adoptCanonicalCatalogId(db, {
+    workspaceId: row.workspace_id,
+    entityType,
+    localId: collision.id,
+    canonicalId: row.id,
+  });
+};
+
 const isoOrNull = (value: unknown): string | null =>
   typeof value === "string" && value.length > 0 ? value : null;
 
 const hasOutboxPendingForEntity = (
   db: DatabaseSync,
   workspaceId: string,
-  entityType: CatalogEntityType,
+  entityType: CatalogEntityType | "exchange_rate",
   entityId: string,
 ): boolean => {
   const row = db
@@ -76,7 +193,11 @@ const hasOutboxPendingForEntity = (
           AND status IN ('pending', 'processing', 'failed')
       `,
     )
-    .get(workspaceId, entityType, entityId) as { count: number };
+    .get(
+      workspaceId,
+      entityType === "exchange_rate" ? entityType : outboxEntityTypeByCatalog[entityType],
+      entityId,
+    ) as { count: number };
   return row.count > 0;
 };
 
@@ -412,24 +533,32 @@ export const createCatalogPullService = (db: DatabaseSync) => {
           continue;
         }
 
-        if (hasOutboxPendingForEntity(db, workspaceId, entityType, row.id)) {
-          result.skippedDueToOutboxCount += 1;
-          continue;
-        }
-
-        const localUpdatedAt = readLocalUpdatedAt(db, entityType, row.id);
-        if (localUpdatedAt && isLocalTimestampAtLeastAsNew(localUpdatedAt, row.updated_at)) {
-          result.skippedDueToOlderCount += 1;
-          continue;
-        }
-
+        db.exec("SAVEPOINT catalog_pull_row");
         try {
+          reconcileNaturalKeyIdentity(db, entityType, row);
+
+          if (hasOutboxPendingForEntity(db, workspaceId, entityType, row.id)) {
+            db.exec("RELEASE SAVEPOINT catalog_pull_row");
+            result.skippedDueToOutboxCount += 1;
+            continue;
+          }
+
+          const localUpdatedAt = readLocalUpdatedAt(db, entityType, row.id);
+          if (localUpdatedAt && isLocalTimestampAtLeastAsNew(localUpdatedAt, row.updated_at)) {
+            db.exec("RELEASE SAVEPOINT catalog_pull_row");
+            result.skippedDueToOlderCount += 1;
+            continue;
+          }
+
           applyOne(db, entityType, row);
+          db.exec("RELEASE SAVEPOINT catalog_pull_row");
           result.appliedCount += 1;
           if (!result.cursorAfter || row.updated_at > result.cursorAfter) {
             result.cursorAfter = row.updated_at;
           }
         } catch (error) {
+          db.exec("ROLLBACK TO SAVEPOINT catalog_pull_row");
+          db.exec("RELEASE SAVEPOINT catalog_pull_row");
           const message = error instanceof Error ? error.message : "Unknown error applying remote row.";
           result.errors.push(`${row.id}: ${message}`);
           logger.warn("Catalog pull row failed.", { entityType, id: row.id, error: message });
@@ -512,7 +641,7 @@ export const createCatalogPullService = (db: DatabaseSync) => {
 
       for (const row of rows) {
         try {
-          if (hasOutboxPendingForEntity(db, workspaceId, "exchange_rate" as CatalogEntityType, row.id)) {
+          if (hasOutboxPendingForEntity(db, workspaceId, "exchange_rate", row.id)) {
             result.skippedDueToOutboxCount += 1;
             continue;
           }

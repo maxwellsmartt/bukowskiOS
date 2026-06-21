@@ -107,6 +107,64 @@ describe("catalogPullService", () => {
     cleanup();
   });
 
+  it("adopts the remote department id and preserves dependent relationships", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-catalog-pull-department-rekey");
+    const workspaceId = "workspace-metadata";
+    const localDepartment = database.prepare(
+      "SELECT id, code, name FROM departments WHERE workspace_id = ? ORDER BY id LIMIT 1",
+    ).get(workspaceId) as { id: string; code: string; name: string };
+    const asset = database.prepare(
+      "SELECT asset_id FROM asset_current_state WHERE workspace_id = ? ORDER BY asset_id LIMIT 1",
+    ).get(workspaceId) as { asset_id: string };
+    database.prepare("UPDATE asset_current_state SET current_department_id = ? WHERE asset_id = ?")
+      .run(localDepartment.id, asset.asset_id);
+
+    const remoteDepartmentId = "department-remote-canonical";
+    const result = createCatalogPullService(database).applyRemoteRows(workspaceId, "departments", [{
+      id: remoteDepartmentId,
+      workspace_id: workspaceId,
+      code: localDepartment.code,
+      name: localDepartment.name,
+      updated_at: new Date().toISOString(),
+    }]);
+
+    expect(result.errors).toEqual([]);
+    expect(database.prepare("SELECT 1 FROM departments WHERE id = ?").get(localDepartment.id)).toBeUndefined();
+    expect(database.prepare("SELECT 1 FROM departments WHERE id = ?").get(remoteDepartmentId)).toBeTruthy();
+    expect(
+      (database.prepare("SELECT current_department_id FROM asset_current_state WHERE asset_id = ?").get(asset.asset_id) as { current_department_id: string }).current_department_id,
+    ).toBe(remoteDepartmentId);
+    cleanup();
+  });
+
+  it("adopts the remote client id and preserves project references", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-catalog-pull-client-rekey");
+    const workspaceId = "workspace-metadata";
+    const localClient = database.prepare(
+      "SELECT id, name FROM clients WHERE workspace_id = ? ORDER BY id LIMIT 1",
+    ).get(workspaceId) as { id: string; name: string };
+    const project = database.prepare(
+      "SELECT id FROM projects WHERE workspace_id = ? ORDER BY id LIMIT 1",
+    ).get(workspaceId) as { id: string };
+    database.prepare("UPDATE projects SET client_id = ? WHERE id = ?").run(localClient.id, project.id);
+
+    const remoteClientId = "client-remote-canonical";
+    const result = createCatalogPullService(database).applyRemoteRows(workspaceId, "clients", [{
+      id: remoteClientId,
+      workspace_id: workspaceId,
+      name: localClient.name,
+      updated_at: new Date().toISOString(),
+    }]);
+
+    expect(result.errors).toEqual([]);
+    expect(database.prepare("SELECT 1 FROM clients WHERE id = ?").get(localClient.id)).toBeUndefined();
+    expect(database.prepare("SELECT 1 FROM clients WHERE id = ?").get(remoteClientId)).toBeTruthy();
+    expect(
+      (database.prepare("SELECT client_id FROM projects WHERE id = ?").get(project.id) as { client_id: string }).client_id,
+    ).toBe(remoteClientId);
+    cleanup();
+  });
+
   it("skips remote updates while a local mutation is pending in the outbox", () => {
     const { cleanup, database } = createTestDatabase("bukowski-catalog-pull-outbox");
     const workspaceId = "workspace-metadata";
@@ -133,7 +191,7 @@ describe("catalogPullService", () => {
     database
       .prepare(
         `INSERT INTO sync_outbox (id, workspace_id, entity_type, entity_id, operation_type, payload_json, status, attempt_count, created_at, updated_at)
-         VALUES (?, ?, 'locations', ?, 'update', '{}', 'pending', 0, ?, ?)`,
+         VALUES (?, ?, 'location', ?, 'update', '{}', 'pending', 0, ?, ?)`,
       )
       .run(
         "outbox-1",
