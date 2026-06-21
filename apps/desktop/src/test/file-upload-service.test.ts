@@ -31,6 +31,30 @@ describe("file upload service", () => {
     expect(detail.files[0]?.originalName).toBe("fixture-asset.pdf");
     expect(detail.files[0]?.status).toBe("available");
     expect(detail.files[0]?.mimeType).toBe("application/pdf");
+    const workspaceFile = database.prepare(
+      `SELECT workspace_id, domain, entity_id, storage_object_key, status
+       FROM workspace_files WHERE id = ?`,
+    ).get(detail.files[0]!.id) as {
+      workspace_id: string;
+      domain: string;
+      entity_id: string;
+      storage_object_key: string;
+      status: string;
+    };
+    expect(workspaceFile).toMatchObject({
+      workspace_id: "workspace-metadata",
+      domain: "assets",
+      entity_id: "asset-legacy-rentman-1",
+      status: "pending_upload",
+    });
+    expect(workspaceFile.storage_object_key).toContain(
+      `workspace-metadata/assets/asset-legacy-rentman-1/${detail.files[0]!.id}/fixture-asset.pdf`,
+    );
+    expect(database.prepare(
+      `SELECT 1 FROM sync_outbox
+       WHERE workspace_id = 'workspace-metadata' AND entity_type = 'workspace_file'
+         AND entity_id = ? AND status = 'pending'`,
+    ).get(detail.files[0]!.id)).toBeTruthy();
     const storedPath = (
       database.prepare("SELECT storage_path FROM asset_files WHERE asset_id = ? LIMIT 1").get("asset-legacy-rentman-1") as {
         storage_path: string;
@@ -156,6 +180,14 @@ describe("file upload service", () => {
     expect(result.deletedCount).toBe(1);
     expect(result.summary).toBe("Asset file removed.");
     expect(detail.files).toHaveLength(0);
+    expect(database.prepare(
+      `SELECT 1 FROM sync_outbox
+       WHERE entity_type = 'workspace_file' AND entity_id = ? AND operation_type = 'delete' AND status = 'pending'`,
+    ).get(uploadedFile!.id)).toBeTruthy();
+    expect(database.prepare(
+      `SELECT 1 FROM sync_outbox
+       WHERE entity_type = 'workspace_file' AND entity_id = ? AND operation_type = 'upsert' AND status = 'sent'`,
+    ).get(uploadedFile!.id)).toBeTruthy();
 
     cleanup();
     fs.rmSync(tempRoot, { force: true, recursive: true });

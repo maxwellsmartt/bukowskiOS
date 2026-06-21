@@ -34,6 +34,13 @@ export type SupabaseOperationalSnapshotRecord = {
   deleted_at?: string | null;
 };
 
+export type SupabaseWorkspaceFileUpload = {
+  metadata: Record<string, unknown>;
+  objectKey: string;
+  contentType: string;
+  bytes: Uint8Array | null;
+};
+
 // A direct upsert of one or more rows into a real Supabase table. Used for
 // domain entities (treasury, invoices, …) whose tables mirror the local
 // SQLite schema 1:1, so the resolver can hand back ready-to-POST records.
@@ -55,6 +62,9 @@ export type SupabaseOutboxTransportOptions = {
   resolveOperationalSnapshot?: (
     row: SupabaseOutboxTransportRow,
   ) => Promise<SupabaseOperationalSnapshotRecord | null> | SupabaseOperationalSnapshotRecord | null;
+  resolveWorkspaceFileUpload?: (
+    row: SupabaseOutboxTransportRow,
+  ) => Promise<SupabaseWorkspaceFileUpload | null> | SupabaseWorkspaceFileUpload | null;
   // Materializes a financial-domain outbox row into its real Supabase table(s).
   // Returns null for entity types it doesn't handle (so other resolvers run).
   resolveDomainUpserts?: (
@@ -174,6 +184,55 @@ const deleteSupabaseRows = async ({
   }
 };
 
+const storageObjectEndpoint = (normalizedUrl: string, objectKey: string) =>
+  `${normalizedUrl}/storage/v1/object/workspace-documents/${objectKey.split("/").map(encodeURIComponent).join("/")}`;
+
+const uploadStorageObject = async (input: {
+  normalizedUrl: string;
+  accessToken: string;
+  anonKey: string;
+  objectKey: string;
+  contentType: string;
+  bytes: Uint8Array;
+  fetchImpl: typeof fetch;
+}) => {
+  const response = await input.fetchImpl(storageObjectEndpoint(input.normalizedUrl, input.objectKey), {
+    method: "POST",
+    headers: {
+      apikey: input.anonKey,
+      Authorization: `Bearer ${input.accessToken}`,
+      "content-type": input.contentType || "application/octet-stream",
+      "x-upsert": "true",
+      "cache-control": "3600",
+    },
+    body: input.bytes as BodyInit,
+  });
+  if (!response.ok) {
+    const detail = await readErrorBody(response);
+    throw new Error(`Supabase workspace file upload failed (${response.status}): ${detail}`);
+  }
+};
+
+const deleteStorageObject = async (input: {
+  normalizedUrl: string;
+  accessToken: string;
+  anonKey: string;
+  objectKey: string;
+  fetchImpl: typeof fetch;
+}) => {
+  const response = await input.fetchImpl(storageObjectEndpoint(input.normalizedUrl, input.objectKey), {
+    method: "DELETE",
+    headers: {
+      apikey: input.anonKey,
+      Authorization: `Bearer ${input.accessToken}`,
+    },
+  });
+  if (!response.ok && response.status !== 404) {
+    const detail = await readErrorBody(response);
+    throw new Error(`Supabase workspace file delete failed (${response.status}): ${detail}`);
+  }
+};
+
 const isTransactionLinkDedupeConflict = (error: unknown) =>
   error instanceof Error &&
   /409/.test(error.message) &&
@@ -247,6 +306,7 @@ export const createSupabaseOutboxTransport = ({
   getAccessToken,
   resolveAssetSnapshot,
   resolveOperationalSnapshot,
+  resolveWorkspaceFileUpload,
   resolveDomainUpserts,
   resolveDomainDeletes,
   fetchImpl = fetch,
@@ -292,6 +352,36 @@ export const createSupabaseOutboxTransport = ({
 
     if (payload === null || typeof payload !== "object") {
       throw new Error("Outbox payload must be a JSON object.");
+    }
+
+    if (row.entity_type === "workspace_file") {
+      const file = resolveWorkspaceFileUpload ? await resolveWorkspaceFileUpload(row) : null;
+      if (!file) throw new Error(`Workspace file unavailable for outbox row ${row.id}.`);
+
+      if (row.operation_type === "delete") {
+        await deleteStorageObject({ normalizedUrl, accessToken, anonKey, objectKey: file.objectKey, fetchImpl });
+      } else {
+        if (!file.bytes) throw new Error(`Workspace file bytes unavailable for outbox row ${row.id}.`);
+        await uploadStorageObject({
+          normalizedUrl,
+          accessToken,
+          anonKey,
+          objectKey: file.objectKey,
+          contentType: file.contentType,
+          bytes: file.bytes,
+          fetchImpl,
+        });
+      }
+
+      await upsertSupabaseRow({
+        accessToken,
+        anonKey,
+        endpoint: `${normalizedUrl}/rest/v1/workspace_files?on_conflict=id`,
+        payload: file.metadata,
+        fetchImpl,
+      });
+      await recordOutboxRow(row, accessToken, payload);
+      return;
     }
 
     // Delete-propagation: a local deletion removes the matching cloud rows so a

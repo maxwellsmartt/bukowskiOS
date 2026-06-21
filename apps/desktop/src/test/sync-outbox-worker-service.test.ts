@@ -515,6 +515,125 @@ describe("sync outbox worker service", () => {
     });
   });
 
+  it("uploads workspace file bytes before publishing canonical metadata", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const workspaceId = "11111111-1111-4111-8111-111111111111";
+    const objectKey = `${workspaceId}/assets/asset-1/asset-file-1/manual.pdf`;
+    const transport = createSupabaseOutboxTransport({
+      supabaseUrl: "https://bukowski.test/",
+      anonKey: "anon-test-key",
+      getAccessToken: async () => "access-test-token",
+      resolveWorkspaceFileUpload: () => ({
+        objectKey,
+        contentType: "application/pdf",
+        bytes: new Uint8Array([1, 2, 3]),
+        metadata: {
+          id: "asset-file-1",
+          workspace_id: workspaceId,
+          domain: "assets",
+          entity_id: "asset-1",
+          storage_object_key: objectKey,
+          original_name: "manual.pdf",
+          mime_type: "application/pdf",
+          byte_size: 3,
+          status: "available",
+          created_at: "2026-06-21T20:40:00.000Z",
+          updated_at: "2026-06-21T20:40:00.000Z",
+          deleted_at: null,
+        },
+      }),
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(null, { status: 201 });
+      }) as typeof fetch,
+    });
+
+    await transport({
+      id: "outbox-workspace-file-upsert-asset-file-1",
+      workspace_id: workspaceId,
+      entity_type: "workspace_file",
+      entity_id: "asset-file-1",
+      event_id: null,
+      operation_type: "upsert",
+      payload_json: "{}",
+      attempt_count: 0,
+      created_at: "2026-06-21T20:40:00.000Z",
+      updated_at: "2026-06-21T20:40:00.000Z",
+    });
+
+    expect(requests.map((request) => request.url)).toEqual([
+      `https://bukowski.test/storage/v1/object/workspace-documents/${objectKey}`,
+      "https://bukowski.test/rest/v1/workspace_files?on_conflict=id",
+      "https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
+    ]);
+    expect(requests[0]?.init).toMatchObject({ method: "POST" });
+    expect(requests[0]?.init.headers).toMatchObject({
+      apikey: "anon-test-key",
+      Authorization: "Bearer access-test-token",
+      "x-upsert": "true",
+    });
+    expect(JSON.parse(String(requests[1]?.init.body))).toMatchObject({
+      id: "asset-file-1",
+      storage_object_key: objectKey,
+      status: "available",
+    });
+  });
+
+  it("deletes workspace file bytes before publishing its tombstone", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const workspaceId = "11111111-1111-4111-8111-111111111111";
+    const objectKey = `${workspaceId}/incidents/incident-1/incident-file-1/evidence.png`;
+    const transport = createSupabaseOutboxTransport({
+      supabaseUrl: "https://bukowski.test/",
+      anonKey: "anon-test-key",
+      getAccessToken: async () => "access-test-token",
+      resolveWorkspaceFileUpload: () => ({
+        objectKey,
+        contentType: "image/png",
+        bytes: null,
+        metadata: {
+          id: "incident-file-1",
+          workspace_id: workspaceId,
+          domain: "incidents",
+          entity_id: "incident-1",
+          storage_object_key: objectKey,
+          original_name: "evidence.png",
+          mime_type: "image/png",
+          byte_size: 3,
+          status: "deleted",
+          created_at: "2026-06-21T20:40:00.000Z",
+          updated_at: "2026-06-21T20:45:00.000Z",
+          deleted_at: "2026-06-21T20:45:00.000Z",
+        },
+      }),
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(null, { status: 200 });
+      }) as typeof fetch,
+    });
+
+    await transport({
+      id: "outbox-workspace-file-delete-incident-file-1",
+      workspace_id: workspaceId,
+      entity_type: "workspace_file",
+      entity_id: "incident-file-1",
+      event_id: null,
+      operation_type: "delete",
+      payload_json: "{}",
+      attempt_count: 0,
+      created_at: "2026-06-21T20:45:00.000Z",
+      updated_at: "2026-06-21T20:45:00.000Z",
+    });
+
+    expect(requests.map((request) => request.url)).toEqual([
+      `https://bukowski.test/storage/v1/object/workspace-documents/${objectKey}`,
+      "https://bukowski.test/rest/v1/workspace_files?on_conflict=id",
+      "https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
+    ]);
+    expect(requests[0]?.init.method).toBe("DELETE");
+    expect(JSON.parse(String(requests[1]?.init.body))).toMatchObject({ status: "deleted" });
+  });
+
   it("upserts asset projections before acknowledging asset_event rows remotely", async () => {
     const requests: Array<{ url: string; init: RequestInit }> = [];
     const transport = createSupabaseOutboxTransport({

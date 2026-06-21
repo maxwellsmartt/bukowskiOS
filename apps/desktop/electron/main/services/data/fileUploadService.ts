@@ -5,12 +5,9 @@ import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
 import type { FileDeleteMutationResult, FileUploadMutationResult } from "@contracts";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
 import { assertPathWithinRoot } from "../../security/pathSafety";
 import { ensurePrivateDirectory, ensurePrivateFile } from "../../security/storagePrivacy";
-
-const workspaceId = DEFAULT_WORKSPACE_ID;
 
 type FileUploadServiceOptions = {
   userDataPath: string;
@@ -155,6 +152,45 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
   // it resolves outside the workspace storage root (symlink/`..` traversal).
   const ensureSafePath = (target: string) => assertPathWithinRoot(target, getAllowedRoot());
 
+  const domainConfig = {
+    asset: { remoteDomain: "assets", parentTable: "assets" },
+    incident: { remoteDomain: "incidents", parentTable: "incidents" },
+    finance: { remoteDomain: "finance", parentTable: "financial_entries" },
+    crew: { remoteDomain: "crew", parentTable: "crew_members" },
+  } as const;
+
+  const resolveWorkspaceId = (domain: keyof typeof domainConfig, entityId: string) => {
+    const row = db.prepare(
+      `SELECT workspace_id FROM ${domainConfig[domain].parentTable} WHERE id = ? LIMIT 1`,
+    ).get(entityId) as { workspace_id: string } | undefined;
+    if (!row?.workspace_id) throw new Error(`${domain} parent was not found.`);
+    return row.workspace_id;
+  };
+
+  const safeObjectName = (value: string) =>
+    value.replace(/[\\/\u0000-\u001f\u007f]/g, "_").slice(0, 180) || "attachment";
+
+  const enqueueWorkspaceFile = (
+    operationType: "upsert" | "delete",
+    fileId: string,
+    workspaceId: string,
+    now: string,
+  ) => {
+    db.prepare(
+      `INSERT INTO sync_outbox (
+         id, workspace_id, entity_type, entity_id, event_id, operation_type,
+         payload_json, status, attempt_count, last_error, next_retry_at, created_at, updated_at
+       ) VALUES (?, ?, 'workspace_file', ?, NULL, ?, '{}', 'pending', 0, NULL, NULL, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         operation_type = excluded.operation_type,
+         status = 'pending',
+         attempt_count = 0,
+         last_error = NULL,
+         next_retry_at = NULL,
+         updated_at = excluded.updated_at`,
+    ).run(`outbox-workspace-file-${operationType}-${fileId}`, workspaceId, fileId, operationType, now, now);
+  };
+
   const importFiles = (
     domain: "asset" | "incident" | "finance" | "crew",
     entityId: string,
@@ -168,6 +204,7 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
     }
 
     const now = options.now?.() ?? new Date().toISOString();
+    const workspaceId = resolveWorkspaceId(domain, entityId);
     const storageRoot = options.getStorageRoot?.() || options.userDataPath;
     const rootDirectory = path.join(storageRoot, `${domain}-files`, workspaceId, entityId);
     fileSystem.mkdirSync(rootDirectory, { recursive: true });
@@ -301,6 +338,7 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
         }
         const fileId = `${domain}-file-${crypto.randomUUID()}`;
         const storagePath = path.join(rootDirectory, `${fileId}${extension}`);
+        const objectKey = `${workspaceId}/${domainConfig[domain].remoteDomain}/${entityId}/${fileId}/${safeObjectName(originalName)}`;
         const byteSize = fileSystem.statSync(sourceFilePath).size;
         fileSystem.copyFileSync(sourceFilePath, storagePath);
         ensurePrivateFile(storagePath);
@@ -355,6 +393,32 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
         }
 
         setHash.run(contentHash, fileId);
+        db.prepare(
+          `UPDATE ${tableName}
+           SET storage_object_key = ?, updated_at = ?
+           WHERE id = ?`,
+        ).run(objectKey, now, fileId);
+        db.prepare(
+          `INSERT INTO workspace_files (
+             id, workspace_id, domain, entity_id, storage_path, storage_object_key,
+             original_name, mime_type, byte_size, content_hash, status,
+             created_by_user_id, created_at, updated_at, deleted_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_upload', NULL, ?, ?, NULL)`,
+        ).run(
+          fileId,
+          workspaceId,
+          domainConfig[domain].remoteDomain,
+          entityId,
+          storagePath,
+          objectKey,
+          originalName,
+          mimeType,
+          byteSize,
+          contentHash,
+          now,
+          now,
+        );
+        enqueueWorkspaceFile("upsert", fileId, workspaceId, now);
         uploadedCount += 1;
       });
 
@@ -459,6 +523,23 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
           WHERE id = ?
         `,
       ).run(options.now?.() ?? new Date().toISOString(), fileId);
+
+      const deletedAt = options.now?.() ?? new Date().toISOString();
+      const workspaceFile = db.prepare(
+        "SELECT workspace_id FROM workspace_files WHERE id = ? LIMIT 1",
+      ).get(fileId) as { workspace_id: string } | undefined;
+      if (workspaceFile) {
+        db.prepare(
+          "UPDATE workspace_files SET status = 'deleted', deleted_at = ?, updated_at = ? WHERE id = ?",
+        ).run(deletedAt, deletedAt, fileId);
+        db.prepare(
+          `UPDATE sync_outbox
+           SET status = 'sent', last_error = NULL, next_retry_at = NULL, updated_at = ?
+           WHERE workspace_id = ? AND entity_type = 'workspace_file' AND entity_id = ?
+             AND operation_type = 'upsert' AND status IN ('pending', 'processing', 'failed')`,
+        ).run(deletedAt, workspaceFile.workspace_id, fileId);
+        enqueueWorkspaceFile("delete", fileId, workspaceFile.workspace_id, deletedAt);
+      }
 
       return {
         deletedCount: 1,

@@ -19,6 +19,7 @@ import {
   createSupabaseOutboxTransport,
   type SupabaseDomainDelete,
   type SupabaseDomainUpsert,
+  type SupabaseWorkspaceFileUpload,
 } from "@sync";
 
 import { createAssistantGatewayService } from "../ai/assistantGatewayService";
@@ -98,6 +99,7 @@ import { createUserAdminService, type UserAdminService } from "./userAdminServic
 import { createLocalDatabaseKeyStore, DatabaseKeyIntegrityError } from "../auth/databaseKeyStore";
 import { getFreshStoredAccessToken } from "../auth/supabaseAuthBridge";
 import { createWorkspaceAccessGuard, type WorkspaceAccessGuard } from "../auth/workspaceAccessGuard";
+import { assertPathWithinRoot } from "../../security/pathSafety";
 import { createConnectorBridgeService } from "../connectors/connectorBridgeService";
 import { createTelegramConnectorService } from "../connectors/telegramConnectorService";
 import {
@@ -1704,6 +1706,66 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   };
 
   const operationalSnapshots = createOperationalSnapshotService(database);
+  const appSettings = createAppSettingsStore(app.getPath("userData"));
+  const resolveWorkspaceFileUpload = (
+    row: { workspace_id: string; entity_type: string; entity_id: string; operation_type: string },
+  ): SupabaseWorkspaceFileUpload | null => {
+    if (row.entity_type !== "workspace_file") return null;
+    const file = database.prepare(
+      `SELECT id, workspace_id, domain, entity_id, storage_path, storage_object_key,
+              original_name, mime_type, byte_size, content_hash, created_by_user_id,
+              created_at, updated_at, deleted_at
+       FROM workspace_files
+       WHERE id = ? AND workspace_id = ?
+       LIMIT 1`,
+    ).get(row.entity_id, row.workspace_id) as {
+      id: string;
+      workspace_id: string;
+      domain: string;
+      entity_id: string;
+      storage_path: string | null;
+      storage_object_key: string;
+      original_name: string;
+      mime_type: string;
+      byte_size: number;
+      content_hash: string | null;
+      created_by_user_id: string | null;
+      created_at: string;
+      updated_at: string;
+      deleted_at: string | null;
+    } | undefined;
+    if (!file) return null;
+    const expectedPrefix = `${file.workspace_id}/${file.domain}/${file.entity_id}/${file.id}/`;
+    if (!file.storage_object_key.startsWith(expectedPrefix)) {
+      throw new Error(`Workspace file object key is outside its canonical scope: ${file.id}.`);
+    }
+
+    const isDelete = row.operation_type === "delete";
+    const bytes = !isDelete && file.storage_path
+      ? fs.readFileSync(assertPathWithinRoot(file.storage_path, appSettings.getDocumentsRoot()))
+      : null;
+    return {
+      objectKey: file.storage_object_key,
+      contentType: file.mime_type,
+      bytes: bytes ? new Uint8Array(bytes) : null,
+      metadata: {
+        id: file.id,
+        workspace_id: file.workspace_id,
+        domain: file.domain,
+        entity_id: file.entity_id,
+        storage_object_key: file.storage_object_key,
+        original_name: file.original_name,
+        mime_type: file.mime_type,
+        byte_size: file.byte_size,
+        content_hash: file.content_hash,
+        status: isDelete ? "deleted" : "available",
+        created_by_user_id: file.created_by_user_id,
+        created_at: file.created_at,
+        updated_at: file.updated_at,
+        deleted_at: isDelete ? (file.deleted_at ?? file.updated_at) : null,
+      },
+    };
+  };
   const workspaceAccess = createWorkspaceAccessGuard({
     database,
     supabaseUrl: process.env.VITE_SUPABASE_URL,
@@ -1722,6 +1784,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
           getAccessToken: getFreshStoredAccessToken,
           resolveAssetSnapshot: resolveSupabaseAssetSnapshot,
           resolveOperationalSnapshot: (row) => operationalSnapshots.resolveSnapshot(row),
+          resolveWorkspaceFileUpload,
           resolveDomainUpserts: resolveSupabaseDomainUpserts,
           resolveDomainDeletes: resolveSupabaseDomainDeletes,
         })
@@ -1829,7 +1892,6 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   reconcileLiveProviderEnablement(database, secretStore);
   const openaiProviderService = createOpenAIProviderService();
   const anthropicProviderService = createAnthropicProviderService();
-  const appSettings = createAppSettingsStore(app.getPath("userData"));
   const foundationReads = createFoundationReadService(database, {
     getStorageRoot: () => appSettings.getDocumentsRoot(),
   });
