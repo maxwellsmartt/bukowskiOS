@@ -10,6 +10,7 @@ import {
   readCompositePullCursor,
   writeCompositePullCursor,
 } from "@shared/lib/compositePullCursor";
+import { hydrateCatalogDependencies } from "@shared/lib/catalogDependencyHydration";
 
 import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
@@ -164,6 +165,18 @@ export const useAssetSnapshotPull = () => {
             .map((row) => mapAsset(row as Record<string, unknown>))
             .filter((asset) => asset.workspace_id === activeWorkspaceId);
 
+          const dependencyResult = await hydrateCatalogDependencies({
+            remote: remote as any,
+            appApi: appApi!,
+            workspaceId: activeWorkspaceId,
+            dependencies: {
+              departments: states.map((state) => state.current_department_id),
+            },
+          });
+          if (dependencyResult.errors.length) {
+            console.warn("[asset-snapshot-pull] Catalog dependency hydration failed", dependencyResult.errors);
+          }
+
           const result = await appApi!.applyRemoteAssetSnapshots({
             workspaceId: activeWorkspaceId,
             assets,
@@ -224,6 +237,17 @@ export const useAssetSnapshotPull = () => {
           const states = (stateRows ?? [])
             .map((row) => mapState(row as Record<string, unknown>))
             .filter((state) => state.workspace_id === activeWorkspaceId);
+          const dependencyResult = await hydrateCatalogDependencies({
+            remote: remote as any,
+            appApi: appApi!,
+            workspaceId: activeWorkspaceId,
+            dependencies: {
+              departments: states.map((state) => state.current_department_id),
+            },
+          });
+          if (dependencyResult.errors.length) {
+            console.warn("[asset-snapshot-pull] Metadata dependency hydration failed", dependencyResult.errors);
+          }
           const result = await appApi!.applyRemoteAssetSnapshots({
             workspaceId: activeWorkspaceId,
             assets,

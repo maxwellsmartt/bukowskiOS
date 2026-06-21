@@ -1,0 +1,115 @@
+import type { AppRemoteCatalogRow, CatalogPullEntityType } from "@contracts";
+
+type CatalogDependencyType = Extract<
+  CatalogPullEntityType,
+  "asset_categories" | "locations" | "clients" | "production_companies" | "crew_members" | "departments"
+>;
+
+export type CatalogDependencyMap = Partial<Record<CatalogDependencyType, Iterable<string | null | undefined>>>;
+
+type CatalogDependencyRemote = {
+  from: (table: string) => {
+    select: (columns: string) => {
+      eq: (column: string, value: string) => {
+        in: (column: string, values: string[]) => Promise<{ data: unknown[] | null; error: unknown }>;
+      };
+    };
+  };
+};
+
+type CatalogDependencyAppApi = {
+  applyRemoteCatalogRows: (input: {
+    workspaceId: string;
+    entityType: CatalogPullEntityType;
+    rows: AppRemoteCatalogRow[];
+  }) => Promise<{ errors: string[] }>;
+};
+
+const MAX_IDS_PER_QUERY = 100;
+
+const uniqueIds = (values: Iterable<string | null | undefined>): string[] =>
+  Array.from(new Set(Array.from(values).filter((value): value is string => Boolean(value))));
+
+const chunksOf = <T,>(values: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) chunks.push(values.slice(index, index + size));
+  return chunks;
+};
+
+/**
+ * Fetches exact catalog parents required by a snapshot before the snapshot is
+ * applied. This is intentionally independent from delta cursors: a dependency
+ * must remain recoverable even when an older cursor was advanced by a previous
+ * app version or when concurrent pull hooks run out of order.
+ */
+export const hydrateCatalogDependencies = async (input: {
+  remote: CatalogDependencyRemote;
+  appApi: CatalogDependencyAppApi;
+  workspaceId: string;
+  dependencies: CatalogDependencyMap;
+}): Promise<{ hydratedCount: number; errors: string[] }> => {
+  let hydratedCount = 0;
+  const errors: string[] = [];
+
+  for (const [entityType, values] of Object.entries(input.dependencies) as Array<
+    [CatalogDependencyType, Iterable<string | null | undefined> | undefined]
+  >) {
+    if (!values) continue;
+    const ids = uniqueIds(values);
+    for (const idsChunk of chunksOf(ids, MAX_IDS_PER_QUERY)) {
+      const { data, error } = await input.remote
+        .from(entityType)
+        .select("*")
+        .eq("workspace_id", input.workspaceId)
+        .in("id", idsChunk);
+      if (error) {
+        errors.push(`${entityType}: remote dependency query failed`);
+        continue;
+      }
+
+      const rows = (data ?? []) as AppRemoteCatalogRow[];
+      if (!rows.length) continue;
+      const result = await input.appApi.applyRemoteCatalogRows({
+        workspaceId: input.workspaceId,
+        entityType,
+        rows,
+      });
+      hydratedCount += rows.length - result.errors.length;
+      errors.push(...result.errors.map((message) => `${entityType}: ${message}`));
+    }
+  }
+
+  return { hydratedCount, errors };
+};
+
+const records = (value: unknown): Array<Record<string, unknown>> =>
+  Array.isArray(value)
+    ? value.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row))
+    : [];
+
+const idFrom = (row: Record<string, unknown> | undefined, key: string): string | null =>
+  row && typeof row[key] === "string" && row[key] ? String(row[key]) : null;
+
+export const catalogDependenciesFromOperationalSnapshots = (
+  snapshots: Array<{ snapshot_json: Record<string, unknown> }>,
+): CatalogDependencyMap => {
+  const clients: Array<string | null> = [];
+  const productionCompanies: Array<string | null> = [];
+  const departments: Array<string | null> = [];
+
+  for (const snapshot of snapshots) {
+    const project = snapshot.snapshot_json.project as Record<string, unknown> | undefined;
+    clients.push(idFrom(project, "client_id"));
+    productionCompanies.push(idFrom(project, "production_company_id"));
+    departments.push(
+      ...records(snapshot.snapshot_json.projectDepartments).map((row) => idFrom(row, "department_id")),
+      ...records(snapshot.snapshot_json.unitDepartments).map((row) => idFrom(row, "department_id")),
+    );
+  }
+
+  return {
+    clients,
+    production_companies: productionCompanies,
+    departments,
+  };
+};

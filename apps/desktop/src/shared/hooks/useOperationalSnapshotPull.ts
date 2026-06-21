@@ -10,6 +10,10 @@ import {
   readCompositePullCursor,
   writeCompositePullCursor,
 } from "@shared/lib/compositePullCursor";
+import {
+  catalogDependenciesFromOperationalSnapshots,
+  hydrateCatalogDependencies,
+} from "@shared/lib/catalogDependencyHydration";
 
 import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
@@ -87,6 +91,18 @@ export const useOperationalSnapshotPull = () => {
             const rows = rawRows.map((row) => mapSnapshot(row));
             if (!rows.length) {
               break;
+            }
+
+            if (entityType === "project") {
+              const dependencyResult = await hydrateCatalogDependencies({
+                remote: supabase as any,
+                appApi,
+                workspaceId: activeWorkspaceId,
+                dependencies: catalogDependenciesFromOperationalSnapshots(rows),
+              });
+              if (dependencyResult.errors.length) {
+                console.warn("[operational-snapshot-pull] Catalog dependency hydration failed", dependencyResult.errors);
+              }
             }
 
             const result = await appApi.applyRemoteOperationalSnapshots({

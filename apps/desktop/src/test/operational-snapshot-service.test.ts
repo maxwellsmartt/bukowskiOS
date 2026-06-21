@@ -135,7 +135,7 @@ describe("operational snapshot service", () => {
               workspace_id: "workspace-metadata",
               code: "RMC",
               name: "Remote Missing Catalog",
-              client_name: "Remote Client Snapshot",
+              client_name: null,
               status: "Prep",
               start_date: "2026-06-01",
               end_date: "2026-06-02",
@@ -237,6 +237,75 @@ describe("operational snapshot service", () => {
       expect(
         (database.prepare("SELECT client_id FROM projects WHERE id = 'project-with-equivalent-client'").get() as { client_id: string }).client_id,
       ).toBe("client-server-canonical");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("hydrates named legacy clients and reconciles encoded department ids", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-legacy-dependencies");
+
+    try {
+      const localDepartment = database.prepare(
+        "SELECT id, code FROM departments WHERE workspace_id = 'workspace-metadata' ORDER BY id LIMIT 1",
+      ).get() as { id: string; code: string };
+      const canonicalDepartmentId = `department-${localDepartment.code.toLowerCase()}-remote`;
+      const timestamp = "2026-05-06T12:06:00.000Z";
+
+      const result = createOperationalSnapshotService(database).applyRemoteSnapshots(
+        "workspace-metadata",
+        "project",
+        [{
+          workspace_id: "workspace-metadata",
+          entity_type: "project",
+          entity_id: "project-legacy-dependencies",
+          updated_at: timestamp,
+          deleted_at: null,
+          snapshot_json: {
+            project: {
+              id: "project-legacy-dependencies",
+              workspace_id: "workspace-metadata",
+              code: "PLD",
+              name: "Legacy dependencies",
+              client_id: "client-legacy-snapshot",
+              client_name: "Legacy Snapshot Client",
+              production_company_id: null,
+              production_company_name: null,
+              status: "Prep",
+              start_date: "2026-06-01",
+              end_date: "2026-06-02",
+              description: null,
+              color_key: null,
+              has_preproduction: 0,
+              preproduction_start_date: null,
+              preproduction_end_date: null,
+              archived_at: null,
+              created_at: timestamp,
+              updated_at: timestamp,
+            },
+            units: [],
+            unitWindows: [],
+            projectDepartments: [{
+              project_id: "project-legacy-dependencies",
+              department_id: canonicalDepartmentId,
+              created_at: timestamp,
+            }],
+            unitDepartments: [],
+            crewAssignments: [],
+          },
+        }],
+      );
+
+      expect(result.errors).toEqual([]);
+      expect(result.appliedCount).toBe(1);
+      expect(
+        (database.prepare("SELECT name FROM clients WHERE id = 'client-legacy-snapshot'").get() as { name: string }).name,
+      ).toBe("Legacy Snapshot Client");
+      expect(database.prepare("SELECT 1 FROM departments WHERE id = ?").get(localDepartment.id)).toBeUndefined();
+      expect(database.prepare("SELECT 1 FROM departments WHERE id = ?").get(canonicalDepartmentId)).toBeTruthy();
+      expect(database.prepare(
+        "SELECT 1 FROM project_departments WHERE project_id = 'project-legacy-dependencies' AND department_id = ?",
+      ).get(canonicalDepartmentId)).toBeTruthy();
     } finally {
       cleanup();
     }

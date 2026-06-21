@@ -32,6 +32,69 @@ const adoptEquivalentCatalogReference = (
   return true;
 };
 
+const hydrateNamedProjectReference = (
+  db: DatabaseSync,
+  input: {
+    workspaceId: string;
+    entityType: Extract<CatalogEntityType, "clients" | "production_companies">;
+    canonicalId: string;
+    naturalName: unknown;
+    updatedAt: unknown;
+  },
+): boolean => {
+  if (rowExists(db, input.entityType, input.canonicalId)) return true;
+  if (adoptEquivalentCatalogReference(db, input)) return true;
+  if (typeof input.naturalName !== "string" || !input.naturalName.trim()) return false;
+
+  // Legacy snapshots predate embedded catalog dependencies but still carry
+  // the canonical display name. Materialize only that known projection; a
+  // later catalog pull can safely fill the optional contact fields.
+  const timestamp = typeof input.updatedAt === "string" && input.updatedAt
+    ? input.updatedAt
+    : new Date().toISOString();
+  if (input.entityType === "clients") {
+    db.prepare(
+      `INSERT INTO clients (id, workspace_id, name, contact_name, email, phone, rnc, notes, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, NULL, NULL, NULL, NULL, NULL, 1, ?, ?)`,
+    ).run(input.canonicalId, input.workspaceId, input.naturalName.trim(), timestamp, timestamp);
+  } else {
+    db.prepare(
+      `INSERT INTO production_companies (id, workspace_id, name, contact_name, email, phone, pur, notes, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, NULL, NULL, NULL, NULL, NULL, 1, ?, ?)`,
+    ).run(input.canonicalId, input.workspaceId, input.naturalName.trim(), timestamp, timestamp);
+  }
+  return true;
+};
+
+const adoptLegacyDepartmentReference = (
+  db: DatabaseSync,
+  workspaceId: string,
+  canonicalId: unknown,
+): boolean => {
+  if (typeof canonicalId !== "string" || !canonicalId) return false;
+  if (rowExists(db, "departments", canonicalId)) return true;
+  // Historical department ids were generated as department-<code>-<suffix>.
+  // Only reconcile when that encoded code has one exact local match.
+  const match = /^department-([a-z0-9]+)-/i.exec(canonicalId);
+  const encodedCode = match?.[1];
+  if (!encodedCode) return false;
+
+  const local = db.prepare(
+    `SELECT id FROM departments
+     WHERE workspace_id = ? AND lower(code) = lower(?)
+     LIMIT 1`,
+  ).get(workspaceId, encodedCode) as { id: string } | undefined;
+  if (!local) return false;
+
+  adoptCanonicalCatalogId(db, {
+    workspaceId,
+    entityType: "departments",
+    localId: local.id,
+    canonicalId,
+  });
+  return true;
+};
+
 export type OperationalSnapshotEntityType = "project" | "packing_slip" | "incident" | "rma_case";
 
 export type RemoteOperationalSnapshotRow = {
@@ -522,6 +585,17 @@ const resolveProjectSnapshot = (db: DatabaseSync, workspaceId: string, projectId
 
   return {
     project,
+    client: project.client_id
+      ? selectOne(db, "SELECT * FROM clients WHERE id = ? AND workspace_id = ? LIMIT 1", String(project.client_id), workspaceId)
+      : null,
+    productionCompany: project.production_company_id
+      ? selectOne(
+          db,
+          "SELECT * FROM production_companies WHERE id = ? AND workspace_id = ? LIMIT 1",
+          String(project.production_company_id),
+          workspaceId,
+        )
+      : null,
     units,
     unitWindows: unitIds.length
       ? selectMany(db, `SELECT * FROM project_unit_windows WHERE project_unit_id IN (${placeholders})`, ...unitIds)
@@ -629,23 +703,43 @@ const applyProjectSnapshot = (
   }
 
   const safeProject = { ...project };
+  const snapshotClient = snapshot.client as Record<string, unknown> | null | undefined;
+  if (
+    snapshotClient
+    && snapshotClient.id === safeProject.client_id
+    && snapshotClient.workspace_id === context.workspaceId
+    && !rowExists(db, "clients", snapshotClient.id)
+  ) {
+    upsertRow(db, "clients", snapshotClient);
+  }
+  const snapshotProductionCompany = snapshot.productionCompany as Record<string, unknown> | null | undefined;
+  if (
+    snapshotProductionCompany
+    && snapshotProductionCompany.id === safeProject.production_company_id
+    && snapshotProductionCompany.workspace_id === context.workspaceId
+    && !rowExists(db, "production_companies", snapshotProductionCompany.id)
+  ) {
+    upsertRow(db, "production_companies", snapshotProductionCompany);
+  }
   if (safeProject.client_id && !rowExists(db, "clients", safeProject.client_id)) {
-    const adopted = adoptEquivalentCatalogReference(db, {
+    const adopted = hydrateNamedProjectReference(db, {
       workspaceId: context.workspaceId,
       entityType: "clients",
       canonicalId: String(safeProject.client_id),
       naturalName: safeProject.client_name,
+      updatedAt: safeProject.updated_at,
     });
     if (!adopted) {
       throw new Error(`Project references unavailable client ${String(safeProject.client_id)}; snapshot deferred.`);
     }
   }
   if (safeProject.production_company_id && !rowExists(db, "production_companies", safeProject.production_company_id)) {
-    const adopted = adoptEquivalentCatalogReference(db, {
+    const adopted = hydrateNamedProjectReference(db, {
       workspaceId: context.workspaceId,
       entityType: "production_companies",
       canonicalId: String(safeProject.production_company_id),
       naturalName: safeProject.production_company_name,
+      updatedAt: safeProject.updated_at,
     });
     if (!adopted) {
       throw new Error(`Project references unavailable production company ${String(safeProject.production_company_id)}; snapshot deferred.`);
@@ -776,7 +870,7 @@ const applyProjectSnapshot = (
   for (const row of departments) upsertRow(db, "departments", row);
   for (const row of crewMembers) upsertRow(db, "crew_members", row);
   for (const row of projectDepartments) {
-    if (!rowExists(db, "departments", row.department_id)) {
+    if (!adoptLegacyDepartmentReference(db, context.workspaceId, row.department_id)) {
       throw new Error(`Project department ${String(row.department_id)} is unavailable; snapshot deferred.`);
     }
     db
@@ -789,7 +883,7 @@ const applyProjectSnapshot = (
       .run(toSqlInputValue(row.project_id), toSqlInputValue(row.department_id), toSqlInputValue(row.created_at));
   }
   for (const row of unitDepartments) {
-    if (!rowExists(db, "departments", row.department_id)) {
+    if (!adoptLegacyDepartmentReference(db, context.workspaceId, row.department_id)) {
       throw new Error(`Project unit department ${String(row.department_id)} is unavailable; snapshot deferred.`);
     }
     db
