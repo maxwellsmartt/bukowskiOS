@@ -27,7 +27,7 @@ type PullCursorKey = {
 };
 
 const buildCursorKey = ({ workspaceId, entityType }: PullCursorKey) =>
-  `bukowski:catalog-pull-cursor:${workspaceId}:${entityType}`;
+  `bukowski:catalog-pull-cursor:${workspaceId}:${entityType}:v2`;
 
 // Catalog tables pulled from Supabase. clients/manufacturers/production_companies
 // gained their Supabase mirror + local-first sync in
@@ -44,7 +44,7 @@ const entityTables: CatalogPullEntityType[] = [
   "departments",
 ];
 const RATES_CURSOR_KEY = (workspaceId: string) =>
-  `bukowski:catalog-pull-cursor:${workspaceId}:exchange_rates`;
+  `bukowski:catalog-pull-cursor:${workspaceId}:exchange_rates:v2`;
 
 const errorLogger = {
   warn: (label: string, error: unknown) => {

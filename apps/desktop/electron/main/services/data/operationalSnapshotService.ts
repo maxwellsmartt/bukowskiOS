@@ -1,6 +1,7 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 
 import { getDesktopLogger } from "../logger";
+import { isLocalTimestampAtLeastAsNew } from "./syncTimestampPolicy";
 
 const logger = getDesktopLogger("operational-snapshot-service");
 
@@ -920,7 +921,7 @@ export const createOperationalSnapshotService = (db: DatabaseSync) => ({
         }
 
         const localUpdatedAt = readLocalUpdatedAt(db, entityType, row.entity_id);
-        if (localUpdatedAt && localUpdatedAt >= row.updated_at) {
+        if (localUpdatedAt && isLocalTimestampAtLeastAsNew(localUpdatedAt, row.updated_at)) {
           result.skippedDueToOlderCount += 1;
           result.cursorAfter = row.updated_at;
           continue;

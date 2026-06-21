@@ -14,7 +14,7 @@ const PULL_BATCH_SIZE = 150;
 const entityTables: AutomationControlPlanePullEntityType[] = ["agents", "ai_provider_configs", "agent_connector_configs"];
 
 const cursorKey = (workspaceId: string, entityType: AutomationControlPlanePullEntityType) =>
-  `bukowski:automation-control-plane-pull-cursor:${workspaceId}:${entityType}`;
+  `bukowski:automation-control-plane-pull-cursor:${workspaceId}:${entityType}:v2`;
 
 export const useAutomationControlPlanePull = () => {
   const { supabase, isLocalFallback, status } = useSession();

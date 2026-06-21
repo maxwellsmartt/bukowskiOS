@@ -23,13 +23,13 @@ const tableConfigs: Array<{ table: TreasuryPullTable; cursorColumn: string; idCo
 ];
 
 const cursorVersions: Partial<Record<TreasuryPullTable, string>> = {
-  bank_accounts: "v2",
-  transaction_annotations: "v2",
-  transaction_links: "v2",
+  bank_accounts: "v3",
+  transaction_annotations: "v3",
+  transaction_links: "v3",
 };
 
 const cursorKey = (workspaceId: string, table: TreasuryPullTable) =>
-  `bukowski:treasury-pull-cursor:${workspaceId}:${table}:${cursorVersions[table] ?? "v1"}`;
+  `bukowski:treasury-pull-cursor:${workspaceId}:${table}:${cursorVersions[table] ?? "v2"}`;
 
 export const useTreasuryPull = () => {
   const { supabase, isLocalFallback, status } = useSession();

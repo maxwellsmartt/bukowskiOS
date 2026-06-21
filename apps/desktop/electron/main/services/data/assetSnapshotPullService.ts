@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import { getDesktopLogger } from "../logger";
+import { isLocalTimestampAtLeastAsNew } from "./syncTimestampPolicy";
 
 const logger = getDesktopLogger("asset-snapshot-pull-service");
 
@@ -347,8 +348,11 @@ export const createAssetSnapshotPullService = (db: DatabaseSync) => ({
         }
 
         const localStateUpdatedAt = readStateUpdatedAt(db, workspaceId, state.asset_id);
-        const shouldApplyAsset = Boolean(asset && (!localAssetUpdatedAt || asset.updated_at > localAssetUpdatedAt));
-        const shouldApplyState = !localStateUpdatedAt || state.updated_at > localStateUpdatedAt;
+        const shouldApplyAsset = Boolean(
+          asset && (!localAssetUpdatedAt || !isLocalTimestampAtLeastAsNew(localAssetUpdatedAt, asset.updated_at)),
+        );
+        const shouldApplyState = !localStateUpdatedAt
+          || !isLocalTimestampAtLeastAsNew(localStateUpdatedAt, state.updated_at);
         if (!shouldApplyAsset && !shouldApplyState) {
           result.skippedDueToOlderCount += 1;
           continue;
@@ -380,7 +384,7 @@ export const createAssetSnapshotPullService = (db: DatabaseSync) => ({
           result.missingAssetCount += 1;
           continue;
         }
-        if (localAssetUpdatedAt >= asset.updated_at) {
+        if (isLocalTimestampAtLeastAsNew(localAssetUpdatedAt, asset.updated_at)) {
           result.skippedDueToOlderCount += 1;
           continue;
         }

@@ -20,7 +20,7 @@ const MAX_BATCHES_PER_ENTITY = 3;
 const entityTypes: OperationalSnapshotEntityType[] = ["project", "packing_slip", "incident", "rma_case"];
 
 const cursorKey = (workspaceId: string, entityType: OperationalSnapshotEntityType) =>
-  `bukowski:operational-snapshot-pull-cursor:${workspaceId}:${entityType}:v2`;
+  `bukowski:operational-snapshot-pull-cursor:${workspaceId}:${entityType}:v3`;
 
 const mapSnapshot = (row: Record<string, unknown>): AppRemoteOperationalSnapshotRow => ({
   workspace_id: String(row.workspace_id),

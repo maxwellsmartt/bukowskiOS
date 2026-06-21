@@ -1,6 +1,7 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 
 import { getDesktopLogger } from "../logger";
+import { isLocalTimestampAtLeastAsNew } from "./syncTimestampPolicy";
 import { materializeTreasuryCounterpartyRules } from "./treasuryCounterpartyRuleMaterializer";
 
 const logger = getDesktopLogger("financial-domain-pull-service");
@@ -494,7 +495,7 @@ const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTab
       }
 
       const localCursor = readLocalCursor(db, table, rawRow, config.conflictColumns);
-      if (localCursor && cursorValue && localCursor >= cursorValue) {
+      if (localCursor && cursorValue && isLocalTimestampAtLeastAsNew(localCursor, cursorValue)) {
         result.skippedDueToOlderCount += 1;
         markCursorApplied();
         continue;

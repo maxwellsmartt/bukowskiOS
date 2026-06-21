@@ -16,8 +16,8 @@ import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDa
 const POLL_INTERVAL_MS = 60_000;
 const PULL_BATCH_SIZE = 200;
 const MAX_BATCHES_PER_PASS = 5;
-const stateCursorKey = (workspaceId: string) => `bukowski:asset-snapshot-pull-cursor:${workspaceId}:v2`;
-const metadataCursorKey = (workspaceId: string) => `bukowski:asset-metadata-pull-cursor:${workspaceId}:v1`;
+const stateCursorKey = (workspaceId: string) => `bukowski:asset-snapshot-pull-cursor:${workspaceId}:v3`;
+const metadataCursorKey = (workspaceId: string) => `bukowski:asset-metadata-pull-cursor:${workspaceId}:v2`;
 
 const toNumberOrNull = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) return value;

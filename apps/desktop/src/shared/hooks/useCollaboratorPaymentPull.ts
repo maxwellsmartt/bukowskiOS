@@ -17,7 +17,7 @@ const tableConfigs: Array<{ table: CollaboratorPaymentPullTable; cursorColumn: s
 ];
 
 const cursorKey = (workspaceId: string, table: CollaboratorPaymentPullTable) =>
-  `bukowski:collaborator-payment-pull-cursor:${workspaceId}:${table}`;
+  `bukowski:collaborator-payment-pull-cursor:${workspaceId}:${table}:v2`;
 
 export const useCollaboratorPaymentPull = () => {
   const { supabase, isLocalFallback, status } = useSession();

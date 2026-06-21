@@ -1,5 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import { isLocalTimestampAtLeastAsNew } from "./syncTimestampPolicy";
+
 import { getDesktopLogger } from "../logger";
 
 export type AutomationControlPlaneEntityType = "agents" | "ai_provider_configs" | "agent_connector_configs";
@@ -174,7 +176,7 @@ export const createAutomationControlPlanePullService = (db: DatabaseSync) => {
           }
 
           const localUpdatedAt = readLocalUpdatedAt(db, entityType, row.id);
-          if (localUpdatedAt && localUpdatedAt >= row.updated_at) {
+          if (localUpdatedAt && isLocalTimestampAtLeastAsNew(localUpdatedAt, row.updated_at)) {
             result.skippedDueToOlderCount += 1;
             continue;
           }

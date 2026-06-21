@@ -79,6 +79,34 @@ describe("catalogPullService", () => {
     cleanup();
   });
 
+  it("accepts server state when the local workstation timestamp is implausibly future", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-catalog-pull-clock-skew");
+    const workspaceId = "workspace-metadata";
+    const service = createCatalogPullService(database);
+    const serverNow = new Date().toISOString();
+    const futureLocal = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    database.prepare(
+      `INSERT INTO locations (id, workspace_id, code, name, type, description, is_active, created_at, updated_at)
+       VALUES ('loc-clock-skew', ?, 'CLOCK', 'Future local', 'warehouse', NULL, 1, ?, ?)`,
+    ).run(workspaceId, futureLocal, futureLocal);
+
+    const result = service.applyRemoteRows(workspaceId, "locations", [{
+      id: "loc-clock-skew",
+      workspace_id: workspaceId,
+      code: "CLOCK",
+      name: "Server canonical",
+      type: "warehouse",
+      updated_at: serverNow,
+    }]);
+
+    expect(result.appliedCount).toBe(1);
+    expect(result.skippedDueToOlderCount).toBe(0);
+    expect((database.prepare("SELECT name FROM locations WHERE id = 'loc-clock-skew'").get() as { name: string }).name)
+      .toBe("Server canonical");
+    cleanup();
+  });
+
   it("skips remote updates while a local mutation is pending in the outbox", () => {
     const { cleanup, database } = createTestDatabase("bukowski-catalog-pull-outbox");
     const workspaceId = "workspace-metadata";

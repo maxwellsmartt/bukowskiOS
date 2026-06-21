@@ -25,11 +25,11 @@ const tableConfigs: Array<{ table: FinanceBusinessPullTable; cursorColumn: strin
 ];
 
 const cursorVersions: Partial<Record<FinanceBusinessPullTable, string>> = {
-  invoice_extractions: "v2",
+  invoice_extractions: "v3",
 };
 
 const cursorKey = (workspaceId: string, table: FinanceBusinessPullTable) =>
-  `bukowski:finance-business-pull-cursor:${workspaceId}:${table}:${cursorVersions[table] ?? "v1"}`;
+  `bukowski:finance-business-pull-cursor:${workspaceId}:${table}:${cursorVersions[table] ?? "v2"}`;
 
 export const useFinanceBusinessPull = () => {
   const { supabase, isLocalFallback, status } = useSession();

@@ -421,7 +421,7 @@ describe("security regression checks", () => {
     expect(treasuryPullSource).toContain(
       '{ table: "transaction_links", cursorColumn: "updated_at", idColumn: "id" }',
     );
-    expect(treasuryPullSource).toContain('transaction_links: "v2"');
+    expect(treasuryPullSource).toContain('transaction_links: "v3"');
     expect(financePullSource).toContain("!canPullFinanceBusiness");
     expect(collaboratorPullSource).toContain("!canPullCollaboratorPayments");
   });
@@ -552,5 +552,33 @@ describe("security regression checks", () => {
     expect(source).toContain('applyCompositePullCursor(assetQuery, assetCursor, "updated_at", "id")');
     expect(source).toContain('.from("asset_current_state")');
     expect(source).toContain('.in("asset_id", assetIds)');
+  });
+
+  it("uses server-authoritative clocks across synchronized streams", () => {
+    const migration = readText("supabase/migrations/20260621192648_sync_server_clock_authority.sql");
+    const guardedServices = [
+      "catalogPullService.ts",
+      "assetSnapshotPullService.ts",
+      "operationalSnapshotService.ts",
+      "financialDomainPullService.ts",
+      "automationControlPlanePullService.ts",
+      "syncTombstonePullService.ts",
+    ];
+
+    expect(migration).toContain("CREATE OR REPLACE FUNCTION public.stamp_sync_updated_at()");
+    expect(migration).toContain("NEW.updated_at := statement_timestamp()");
+    expect(migration).toContain("NEW.created_at := statement_timestamp()");
+    expect(migration).toContain("BEFORE INSERT OR UPDATE");
+    expect(migration).toContain("NEW.created_at := OLD.created_at");
+    expect(migration).toContain("stamp_sync_created_at_before_write BEFORE INSERT OR UPDATE");
+    expect(migration).toContain("interval ''5 minutes''");
+    expect(migration).toContain("'operational_snapshots'");
+    expect(migration).toContain("'asset_current_state'");
+    expect(migration).toContain("'agent_connector_configs'");
+
+    guardedServices.forEach((fileName) => {
+      const source = readText(`apps/desktop/electron/main/services/data/${fileName}`);
+      expect(source, fileName).toContain("syncTimestampPolicy");
+    });
   });
 });

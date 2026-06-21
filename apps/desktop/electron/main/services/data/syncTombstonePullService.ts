@@ -1,5 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import { isLocalTimestampStrictlyNewer } from "./syncTimestampPolicy";
+
 export type RemoteSyncTombstone = {
   workspace_id: string;
   table_name: string;
@@ -185,7 +187,7 @@ export const createSyncTombstonePullService = (db: DatabaseSync) => ({
               nonConsumableRows.add(row);
               continue;
             }
-            if (localFreshness > deletedAt) {
+            if (isLocalTimestampStrictlyNewer(String(local.freshness), row.deleted_at)) {
               skippedDueToNewerCount += 1;
               continue;
             }

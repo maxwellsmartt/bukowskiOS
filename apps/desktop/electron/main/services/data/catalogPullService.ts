@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import { getDesktopLogger } from "../logger";
+import { isLocalTimestampAtLeastAsNew } from "./syncTimestampPolicy";
 
 const logger = getDesktopLogger("catalog-pull-service");
 
@@ -417,7 +418,7 @@ export const createCatalogPullService = (db: DatabaseSync) => {
         }
 
         const localUpdatedAt = readLocalUpdatedAt(db, entityType, row.id);
-        if (localUpdatedAt && localUpdatedAt >= row.updated_at) {
+        if (localUpdatedAt && isLocalTimestampAtLeastAsNew(localUpdatedAt, row.updated_at)) {
           result.skippedDueToOlderCount += 1;
           continue;
         }
