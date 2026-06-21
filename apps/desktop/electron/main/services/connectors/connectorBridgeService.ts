@@ -1,8 +1,10 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
+
 import type { AssistantChatService } from "../data/assistantChatService";
 
-const defaultWorkspaceId = "workspace-metadata";
+const defaultWorkspaceId = LOCAL_FALLBACK_WORKSPACE_ID;
 const defaultThreadTtlMs: number | null = null;
 
 type TelegramDmInboundMessage = {

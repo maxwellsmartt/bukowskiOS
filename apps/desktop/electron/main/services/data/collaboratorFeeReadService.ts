@@ -1,12 +1,13 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import type {
-  CollaboratorFeeDetail,
-  CollaboratorFeeListQuery,
-  CollaboratorFeeRow,
-  CollaboratorFeeStatus,
-  CollaboratorFeeSuggestion,
-  CollaboratorFeeSummary,
+import {
+  LOCAL_FALLBACK_WORKSPACE_ID,
+  type CollaboratorFeeDetail,
+  type CollaboratorFeeListQuery,
+  type CollaboratorFeeRow,
+  type CollaboratorFeeStatus,
+  type CollaboratorFeeSuggestion,
+  type CollaboratorFeeSummary,
 } from "@contracts";
 
 const defaultQuery: CollaboratorFeeListQuery = {
@@ -17,7 +18,7 @@ const defaultQuery: CollaboratorFeeListQuery = {
 };
 
 const normalizeSearch = (value?: string) => value?.trim().toLowerCase() ?? "";
-const resolveWorkspaceId = (workspaceId?: string | null) => workspaceId?.trim() || "workspace-metadata";
+const resolveWorkspaceId = (workspaceId?: string | null) => workspaceId?.trim() || LOCAL_FALLBACK_WORKSPACE_ID;
 
 const mapFeeRow = (row: Record<string, unknown>): CollaboratorFeeRow => ({
   id: String(row.id),

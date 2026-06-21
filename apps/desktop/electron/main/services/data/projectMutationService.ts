@@ -23,10 +23,10 @@ import {
   todayDateOnly,
 } from "./projectScheduling";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 import { enqueueOperationalSnapshotOutbox } from "./operationalSnapshotService";
 
-const fallbackWorkspaceId = DEFAULT_WORKSPACE_ID;
+const fallbackWorkspaceId = LOCAL_FALLBACK_WORKSPACE_ID;
 const placeholderTimestamp = "2026-04-09T18:45:00.000Z";
 
 const placeholderProjects = [

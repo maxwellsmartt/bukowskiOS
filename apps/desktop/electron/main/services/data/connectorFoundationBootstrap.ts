@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
+const workspaceId = LOCAL_FALLBACK_WORKSPACE_ID;
 const now = "2026-04-14T19:00:00.000Z";
 
 const connectorDefaults = [

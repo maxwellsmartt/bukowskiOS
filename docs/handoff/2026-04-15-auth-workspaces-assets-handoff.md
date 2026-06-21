@@ -110,7 +110,7 @@ Impacto medio:
 - El import CSV todavía no tiene preview antes de escribir.
 - No hay wizard de mapeo de columnas ni creación guiada de categorías/locations faltantes.
 - Catálogos base aún no están formalmente workspace-scoped/clonados.
-- `DEFAULT_WORKSPACE_ID` sigue existiendo en varios dominios fuera de Assets.
+- `LOCAL_FALLBACK_WORKSPACE_ID` sigue existiendo en varios dominios fuera de Assets.
 - MFA TOTP sigue como placeholder.
 
 Impacto bajo:

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 import { assertPathWithinRoot } from "../../security/pathSafety";
 
 type DataRetentionDeps = {
@@ -93,7 +93,7 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
               AND assistant_chat_threads.deleted_at < ?
           `,
         )
-        .all(DEFAULT_WORKSPACE_ID, chatCutoff) as Array<{ storage_path: string }>;
+        .all(LOCAL_FALLBACK_WORKSPACE_ID, chatCutoff) as Array<{ storage_path: string }>;
 
       let deletedAttachmentFiles = 0;
       oldDeletedAttachments.forEach((attachment) => {
@@ -121,7 +121,7 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
               AND updated_at < ?
           `,
         )
-        .run(now, DEFAULT_WORKSPACE_ID, memoryMinConfidence, memoryCutoff).changes,
+        .run(now, LOCAL_FALLBACK_WORKSPACE_ID, memoryMinConfidence, memoryCutoff).changes,
       );
 
       const deletedSentOutboxRows = Number(
@@ -134,7 +134,7 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
               AND updated_at < ?
           `,
         )
-        .run(DEFAULT_WORKSPACE_ID, sentOutboxCutoff).changes,
+        .run(LOCAL_FALLBACK_WORKSPACE_ID, sentOutboxCutoff).changes,
       );
 
       const deletedRuntimeErrorByAge = Number(
@@ -146,7 +146,7 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
               AND created_at < ?
           `,
         )
-        .run(DEFAULT_WORKSPACE_ID, runtimeErrorCutoff).changes,
+        .run(LOCAL_FALLBACK_WORKSPACE_ID, runtimeErrorCutoff).changes,
       );
 
       // Hard cap: even within the retention window a runaway error burst can
@@ -165,7 +165,7 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
               )
           `,
         )
-        .run(DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_ID, runtimeErrorMaxRows).changes,
+        .run(LOCAL_FALLBACK_WORKSPACE_ID, LOCAL_FALLBACK_WORKSPACE_ID, runtimeErrorMaxRows).changes,
       );
       const deletedRuntimeErrorRows = deletedRuntimeErrorByAge + deletedRuntimeErrorByCap;
 
@@ -178,7 +178,7 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
               AND created_at < ?
           `,
         )
-        .run(DEFAULT_WORKSPACE_ID, agentActivityCutoff).changes,
+        .run(LOCAL_FALLBACK_WORKSPACE_ID, agentActivityCutoff).changes,
       );
 
       const deletedAgentActivityByCap = Number(
@@ -195,7 +195,7 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
               )
           `,
         )
-        .run(DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_ID, agentActivityMaxRows).changes,
+        .run(LOCAL_FALLBACK_WORKSPACE_ID, LOCAL_FALLBACK_WORKSPACE_ID, agentActivityMaxRows).changes,
       );
       const deletedAgentActivityRows = deletedAgentActivityByAge + deletedAgentActivityByCap;
 
@@ -208,7 +208,7 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
               AND created_at < ?
           `,
         )
-        .run(DEFAULT_WORKSPACE_ID, memoryEventCutoff).changes,
+        .run(LOCAL_FALLBACK_WORKSPACE_ID, memoryEventCutoff).changes,
       );
 
       const deletedChatThreads = Number(
@@ -221,7 +221,7 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
               AND deleted_at < ?
           `,
         )
-        .run(DEFAULT_WORKSPACE_ID, chatCutoff).changes,
+        .run(LOCAL_FALLBACK_WORKSPACE_ID, chatCutoff).changes,
       );
 
       const totalDeleted =

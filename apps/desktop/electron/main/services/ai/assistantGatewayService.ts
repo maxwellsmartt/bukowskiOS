@@ -21,10 +21,10 @@ import type { OpenAIProviderService } from "./openaiProviderService";
 import type { AssistantGatewaySessionStore } from "./assistantGatewaySessionStore";
 
 import { extractDocumentFromDataUrl } from "../data/documentExtractionService";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 import { getDesktopLogger } from "../logger";
 
-const defaultWorkspaceId = DEFAULT_WORKSPACE_ID;
+const defaultWorkspaceId = LOCAL_FALLBACK_WORKSPACE_ID;
 const maxToolCalls = 10;
 const maxToolPayloadChars = 4000;
 const logger = getDesktopLogger("assistant-gateway");

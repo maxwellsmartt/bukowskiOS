@@ -1,13 +1,13 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
 import type { AssistantAudioTranscriptionService } from "../ai/assistantAudioTranscriptionService";
 import type { ConnectorSecretStore } from "../ai/aiSecretStore";
 import { getDesktopLogger } from "../logger";
 import type { ConnectorBridgeService } from "./connectorBridgeService";
 
-const defaultWorkspaceId = DEFAULT_WORKSPACE_ID;
+const defaultWorkspaceId = LOCAL_FALLBACK_WORKSPACE_ID;
 const logger = getDesktopLogger("telegram-connector");
 
 type TelegramGetMeResponse = {

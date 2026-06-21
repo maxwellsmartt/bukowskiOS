@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import {
-  DEFAULT_WORKSPACE_ID,
+  LOCAL_FALLBACK_WORKSPACE_ID,
   type BankAccountRow,
   type BankAccountType,
   type BankName,
@@ -46,7 +46,7 @@ import {
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const toIsoDate = (value: Date) => value.toISOString().slice(0, 10);
 const resolveWorkspaceId = (workspaceId?: string | null) =>
-  workspaceId?.trim() || DEFAULT_WORKSPACE_ID;
+  workspaceId?.trim() || LOCAL_FALLBACK_WORKSPACE_ID;
 const normalizeCurrency = (value: string | null | undefined, fallback = "DOP") =>
   (value?.trim().toUpperCase() || fallback).slice(0, 8);
 const normalizeRuleText = (value: string | null | undefined) =>

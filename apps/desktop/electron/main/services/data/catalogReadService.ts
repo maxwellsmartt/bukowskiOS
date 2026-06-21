@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import type { CatalogListQuery, CatalogSnapshot } from "@contracts";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 const activeProjectStatuses = new Set(["Prep", "Active", "On hold"]);
 
 const compareCatalogLabel = (first: string, second: string) =>
@@ -66,7 +66,7 @@ type CatalogReadDeps = {
 export const createCatalogReadService = (db: DatabaseSync, _deps: CatalogReadDeps = {}) => {
   return {
   getSnapshot(query?: Pick<CatalogListQuery, "workspaceId">): CatalogSnapshot {
-    const workspaceId = query?.workspaceId ?? DEFAULT_WORKSPACE_ID;
+    const workspaceId = query?.workspaceId ?? LOCAL_FALLBACK_WORKSPACE_ID;
     const locations = db
       .prepare(
         `

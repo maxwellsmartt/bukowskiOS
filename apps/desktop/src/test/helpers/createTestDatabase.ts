@@ -31,7 +31,10 @@ type TestDatabase = {
   databasePath: string;
 };
 
-export const createTestDatabase = (prefix: string): TestDatabase => {
+export const createTestDatabase = (
+  prefix: string,
+  options: { includeDemoData?: boolean } = {},
+): TestDatabase => {
   const databasePath = path.join(os.tmpdir(), `${prefix}-${Date.now()}-${Math.random()}.sqlite`);
   const database = new DatabaseSync(databasePath);
 
@@ -45,13 +48,16 @@ export const createTestDatabase = (prefix: string): TestDatabase => {
   applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database));
   applyTrackedStep(database, "runtime_connector_foundation_v1", () => applyConnectorFoundationMigration(database));
   applyTrackedStep(database, "runtime_operational_files_v2", () => applyOperationalFilesMigration(database));
-  seedFoundationData(database);
+  const includeDemoData = options.includeDemoData !== false;
+  seedFoundationData(database, { includeDemoData });
   bootstrapAIGatewayFoundation(database);
-  ensureProjectShellDefaults(database);
-  bootstrapLegacyRentmanDemo(database);
+  if (includeDemoData) {
+    ensureProjectShellDefaults(database);
+    bootstrapLegacyRentmanDemo(database);
+  }
   applyTrackedStep(database, "runtime_asset_quantity_foundation_v1", () => applyAssetQuantityFoundationMigration(database));
   bootstrapAdminFoundation(database);
-  bootstrapSchedulingFoundation(database);
+  if (includeDemoData) bootstrapSchedulingFoundation(database);
 
   return {
     database,

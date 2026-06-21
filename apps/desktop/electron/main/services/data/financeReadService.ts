@@ -2,7 +2,7 @@ import fs from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 
 import {
-  DEFAULT_WORKSPACE_ID,
+  LOCAL_FALLBACK_WORKSPACE_ID,
   type FinancialDocumentRow,
   type FinanceCostLinkRow,
   type FinanceEntryListQuery,
@@ -86,7 +86,7 @@ const buildMonthlyWindows = (months: number) =>
   });
 
 const maxInlinePreviewBytes = 5 * 1024 * 1024;
-const resolveWorkspaceId = (workspaceId?: string | null) => workspaceId?.trim() || DEFAULT_WORKSPACE_ID;
+const resolveWorkspaceId = (workspaceId?: string | null) => workspaceId?.trim() || LOCAL_FALLBACK_WORKSPACE_ID;
 
 export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps) => {
   const resolveStoredPath = (storagePath: string | null | undefined) => {

@@ -554,6 +554,13 @@ describe("security regression checks", () => {
     expect(source).toContain('.in("asset_id", assetIds)');
   });
 
+  it("never copies local demo project shells into remote workspaces", () => {
+    const source = readText("apps/desktop/electron/main/services/data/localDatabase.ts");
+
+    expect(source).not.toContain("seedProjectShellForWorkspace");
+    expect(source).not.toContain("Seeded project shell rows for remote workspaces");
+  });
+
   it("uses server-authoritative clocks across synchronized streams", () => {
     const migration = readText("supabase/migrations/20260621192648_sync_server_clock_authority.sql");
     const guardedServices = [

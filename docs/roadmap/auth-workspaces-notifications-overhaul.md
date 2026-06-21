@@ -8,7 +8,7 @@ Este documento es la fuente viva de seguimiento para el overhaul de auth, users,
 
 ## Resumen ejecutivo
 
-El trabajo avanza con estrategia **Vertical MVP primero**: Supabase como fuente de verdad, SQLite como cache local + outbox, auth profesional, workspace real y un flujo CRUD sincronizado antes del reemplazo completo de `DEFAULT_WORKSPACE_ID`.
+El trabajo avanza con estrategia **Vertical MVP primero**: Supabase como fuente de verdad, SQLite como cache local + outbox, auth profesional, workspace real y un flujo CRUD sincronizado antes del reemplazo completo de `LOCAL_FALLBACK_WORKSPACE_ID`.
 
 Decisiones bloqueadas:
 
@@ -128,7 +128,7 @@ Decisiones bloqueadas:
 | 2026-04-15 | Working tree | Se reemplaza validación JWT local en Edge Functions por lookup contra `/auth/v1/user` y se vuelve idempotente el bootstrap de workspace/rol/membership. | Soportar JWT `ES256` de Supabase y recuperarse de intentos parciales de creación. |
 | 2026-04-15 | Working tree | Se detecta que el gateway de Supabase Edge Functions rechaza JWT `ES256` antes de ejecutar la función; se documenta `verify_jwt=false` para functions que validan bearer internamente. | Evitar doble validación JWT y mantener autorización explícita dentro de la función. |
 | 2026-04-15 | Working tree | Usuario valida en app el flujo Supabase real: login exitoso y creación de workspace remoto después de desactivar gateway JWT verification. Verificación local: `typecheck` y `test` pasan; tests: 26 archivos, 96 casos. | Cerrar el riesgo principal del vertical MVP auth/workspace antes de avanzar a assets/outbox. |
-| 2026-04-15 | Working tree | Assets empieza a respetar workspace activo: el renderer envía `workspaceId`, `getAssets` filtra por `assets.workspace_id` y create/update/archive/assign/packing slip usan el workspace activo. Verificación: `corepack pnpm --filter @bukowski/desktop test -- asset-mutation-service.test.ts` pasa con 26 archivos/97 tests; `typecheck` pasa. | Reducir riesgo del reemplazo de `DEFAULT_WORKSPACE_ID` con un vertical local verificable antes del push remoto a Supabase. |
+| 2026-04-15 | Working tree | Assets empieza a respetar workspace activo: el renderer envía `workspaceId`, `getAssets` filtra por `assets.workspace_id` y create/update/archive/assign/packing slip usan el workspace activo. Verificación: `corepack pnpm --filter @bukowski/desktop test -- asset-mutation-service.test.ts` pasa con 26 archivos/97 tests; `typecheck` pasa. | Reducir riesgo del reemplazo de `LOCAL_FALLBACK_WORKSPACE_ID` con un vertical local verificable antes del push remoto a Supabase. |
 | 2026-04-15 | Working tree | Se convierte `syncOutboxWorkerService` a async con transport injectable, se agrega `createSupabaseOutboxTransport`, migración `public.sync_outbox` con RLS por membership y bandera opt-in `VITE_SUPABASE_SYNC_ENABLED`. Verificación: `typecheck` pasa y `corepack pnpm --filter @bukowski/desktop test -- sync-outbox-worker-service.test.ts` pasa con 26 archivos/99 tests. | Preparar push remoto idempotente y auditable sin romper modo local ni activar red antes de aplicar migración remota. |
 | 2026-04-15 | Working tree | Usuario aplica migración `20260415150000_sync_outbox_bridge.sql`; se valida REST `public.sync_outbox` con sesión guardada y respuesta 200. Se detecta que SQLite local solo tenía `workspace-metadata`, por lo que se agrega IPC `ensureLocalWorkspaces` y `WorkspaceProvider` cachea los workspaces Supabase en local. Verificación: `typecheck`, `build` y tests focalizados pasan; tras reiniciar dev, SQLite contiene `Metadata Cine2` con UUID remoto. | Evitar fallos de foreign key al crear assets con UUID remoto de workspace y mantener la cache local consistente antes de probar outbox real. |
 | 2026-04-15 | Working tree | Se corrige inconsistencia reportada en Assets: el fallback local ya no muestra temporalmente assets de `workspace-metadata` cuando hay sesión Supabase, y `getAssetSummary`/`getAssetsOverview` aceptan `workspaceId` para que métricas y tabla usen el mismo scope. Verificación: `typecheck`, `build` y test de assets pasan. | Evitar parpadeo de datos cruzados y métricas engañosas en workspaces remotos vacíos. |
@@ -215,7 +215,7 @@ Decisiones bloqueadas:
 - Electron nunca contiene `service_role`.
 - Edge Functions/RPC cubren operaciones admin como invites.
 - Tools de agents para notifications/todos/reminders no escriben directo desde Electron main; generan intents y el renderer los persiste con la sesión Supabase del usuario para mantener RLS y auditoría por `(user, workspace)`.
-- Se conserva `DEFAULT_WORKSPACE_ID` solo en seeds/test fixtures durante la migración.
+- Se conserva `LOCAL_FALLBACK_WORKSPACE_ID` solo en seeds/test fixtures durante la migración.
 - Magic link queda dentro de auth v1.
 - First login por invite debe permitir crear password antes de operar; el magic link de usuarios existentes usa `flow=first-login`.
 - El actor `user-ops` se conserva como ID técnico compatible, pero su identidad visible local pasa a ser `AI Agent`.
@@ -237,7 +237,7 @@ Decisiones bloqueadas:
 | --- | --- | --- | --- |
 | crítico | Exponer service role en Electron compromete toda la base. | Solo anon/JWT en app; admin por Edge Functions/RPC. | Abierto, mitigación aplicada en diseño. |
 | crítico | Confiar en `workspaceId` del renderer permite acceso cruzado. | Validar sesión, membership y permisos en main/RLS. | Mitigado en Assets, Packing, Incidents, Projects, RMA, Catalog, Finance, Currency y Quotes; abierto para Agents y smoke manual final. |
-| medio | `DEFAULT_WORKSPACE_ID` está distribuido y puede romper flujos. | Migración por dominio + grep final limitado a seeds/tests. | Abierto. |
+| medio | `LOCAL_FALLBACK_WORKSPACE_ID` está distribuido y puede romper flujos. | Migración por dominio + grep final limitado a seeds/tests. | Abierto. |
 | medio | Roadmap desactualizado pierde valor. | Actualizarlo como parte obligatoria del Definition of Done. | Abierto. |
 | medio | Online-first puede confundir con mala conexión. | Estados visibles de sync, outbox auditable y retries claros. | Abierto. |
 | crítico | Piloto con varios usuarios puede generar confianza falsa si Pull/Push no está claramente en verde antes de operar. | Tratar Sync Activity como preflight de piloto: upload queue sin failed/pending inesperados, download coverage activo y smoke con dos usuarios antes de entregar a Iván/Carlos. | Mitigación en progreso: operational snapshots implementado y migración remota aplicada; falta backfill/smoke multiusuario. |
@@ -270,8 +270,8 @@ Decisiones bloqueadas:
 
 - El schema remoto foundation, las Edge Functions y el flujo autenticado login -> create workspace ya fueron validados contra Supabase dev.
 - Guards de sesión/workspace ya existen, pero falta endurecer comportamiento prod sin fallback.
-- Validación workspace-scoped ya existe en main para Assets, Packing, Incidents, Projects, RMA read/mutations, Catalog IPC, Finance, Currency y Quotes; falta rediseñar Agents porque todavía arrastra `DEFAULT_WORKSPACE_ID`.
-- Aún no se ha iniciado reemplazo de `DEFAULT_WORKSPACE_ID`.
+- Validación workspace-scoped ya existe en main para Assets, Packing, Incidents, Projects, RMA read/mutations, Catalog IPC, Finance, Currency y Quotes; falta rediseñar Agents porque todavía arrastra `LOCAL_FALLBACK_WORKSPACE_ID`.
+- Aún no se ha iniciado reemplazo de `LOCAL_FALLBACK_WORKSPACE_ID`.
 - El worker ya escribe remoto en `public.sync_outbox` y, para filas `asset_event`, ahora proyecta snapshots en `public.assets`, `public.asset_current_state` y `public.asset_events`.
 - El worker ahora también proyecta snapshots operativos en `public.operational_snapshots` para Projects, Packing Slips, Incidents y RMAs. La migración `20260505130000_operational_snapshots.sql` ya fue aplicada por el usuario; el backfill idempotente ya existe en Sync Activity. El pull/apply fue endurecido el 2026-05-06 para no avanzar cursor con errores, recuperar cursores adelantados y tolerar FKs opcionales faltantes. Falta smoke con dos usuarios usando build actualizado.
 - Packaging hardening: la app ahora descarta bounds de ventana fuera de pantalla y muestra/focus la ventana aunque `ready-to-show` no dispare. Build arm64 interna ya fue generada; falta probar específicamente en la MacBook Air M4 de Carlos.

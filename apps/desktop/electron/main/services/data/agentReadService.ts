@@ -14,7 +14,7 @@ import type {
   MissionControlSnapshot,
 } from "@contracts";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 import {
   compareOpenAIModelPriority,
   formatOpenAIModelLabel,
@@ -26,7 +26,7 @@ type AgentWorkspaceQuery = {
   workspaceId?: string | null;
 };
 
-const resolveWorkspaceId = (query?: AgentWorkspaceQuery) => query?.workspaceId?.trim() || DEFAULT_WORKSPACE_ID;
+const resolveWorkspaceId = (query?: AgentWorkspaceQuery) => query?.workspaceId?.trim() || LOCAL_FALLBACK_WORKSPACE_ID;
 const recentConnectorBusyWindowSeconds = 15;
 
 const relativeFormatter = new Intl.RelativeTimeFormat("en-US", { numeric: "auto" });
@@ -160,7 +160,7 @@ const shouldShowInternalAgents = () => process.env.BUKOWSKI_SHOW_INTERNAL_AGENTS
 
 const isVisibleAgent = (row: AgentRow) => shouldShowInternalAgents() || row.visibility !== "internal";
 
-const loadAgentRows = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID) =>
+const loadAgentRows = (db: DatabaseSync, workspaceId = LOCAL_FALLBACK_WORKSPACE_ID) =>
   db
     .prepare(
       `
@@ -232,7 +232,7 @@ const toRosterRow = (
   };
 };
 
-const loadBusyAgentIds = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID) => {
+const loadBusyAgentIds = (db: DatabaseSync, workspaceId = LOCAL_FALLBACK_WORKSPACE_ID) => {
   const runRows = db
     .prepare(
       `
@@ -278,7 +278,7 @@ const loadBusyAgentIds = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID) 
   ]);
 };
 
-const loadNotWorkingAgentIds = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID) => {
+const loadNotWorkingAgentIds = (db: DatabaseSync, workspaceId = LOCAL_FALLBACK_WORKSPACE_ID) => {
   const providerRows = loadProviderRows(db, workspaceId);
   const unhealthyProviders = new Set(
     providerRows
@@ -352,7 +352,7 @@ type ProviderConfigRow = {
   notes: string;
 };
 
-const loadProviderRows = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID) =>
+const loadProviderRows = (db: DatabaseSync, workspaceId = LOCAL_FALLBACK_WORKSPACE_ID) =>
   db
     .prepare(
       `
@@ -379,7 +379,7 @@ const loadProviderRows = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID) 
     )
     .all(workspaceId) as ProviderConfigRow[];
 
-const loadRuns = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID, limit?: number, agentId?: string) => {
+const loadRuns = (db: DatabaseSync, workspaceId = LOCAL_FALLBACK_WORKSPACE_ID, limit?: number, agentId?: string) => {
   const clauses = ["agent_runs.workspace_id = ?"];
   const params: Array<string | number> = [workspaceId];
 
@@ -463,7 +463,7 @@ const toRunRow = (row: ReturnType<typeof loadRuns>[number]): AgentRunRow => {
   };
 };
 
-const loadActivity = (db: DatabaseSync, workspaceId = DEFAULT_WORKSPACE_ID, limit = 6) =>
+const loadActivity = (db: DatabaseSync, workspaceId = LOCAL_FALLBACK_WORKSPACE_ID, limit = 6) =>
   db
     .prepare(
       `

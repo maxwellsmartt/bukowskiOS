@@ -25,9 +25,9 @@ type MemoryEntry = {
 type MemoryCandidate = Omit<MemoryEntry, "id" | "updatedAt">;
 
 const maxCandidatesPerTurn = 3;
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
+const workspaceId = LOCAL_FALLBACK_WORKSPACE_ID;
 
 const normalizeWhitespace = (value: string) => value.replace(/\s+/g, " ").trim();
 const normalizeKey = (kind: MemoryKind, agentId: string | null, projectId: string | null, body: string) =>

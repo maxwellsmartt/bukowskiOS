@@ -19,7 +19,7 @@ Actualización 2026-05-05:
 - Se inicia polish visual transversal de controles: filtros con muchas opciones migran a dropdowns y los pills quedan reservados para estados, toggles pequeños o quick actions.
 - Queda pendiente smoke manual explícito de Projects -> Packing Slips -> Incidents -> RMA con dos usuarios.
 - Se implementa primer corte de sync para Projects, Packing Slips, Incidents y RMA vía snapshots operativos en Supabase. La migración remota fue aplicada y ahora existe backfill idempotente desde Sync Activity; queda pendiente ejecutarlo en data real y validar pull/push con dos dispositivos/usuarios.
-- Se extiende `workspaceAccess` fuera de inventario a Finance, Currency y Quotes. Agents queda como deuda separada porque todavía usa `DEFAULT_WORKSPACE_ID` internamente y requiere refactor de runtime, no sólo guard de IPC.
+- Se extiende `workspaceAccess` fuera de inventario a Finance, Currency y Quotes. Agents queda como deuda separada porque todavía usa `LOCAL_FALLBACK_WORKSPACE_ID` internamente y requiere refactor de runtime, no sólo guard de IPC.
 
 Actualización 2026-05-12:
 - Se cerró una unidad de localización visible para **Incidents + RMA**: listas, panel de reporte, detalle de incidente, archivos, handoff a reparación, RMA list/detail/editor, estados, severidades, columnas, placeholders, toasts y empty states ahora consumen `i18n`.
@@ -106,8 +106,8 @@ Hallazgos de baseline:
 - `Metadata Cine2`: 6 active projects y 629 active assets.
 - `workspace-metadata`: 6 active projects y 789 active assets; todavía conserva Packing/Incidents/RMA seed/demo.
 - Packing/Incidents/RMA no tienen datos reales en `Metadata Cine2` todavía.
-- RMA estaba redirigido a Incidents en UI y el data layer todavía usaba `DEFAULT_WORKSPACE_ID`.
-- Catalog read/mutation todavía depende de `DEFAULT_WORKSPACE_ID`; se considera parte de IC-1.
+- RMA estaba redirigido a Incidents en UI y el data layer todavía usaba `LOCAL_FALLBACK_WORKSPACE_ID`.
+- Catalog read/mutation todavía depende de `LOCAL_FALLBACK_WORKSPACE_ID`; se considera parte de IC-1.
 - 2026-04-28: la auditoría posterior al trabajo vertical encontró que Global Search ya estaba scoped por workspace y con test de aislamiento, pero quedaban fallbacks viejos de Catalog en project catalog/blueprint export.
 
 Pruebas:

@@ -771,9 +771,9 @@
   - `apps/desktop/electron/main/services/data/localDatabase.ts`
   - `apps/desktop/src/features/admin/SettingsPage.tsx`
   - `docs/foundation/sync-roadmap.md`
-  - múltiples servicios y superficies activas que ahora importan `DEFAULT_WORKSPACE_ID`
+  - múltiples servicios y superficies activas que ahora importan `LOCAL_FALLBACK_WORKSPACE_ID`
 - Backend:
-  - se añadió `DEFAULT_WORKSPACE_ID` como contrato compartido en lugar de seguir replicando el string en runtime
+  - se añadió `LOCAL_FALLBACK_WORKSPACE_ID` como contrato compartido en lugar de seguir replicando el string en runtime
   - se creó `dataRetentionService` con una política conservadora:
     - archiva memory entries viejas y de baja confianza
     - purga `sync_outbox` en estado `sent`

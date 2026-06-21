@@ -12,7 +12,7 @@ import type {
   SetAppUserActiveCommand,
   UpdateAppUserCommand,
 } from "@contracts";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
 const slugify = (value: string) =>
   value
@@ -31,7 +31,7 @@ const optionalValue = (value?: string | null) => {
   return nextValue ? nextValue : null;
 };
 
-const resolveWorkspaceId = (workspaceId?: string | null) => optionalValue(workspaceId) ?? DEFAULT_WORKSPACE_ID;
+const resolveWorkspaceId = (workspaceId?: string | null) => optionalValue(workspaceId) ?? LOCAL_FALLBACK_WORKSPACE_ID;
 
 const loadRoles = (db: DatabaseSync, workspaceId: string): AppUserRoleRow[] =>
   db

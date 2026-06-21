@@ -1,9 +1,9 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 import { getDesktopLogger } from "../logger";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
+const workspaceId = LOCAL_FALLBACK_WORKSPACE_ID;
 const logger = getDesktopLogger("runtime-diagnostics");
 
 export type RecordRuntimeErrorInput = {

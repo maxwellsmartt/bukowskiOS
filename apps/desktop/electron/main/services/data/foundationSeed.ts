@@ -1,5 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
+
 const now = "2026-04-09T16:00:00.000Z";
 
 const permissions = [
@@ -570,7 +572,20 @@ const runSeedRows = (db: DatabaseSync, sql: string, rows: readonly SeedRow[]) =>
   }
 };
 
-export const seedFoundationData = (db: DatabaseSync) => {
+export const seedFoundationData = (db: DatabaseSync, options: { includeDemoData?: boolean } = {}) => {
+  runSeedRows(
+    db,
+    `
+      INSERT OR IGNORE INTO permissions (id, key, label, description)
+      VALUES (?, ?, ?, ?)
+    `,
+    permissions,
+  );
+
+  if (options.includeDemoData === false) {
+    return;
+  }
+
   const { count } = db.prepare("SELECT COUNT(*) AS count FROM workspaces").get() as { count: number };
 
   if (count > 0) {
@@ -586,16 +601,7 @@ export const seedFoundationData = (db: DatabaseSync) => {
         INSERT INTO workspaces (id, slug, name, base_currency, is_active, created_at, updated_at)
         VALUES (?, 'metadata-cine', 'Metadata Cine', 'USD', 1, ?, ?)
       `,
-      [["workspace-metadata", now, now]],
-    );
-
-    runSeedRows(
-      db,
-      `
-        INSERT INTO permissions (id, key, label, description)
-        VALUES (?, ?, ?, ?)
-      `,
-      permissions,
+      [[LOCAL_FALLBACK_WORKSPACE_ID, now, now]],
     );
 
     runSeedRows(

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
 const defaultTimeoutMs = 60 * 60 * 1000;
 
@@ -194,7 +194,7 @@ export const createAssistantGatewaySessionStore = (db: DatabaseSync | null = nul
                 LIMIT 1
               `,
             )
-            .get(DEFAULT_WORKSPACE_ID, nextValue.lastTargetAgent) as { id: string } | undefined)?.id ?? null)
+            .get(LOCAL_FALLBACK_WORKSPACE_ID, nextValue.lastTargetAgent) as { id: string } | undefined)?.id ?? null)
         : null;
 
     db.prepare(

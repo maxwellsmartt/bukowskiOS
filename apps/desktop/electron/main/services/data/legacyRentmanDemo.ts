@@ -8,9 +8,9 @@ import {
   type LegacyRentmanSeedRow,
 } from "@db";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
+const workspaceId = LOCAL_FALLBACK_WORKSPACE_ID;
 const importedAt = "2026-04-09T18:30:00.000Z";
 const actorUserId = "user-ops";
 const fallbackLocationId = "loc-legacy-unassigned";

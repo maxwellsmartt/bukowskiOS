@@ -39,12 +39,12 @@ import { normalizeOpenAIBaseUrl, type OpenAIProviderService } from "../ai/openai
 import type { ConnectorBridgeService } from "../connectors/connectorBridgeService";
 import type { TelegramConnectorService } from "../connectors/telegramConnectorService";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
 const resolveCommandWorkspaceId = (input: { workspaceId?: string }) =>
-  ensureValue(input.workspaceId ?? DEFAULT_WORKSPACE_ID, "Workspace");
+  ensureValue(input.workspaceId ?? LOCAL_FALLBACK_WORKSPACE_ID, "Workspace");
 const buildWorkspaceScopedAgentId = (agentId: string, workspaceId: string) =>
-  workspaceId === DEFAULT_WORKSPACE_ID ? `agent-${agentId}` : `agent-${agentId}-${workspaceId}`;
+  workspaceId === LOCAL_FALLBACK_WORKSPACE_ID ? `agent-${agentId}` : `agent-${agentId}-${workspaceId}`;
 type AIModelListingService = {
   listModels?: OpenAIProviderService["listModels"];
   testConnection: OpenAIProviderService["testConnection"];

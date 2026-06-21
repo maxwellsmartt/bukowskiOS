@@ -8,7 +8,7 @@ import {
   appUsersSnapshotReadArgsSchema,
   createAppUserSchema,
   deleteAppUserSchema,
-  DEFAULT_WORKSPACE_ID,
+  LOCAL_FALLBACK_WORKSPACE_ID,
   emptyReadArgsSchema,
   revokeTelegramLinkSchema,
   setAppUserActiveSchema,
@@ -556,7 +556,7 @@ export const registerAppIpc = ({
   safeHandleReadWithSchema(ipcChannels.app.getDiagnostics, emptyReadArgsSchema, () => getDiagnosticsSnapshot());
   safeHandleReadWithSchema(ipcChannels.app.getSupportSnapshot, emptyReadArgsSchema, () => getSupportSnapshot());
   safeHandleReadWithSchema(ipcChannels.app.getUsersSnapshot, appUsersSnapshotReadArgsSchema, async (_event, query) => {
-    const workspaceId = (query as import("@contracts").AppUsersSnapshotQuery | undefined)?.workspaceId ?? DEFAULT_WORKSPACE_ID;
+    const workspaceId = (query as import("@contracts").AppUsersSnapshotQuery | undefined)?.workspaceId ?? LOCAL_FALLBACK_WORKSPACE_ID;
     await workspaceAccess.assertWorkspaceAccess({
       workspaceId,
       action: "view workspace users",

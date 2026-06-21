@@ -163,7 +163,7 @@ import {
   updateRmaCaseSchema,
   scheduleTimelineReadArgsSchema,
   uploadCrewCatalogDocumentsReadArgsSchema,
-  DEFAULT_WORKSPACE_ID,
+  LOCAL_FALLBACK_WORKSPACE_ID,
 } from "@contracts";
 import type {
   AddDepartmentToProjectUnitInput,
@@ -751,7 +751,7 @@ export const registerFoundationIpc = ({
   runtimeDiagnostics,
 }: RegisterFoundationIpcOptions) => {
   const normalizeProjectListQuery = (query: ProjectListQuery | undefined): ProjectListQuery => ({
-    workspaceId: query?.workspaceId ?? DEFAULT_WORKSPACE_ID,
+    workspaceId: query?.workspaceId ?? LOCAL_FALLBACK_WORKSPACE_ID,
     search: query?.search ?? "",
     sortBy: query?.sortBy ?? "name",
     sortDirection: query?.sortDirection ?? "asc",
@@ -774,7 +774,7 @@ export const registerFoundationIpc = ({
 
   const getProjectListForWorkspace = async (query: ProjectListQuery) => {
     const scopedQuery = normalizeProjectListQuery(query);
-    const workspaceId = scopedQuery.workspaceId ?? DEFAULT_WORKSPACE_ID;
+    const workspaceId = scopedQuery.workspaceId ?? LOCAL_FALLBACK_WORKSPACE_ID;
     const includeFinancials = await canReadFinanceForWorkspace(workspaceId);
     const safeQuery =
       includeFinancials || scopedQuery.sortBy !== "exposure"
@@ -833,7 +833,7 @@ export const registerFoundationIpc = ({
 
   const assertAgentReadAccess = (workspaceId: string | undefined, action: string) =>
     workspaceAccess.assertWorkspaceAccess({
-      workspaceId: workspaceId ?? DEFAULT_WORKSPACE_ID,
+      workspaceId: workspaceId ?? LOCAL_FALLBACK_WORKSPACE_ID,
       action,
       accessLevel: "read",
     });
@@ -1599,7 +1599,7 @@ export const registerFoundationIpc = ({
     async (_event, query: ProjectListQuery | undefined) => {
       const scopedQuery = normalizeProjectListQuery(query);
       await workspaceAccess.assertWorkspaceAccess({
-        workspaceId: scopedQuery.workspaceId ?? DEFAULT_WORKSPACE_ID,
+        workspaceId: scopedQuery.workspaceId ?? LOCAL_FALLBACK_WORKSPACE_ID,
         action: "load projects",
         accessLevel: "read",
         requiredPermission: "projects.read",
@@ -1787,7 +1787,7 @@ export const registerFoundationIpc = ({
     ipcChannels.catalog.getSnapshot,
     catalogListReadArgsSchema,
     async (_event, query: CatalogListQuery | undefined) => {
-      const workspaceId = query?.workspaceId ?? DEFAULT_WORKSPACE_ID;
+      const workspaceId = query?.workspaceId ?? LOCAL_FALLBACK_WORKSPACE_ID;
       await workspaceAccess.assertWorkspaceAccess({
         workspaceId,
         action: "view this catalog",

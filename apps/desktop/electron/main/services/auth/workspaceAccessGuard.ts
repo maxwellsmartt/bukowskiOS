@@ -255,7 +255,7 @@ export const createWorkspaceAccessGuard = ({
     // Bypass auth ONLY when Supabase is not configured (pure local/offline
     // mode). The default workspace is still a real workspace with real data
     // when Supabase is configured, so it must be access-checked like any other
-    // — otherwise an actor could spoof `workspaceId: DEFAULT_WORKSPACE_ID` to
+    // — otherwise an actor could spoof `workspaceId: LOCAL_FALLBACK_WORKSPACE_ID` to
     // evade membership/permission checks.
     if (!isConfigured(supabaseUrl, anonKey)) {
       return;

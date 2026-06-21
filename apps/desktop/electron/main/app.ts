@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, Menu, session } from "electron";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { format } from "date-fns";
-import { DEFAULT_WORKSPACE_ID, ipcChannels, type CreateProjectBlueprintInput, type PackingInsuranceExportOptions, type TreasuryOverviewQuery } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID, ipcChannels, type CreateProjectBlueprintInput, type PackingInsuranceExportOptions, type TreasuryOverviewQuery } from "@contracts";
 
 import { buildContentSecurityPolicy } from "./security/securityConfig";
 import { registerAuthIpc } from "./ipc/registerAuthIpc";
@@ -422,7 +422,7 @@ app.whenReady().then(async () => {
   }
   const documentGeneration = createDocumentGenerationService();
   const createFinanceSummaryReportPdf = async (query: TreasuryOverviewQuery | undefined, targetFilePath: string) => {
-    const workspaceId = query?.workspaceId ?? DEFAULT_WORKSPACE_ID;
+    const workspaceId = query?.workspaceId ?? LOCAL_FALLBACK_WORKSPACE_ID;
     const reportQuery: TreasuryOverviewQuery = {
       workspaceId,
       period: query?.period ?? "month",

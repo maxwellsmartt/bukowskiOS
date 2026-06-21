@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 import type {
   CreateProjectBlueprintInput,
   ListSortDirection,
@@ -309,7 +309,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         ? query
         : { pagination: query }
       : undefined;
-    const workspaceId = timelineQuery?.workspaceId ?? deps.defaultProjectListQuery.workspaceId ?? DEFAULT_WORKSPACE_ID;
+    const workspaceId = timelineQuery?.workspaceId ?? deps.defaultProjectListQuery.workspaceId ?? LOCAL_FALLBACK_WORKSPACE_ID;
     const pagination = timelineQuery?.pagination;
     const window = deps.resolveTimelineWindow(range, scale, anchorDate);
     const rows = db

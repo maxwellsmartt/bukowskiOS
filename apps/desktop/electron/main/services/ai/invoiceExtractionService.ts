@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
 import { extractDocumentFromBuffer } from "../data/documentExtractionService";
 import type { AISecretStore } from "./aiSecretStore";
@@ -58,7 +58,7 @@ const loadSupervisor = (db: DatabaseSync, workspaceId: string) =>
         ORDER BY CASE WHEN workspace_id = ? THEN 0 ELSE 1 END
         LIMIT 1`,
     )
-    .get(workspaceId, DEFAULT_WORKSPACE_ID, workspaceId) as
+    .get(workspaceId, LOCAL_FALLBACK_WORKSPACE_ID, workspaceId) as
     | { workspace_id: string; provider_key: string; model_key: string }
     | undefined;
 
@@ -71,7 +71,7 @@ const loadProvider = (db: DatabaseSync, providerKey: string, workspaceId: string
         ORDER BY CASE WHEN workspace_id = ? THEN 0 ELSE 1 END
         LIMIT 1`,
     )
-    .get(workspaceId, DEFAULT_WORKSPACE_ID, providerKey, workspaceId) as
+    .get(workspaceId, LOCAL_FALLBACK_WORKSPACE_ID, providerKey, workspaceId) as
     | { enabled: number; default_model_key: string; base_url: string; timeout_ms: number }
     | undefined;
 
@@ -175,7 +175,7 @@ export const createInvoiceExtractionService = (
     }
     const apiKey =
       options.secretStore.getProviderSecret(supervisor?.workspace_id ?? workspaceId, providerKey) ??
-      options.secretStore.getProviderSecret(DEFAULT_WORKSPACE_ID, providerKey);
+      options.secretStore.getProviderSecret(LOCAL_FALLBACK_WORKSPACE_ID, providerKey);
     if (!apiKey) {
       throw new Error("Falta la API key del proveedor de IA.");
     }

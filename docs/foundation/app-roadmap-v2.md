@@ -405,7 +405,7 @@
 - Qué cambió:
   - primer polish visual de Settings con navegación compacta por secciones
   - overview con health cards para data, sync, team y support
-  - `Team` dejó de mutar usuarios contra `DEFAULT_WORKSPACE_ID` y ahora usa el workspace activo
+  - `Team` dejó de mutar usuarios contra `LOCAL_FALLBACK_WORKSPACE_ID` y ahora usa el workspace activo
   - `Data` separa salud de base local y actividad de sync para reducir ruido técnico
   - `Advanced` quedó reorganizado en soporte, export técnico y sistema; se retiró `Visual Audit` de la UI final
   - Settings movió su subnav a un rail vertical interno para quitar peso del header

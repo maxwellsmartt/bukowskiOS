@@ -4,9 +4,9 @@ import type { ProjectColorKey } from "@contracts";
 
 import { assertDateWindow, deriveProjectUnitStatus } from "./projectScheduling";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
+const workspaceId = LOCAL_FALLBACK_WORKSPACE_ID;
 
 const hasColumn = (db: DatabaseSync, tableName: string, columnName: string) => {
   const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;

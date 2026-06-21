@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { createCodeGenerationService } from "./codeGenerationService";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
 const operationalPermissions = [
   ["perm-projects-read", "projects.read", "Read projects", "View project registry, details and schedule"],
@@ -130,7 +130,7 @@ const slugify = (value: string) =>
     .toLowerCase();
 
 export const getWorkspaceRoleId = (workspaceId: string, baseRoleId: string) =>
-  workspaceId === DEFAULT_WORKSPACE_ID ? baseRoleId : `${baseRoleId}-${slugify(workspaceId).slice(0, 48)}`;
+  workspaceId === LOCAL_FALLBACK_WORKSPACE_ID ? baseRoleId : `${baseRoleId}-${slugify(workspaceId).slice(0, 48)}`;
 
 const ensureDefaultCommandActorAccess = (db: DatabaseSync, now: string) => {
   db.prepare(
@@ -313,6 +313,11 @@ export const bootstrapAdminFoundation = (db: DatabaseSync, options: AdminFoundat
       });
     });
 
+    if (!workspaces.some((workspace) => workspace.id === LOCAL_FALLBACK_WORKSPACE_ID)) {
+      db.exec("COMMIT");
+      return;
+    }
+
     ensureDefaultCommandActorAccess(db, now);
 
     const projectsWithClients = db
@@ -325,7 +330,7 @@ export const bootstrapAdminFoundation = (db: DatabaseSync, options: AdminFoundat
             AND trim(client_name) != ''
         `,
       )
-      .all(DEFAULT_WORKSPACE_ID) as Array<{ id: string; client_name: string }>;
+      .all(LOCAL_FALLBACK_WORKSPACE_ID) as Array<{ id: string; client_name: string }>;
 
     projectsWithClients.forEach((project) => {
       const clientName = project.client_name.trim();
@@ -347,7 +352,7 @@ export const bootstrapAdminFoundation = (db: DatabaseSync, options: AdminFoundat
           )
           VALUES (?, ?, ?, NULL, NULL, NULL, 'Backfilled from project registry.', 1, ?, ?)
         `,
-      ).run(clientId, DEFAULT_WORKSPACE_ID, clientName, now, now);
+      ).run(clientId, LOCAL_FALLBACK_WORKSPACE_ID, clientName, now, now);
 
       db.prepare(
         `
@@ -386,7 +391,7 @@ export const bootstrapAdminFoundation = (db: DatabaseSync, options: AdminFoundat
           )
           VALUES (?, ?, ?, 'Core crew', ?, ?, 'Backfilled from users registry.', 1, ?, ?)
         `,
-      ).run(`crew-${user.id}`, DEFAULT_WORKSPACE_ID, user.full_name, user.email, user.phone, now, now);
+      ).run(`crew-${user.id}`, LOCAL_FALLBACK_WORKSPACE_ID, user.full_name, user.email, user.phone, now, now);
     });
 
     const assets = db
@@ -397,11 +402,11 @@ export const bootstrapAdminFoundation = (db: DatabaseSync, options: AdminFoundat
           WHERE workspace_id = ?
         `,
       )
-      .all(DEFAULT_WORKSPACE_ID) as Array<{ id: string; internal_code: string; qr_code_value: string | null }>;
+      .all(LOCAL_FALLBACK_WORKSPACE_ID) as Array<{ id: string; internal_code: string; qr_code_value: string | null }>;
 
     assets.forEach((asset) => {
       codeService.ensurePrimaryCode({
-        workspaceId: DEFAULT_WORKSPACE_ID,
+        workspaceId: LOCAL_FALLBACK_WORKSPACE_ID,
         entityType: "asset",
         entityId: asset.id,
         preferredCodeValue: asset.qr_code_value?.trim() || `AST-${asset.internal_code}`,
@@ -410,11 +415,11 @@ export const bootstrapAdminFoundation = (db: DatabaseSync, options: AdminFoundat
 
     const packingSlips = db
       .prepare("SELECT id FROM packing_slips WHERE workspace_id = ?")
-      .all(DEFAULT_WORKSPACE_ID) as Array<{ id: string }>;
+      .all(LOCAL_FALLBACK_WORKSPACE_ID) as Array<{ id: string }>;
 
     packingSlips.forEach((slip) => {
       codeService.ensurePrimaryCode({
-        workspaceId: DEFAULT_WORKSPACE_ID,
+        workspaceId: LOCAL_FALLBACK_WORKSPACE_ID,
         entityType: "packing_slip",
         entityId: slip.id,
         preferredCodeValue: slip.id.replace("packing-", "PS-"),

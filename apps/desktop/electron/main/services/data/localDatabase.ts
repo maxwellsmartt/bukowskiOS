@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
-  DEFAULT_WORKSPACE_ID,
+  LOCAL_FALLBACK_WORKSPACE_ID,
   ipcChannels,
   type AppDiagnosticsSnapshot,
   type AppExportResult,
@@ -322,6 +322,11 @@ const isSupabaseSyncEnabled = () => {
   return value === "1" || value === "true";
 };
 
+const isDemoDataEnabled = () => {
+  const value = process.env.BUKOWSKI_ENABLE_DEMO_DATA?.trim().toLowerCase();
+  return value === "1" || value === "true" || (!app.isPackaged && value !== "0" && value !== "false");
+};
+
 const parseJsonObject = (value: string | null) => {
   if (!value) {
     return null;
@@ -333,254 +338,6 @@ const parseJsonObject = (value: string | null) => {
   } catch {
     return null;
   }
-};
-
-type ProjectShellSeedRow = {
-  id: string;
-  code: string;
-  name: string;
-  client_name: string | null;
-  status: string;
-  start_date: string | null;
-  end_date: string | null;
-  description: string | null;
-  color_key: string | null;
-  production_company_name: string | null;
-  has_preproduction: number;
-  preproduction_start_date: string | null;
-  preproduction_end_date: string | null;
-};
-
-type ProjectUnitShellSeedRow = {
-  id: string;
-  project_id: string;
-  code: string;
-  name: string;
-  sort_order: number;
-  status: string;
-  status_source: string;
-  color_key: string | null;
-  start_date: string | null;
-  end_date: string | null;
-  notes: string | null;
-  is_primary: number;
-};
-
-type ProjectUnitWindowShellSeedRow = {
-  id: string;
-  project_unit_id: string;
-  start_date: string | null;
-  end_date: string | null;
-  sort_order: number;
-  label: string | null;
-};
-
-const seedProjectShellForWorkspace = (database: DatabaseSync, workspaceId: string, timestamp: string) => {
-  if (workspaceId === DEFAULT_WORKSPACE_ID) {
-    return 0;
-  }
-
-  const existingProjects = database
-    .prepare("SELECT COUNT(*) AS count FROM projects WHERE workspace_id = ?")
-    .get(workspaceId) as { count: number };
-  if (existingProjects.count > 0) {
-    return 0;
-  }
-
-  const assetCount = database
-    .prepare("SELECT COUNT(*) AS count FROM assets WHERE workspace_id = ?")
-    .get(workspaceId) as { count: number };
-  if (assetCount.count === 0) {
-    return 0;
-  }
-
-  const sourceProjects = database
-    .prepare(
-      `
-        SELECT
-          id,
-          code,
-          name,
-          client_name,
-          status,
-          start_date,
-          end_date,
-          description,
-          color_key,
-          production_company_name,
-          has_preproduction,
-          preproduction_start_date,
-          preproduction_end_date
-        FROM projects
-        WHERE workspace_id = ?
-          AND archived_at IS NULL
-        ORDER BY created_at, name
-      `,
-    )
-    .all(DEFAULT_WORKSPACE_ID) as ProjectShellSeedRow[];
-  if (sourceProjects.length === 0) {
-    return 0;
-  }
-
-  const workspaceSuffix = workspaceId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8) || "workspace";
-  const projectIdBySourceId = new Map<string, string>();
-  const insertProject = database.prepare(
-    `
-      INSERT OR IGNORE INTO projects (
-        id,
-        workspace_id,
-        code,
-        name,
-        client_id,
-        client_name,
-        production_company_id,
-        production_company_name,
-        status,
-        start_date,
-        end_date,
-        has_preproduction,
-        preproduction_start_date,
-        preproduction_end_date,
-        color_key,
-        description,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-  );
-  const insertUnit = database.prepare(
-    `
-      INSERT OR IGNORE INTO project_units (
-        id,
-        workspace_id,
-        project_id,
-        code,
-        name,
-        sort_order,
-        status,
-        status_source,
-        color_key,
-        start_date,
-        end_date,
-        notes,
-        is_primary,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-  );
-  const insertWindow = database.prepare(
-    `
-      INSERT OR IGNORE INTO project_unit_windows (
-        id,
-        project_unit_id,
-        start_date,
-        end_date,
-        sort_order,
-        label,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-  );
-  const sourceUnitStatement = database.prepare(
-    `
-      SELECT
-        id,
-        project_id,
-        code,
-        name,
-        sort_order,
-        status,
-        status_source,
-        color_key,
-        start_date,
-        end_date,
-        notes,
-        is_primary
-      FROM project_units
-      WHERE project_id = ?
-      ORDER BY sort_order, name
-    `,
-  );
-  const sourceWindowStatement = database.prepare(
-    `
-      SELECT
-        id,
-        project_unit_id,
-        start_date,
-        end_date,
-        sort_order,
-        label
-      FROM project_unit_windows
-      WHERE project_unit_id = ?
-      ORDER BY sort_order, start_date, end_date
-    `,
-  );
-
-  sourceProjects.forEach((project) => {
-    const targetProjectId = `${project.id}-${workspaceSuffix}`;
-    projectIdBySourceId.set(project.id, targetProjectId);
-    insertProject.run(
-      targetProjectId,
-      workspaceId,
-      project.code,
-      project.name,
-      project.client_name,
-      project.production_company_name,
-      project.status,
-      project.start_date,
-      project.end_date,
-      project.has_preproduction,
-      project.preproduction_start_date,
-      project.preproduction_end_date,
-      project.color_key,
-      project.description,
-      timestamp,
-      timestamp,
-    );
-
-    const sourceUnits = sourceUnitStatement.all(project.id) as ProjectUnitShellSeedRow[];
-    sourceUnits.forEach((unit) => {
-      const targetUnitId = `${unit.id}-${workspaceSuffix}`;
-      insertUnit.run(
-        targetUnitId,
-        workspaceId,
-        targetProjectId,
-        unit.code,
-        unit.name,
-        unit.sort_order,
-        unit.status,
-        unit.status_source,
-        unit.color_key,
-        unit.start_date,
-        unit.end_date,
-        unit.notes,
-        unit.is_primary,
-        timestamp,
-        timestamp,
-      );
-
-      const sourceWindows = sourceWindowStatement.all(unit.id) as ProjectUnitWindowShellSeedRow[];
-      sourceWindows.forEach((window) => {
-        insertWindow.run(
-          `${window.id}-${workspaceSuffix}`,
-          targetUnitId,
-          window.start_date,
-          window.end_date,
-          window.sort_order,
-          window.label,
-          timestamp,
-          timestamp,
-        );
-      });
-    });
-  });
-
-  return projectIdBySourceId.size;
 };
 
 const withRecoveredDatabase = async (databasePath: string, backupPath: string) => {
@@ -716,11 +473,14 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   runStartupStep("apply operational files migration", () =>
     applyTrackedStep(database, "runtime_operational_files_v2", () => applyOperationalFilesMigration(database)),
   );
-  runStartupStep("seed foundation data", () => seedFoundationData(database));
+  const demoDataEnabled = isDemoDataEnabled();
+  runStartupStep("seed foundation permissions", () => seedFoundationData(database, { includeDemoData: demoDataEnabled }));
   runStartupStep("bootstrap AI gateway foundation", () => bootstrapAIGatewayFoundation(database));
   runStartupStep("bootstrap connector foundation", () => bootstrapConnectorFoundation(database));
-  runStartupStep("ensure project shell defaults", () => ensureProjectShellDefaults(database));
-  runStartupStep("bootstrap legacy Rentman demo", () => bootstrapLegacyRentmanDemo(database));
+  if (demoDataEnabled) {
+    runStartupStep("ensure local project shell defaults", () => ensureProjectShellDefaults(database));
+    runStartupStep("bootstrap legacy Rentman demo", () => bootstrapLegacyRentmanDemo(database));
+  }
   runStartupStep("apply asset quantity foundation migration", () =>
     applyTrackedStep(database, "runtime_asset_quantity_foundation_v1", () => applyAssetQuantityFoundationMigration(database)),
   );
@@ -734,7 +494,9 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     applyTrackedStep(database, "runtime_notifications_local_first_v1", () => applyNotificationLocalMigration(database)),
   );
   runStartupStep("bootstrap admin foundation", () => bootstrapAdminFoundation(database, { cleanupDemoPlaceholders: true }));
-  runStartupStep("bootstrap scheduling foundation", () => bootstrapSchedulingFoundation(database));
+  if (demoDataEnabled) {
+    runStartupStep("bootstrap local scheduling demo", () => bootstrapSchedulingFoundation(database));
+  }
   if (process.env.BUKOWSKI_PROFILE_DATASET === "1") {
     runStartupStep("seed performance dataset", () => seedPerformanceFoundationData(database));
     logger.info("Seeded heavy performance dataset.");
@@ -956,7 +718,6 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
 
     try {
       database.exec("BEGIN");
-      let seededProjectCount = 0;
       ensureCommandActorUser.run(timestamp, timestamp);
       workspaces.forEach((workspace) => {
         statement.run(
@@ -1008,12 +769,8 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
             timestamp,
           );
         }
-        seededProjectCount += seedProjectShellForWorkspace(database, workspace.id, timestamp);
       });
       database.exec("COMMIT");
-      if (seededProjectCount > 0) {
-        logger.info("Seeded project shell rows for remote workspaces.", { count: seededProjectCount });
-      }
     } catch (error) {
       database.exec("ROLLBACK");
       throw error;

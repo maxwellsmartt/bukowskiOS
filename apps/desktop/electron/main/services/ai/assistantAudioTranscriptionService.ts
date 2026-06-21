@@ -4,7 +4,7 @@ import type {
   AssistantAudioTranscriptionResult,
   TranscribeAssistantAudioCommand,
 } from "@contracts";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
 import type { AISecretStore } from "./aiSecretStore";
 import type { OpenAIProviderService } from "./openaiProviderService";
@@ -85,7 +85,7 @@ export const createAssistantAudioTranscriptionService = (
 
     const apiKey =
       options.secretStore.getProviderSecret(workspaceId, "openai") ??
-      (workspaceId === DEFAULT_WORKSPACE_ID ? null : options.secretStore.getProviderSecret(DEFAULT_WORKSPACE_ID, "openai"));
+      (workspaceId === LOCAL_FALLBACK_WORKSPACE_ID ? null : options.secretStore.getProviderSecret(LOCAL_FALLBACK_WORKSPACE_ID, "openai"));
     if (!apiKey) {
       throw new Error("Voice transcription needs an OpenAI API key in Automation > AI Models.");
     }
@@ -104,7 +104,7 @@ export const createAssistantAudioTranscriptionService = (
     fileName: string;
     mimeType: string;
   }): Promise<AssistantAudioTranscriptionResult> => {
-    const workspaceId = input.workspaceId?.trim() || DEFAULT_WORKSPACE_ID;
+    const workspaceId = input.workspaceId?.trim() || LOCAL_FALLBACK_WORKSPACE_ID;
     if (!input.data.length) {
       throw new Error("The audio recording is empty. Try recording it again.");
     }

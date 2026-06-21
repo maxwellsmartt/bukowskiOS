@@ -1,9 +1,9 @@
 import type { DatabaseSync } from "node:sqlite";
 import agentConfig from "./agent_config.v1.json";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
+const workspaceId = LOCAL_FALLBACK_WORKSPACE_ID;
 const now = "2026-04-09T16:00:00.000Z";
 
 const providerDefaults = [
@@ -136,7 +136,7 @@ const buildSystemAgentRecord = (agent: AgentConfigRecord) => ({
 });
 
 const buildWorkspaceAgentId = (agentId: string, workspaceId: string) =>
-  workspaceId === "workspace-metadata" ? agentId : `${agentId}-${workspaceId}`;
+  workspaceId === LOCAL_FALLBACK_WORKSPACE_ID ? agentId : `${agentId}-${workspaceId}`;
 
 export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
   ensureColumn(db, "ai_provider_configs", "fallback_model_key", "TEXT NOT NULL DEFAULT ''");

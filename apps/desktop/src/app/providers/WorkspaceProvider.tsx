@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
@@ -49,7 +49,7 @@ export type CreateWorkspaceInput = {
 };
 
 const localMembership: WorkspaceMembership = {
-  workspaceId: DEFAULT_WORKSPACE_ID,
+  workspaceId: LOCAL_FALLBACK_WORKSPACE_ID,
   workspaceName: "Metadata Cine",
   avatarUrl: null,
   iconColor: null,
@@ -116,7 +116,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const hasLoadedWorkspacesRef = useRef(false);
   const userId = user?.id ?? null;
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(
-    () => readStringPreference(uiPreferenceKeys.activeWorkspaceId, DEFAULT_WORKSPACE_ID) ?? DEFAULT_WORKSPACE_ID,
+    () => readStringPreference(uiPreferenceKeys.activeWorkspaceId, LOCAL_FALLBACK_WORKSPACE_ID) ?? LOCAL_FALLBACK_WORKSPACE_ID,
   );
 
   useEffect(() => {
@@ -140,7 +140,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     if (isLocalFallback || !supabase) {
       setMemberships([localMembership]);
       hasLoadedWorkspacesRef.current = true;
-      setActiveWorkspaceId((current) => current || DEFAULT_WORKSPACE_ID);
+      setActiveWorkspaceId((current) => current || LOCAL_FALLBACK_WORKSPACE_ID);
       setWorkspaceError(null);
       setIsSessionExpired(false);
       setIsLoadingWorkspaces(false);
@@ -298,7 +298,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       setActiveWorkspaceId((current) =>
         cachedMemberships.some((membership) => membership.workspaceId === current)
           ? current
-          : cachedMemberships[0]?.workspaceId ?? current ?? DEFAULT_WORKSPACE_ID,
+          : cachedMemberships[0]?.workspaceId ?? current ?? LOCAL_FALLBACK_WORKSPACE_ID,
       );
       setIsLoadingWorkspaces(false);
     }

@@ -286,7 +286,7 @@ Recomendación:
 
 La pantalla existe, pero falta wiring real con Supabase MFA.
 
-### Medio — Agents Aún Arrastran `DEFAULT_WORKSPACE_ID`
+### Medio — Agents Aún Arrastran `LOCAL_FALLBACK_WORKSPACE_ID`
 
 El runtime de agentes debe rediseñarse para workspace activo.
 

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 import { describe, expect, it } from "vitest";
 
 import { createDataRetentionService } from "../../electron/main/services/data/dataRetentionService";
@@ -20,7 +20,7 @@ describe("data retention service", () => {
           id, workspace_id, title, context_key, context_label, summary_text, created_at, updated_at, deleted_at
         ) VALUES (?, ?, 'Old thread', 'global', 'Global', '', ?, ?, ?)
       `,
-    ).run("thread-retention-old", DEFAULT_WORKSPACE_ID, "2025-01-01T00:00:00.000Z", "2025-01-01T00:00:00.000Z", "2025-01-01T00:00:00.000Z");
+    ).run("thread-retention-old", LOCAL_FALLBACK_WORKSPACE_ID, "2025-01-01T00:00:00.000Z", "2025-01-01T00:00:00.000Z", "2025-01-01T00:00:00.000Z");
 
     database.prepare(
       `
@@ -54,7 +54,7 @@ describe("data retention service", () => {
           ('memory-old-low', ?, NULL, NULL, 'preference', 'Old weak preference', 'preference|-|-|old weak preference', 0.3, NULL, NULL, 'repeated_preference', 'active', '2025-01-01T00:00:00.000Z', '2025-01-01T00:00:00.000Z'),
           ('memory-still-active', ?, NULL, NULL, 'stable_fact', 'Warehouse A is primary', 'stable_fact|-|-|warehouse a is primary', 0.9, NULL, NULL, 'stable_operational_fact', 'active', '2026-04-01T00:00:00.000Z', '2026-04-11T00:00:00.000Z')
       `,
-    ).run(DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_ID);
+    ).run(LOCAL_FALLBACK_WORKSPACE_ID, LOCAL_FALLBACK_WORKSPACE_ID);
 
     database.prepare(
       `
@@ -62,7 +62,7 @@ describe("data retention service", () => {
           id, workspace_id, entry_id, thread_id, message_id, event_kind, status, source_reason, body, created_at
         ) VALUES (?, ?, NULL, NULL, NULL, 'memory_candidate_skipped', 'skipped', 'repeated_preference', 'Old event', ?)
       `,
-    ).run("memory-event-old", DEFAULT_WORKSPACE_ID, "2025-01-01T00:00:00.000Z");
+    ).run("memory-event-old", LOCAL_FALLBACK_WORKSPACE_ID, "2025-01-01T00:00:00.000Z");
 
     database.prepare(
       `
@@ -70,7 +70,7 @@ describe("data retention service", () => {
           id, workspace_id, source_kind, process_label, severity, error_name, message, stack, fingerprint, context_json, thread_id, created_at
         ) VALUES (?, ?, 'renderer', 'test', 'medium', 'Error', 'Old runtime error', NULL, 'renderer:test:error:old-runtime-error', NULL, NULL, ?)
       `,
-    ).run("runtime-error-old", DEFAULT_WORKSPACE_ID, "2025-01-01T00:00:00.000Z");
+    ).run("runtime-error-old", LOCAL_FALLBACK_WORKSPACE_ID, "2025-01-01T00:00:00.000Z");
 
     database.prepare(
       `
@@ -80,7 +80,7 @@ describe("data retention service", () => {
           ('sync-old-sent', ?, 'asset', 'asset-1', NULL, 'upsert', '{}', 'sent', 1, NULL, NULL, '2025-01-01T00:00:00.000Z', '2025-01-01T00:00:00.000Z'),
           ('sync-pending', ?, 'asset', 'asset-2', NULL, 'upsert', '{}', 'pending', 0, NULL, NULL, '2025-01-01T00:00:00.000Z', '2025-01-01T00:00:00.000Z')
       `,
-    ).run(DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_ID);
+    ).run(LOCAL_FALLBACK_WORKSPACE_ID, LOCAL_FALLBACK_WORKSPACE_ID);
 
     const retention = createDataRetentionService(database, {
       now: () => "2026-04-12T12:00:00.000Z",
@@ -138,8 +138,8 @@ describe("data retention service", () => {
         ) VALUES (?, ?, NULL, NULL, 'runtime_error_captured', 'storm', 'storm', 'critical', 'system', NULL, ?)
       `,
     );
-    insertActivity.run("activity-old", DEFAULT_WORKSPACE_ID, "2025-01-01T00:00:00.000Z");
-    insertActivity.run("activity-recent", DEFAULT_WORKSPACE_ID, "2026-04-11T00:00:00.000Z");
+    insertActivity.run("activity-old", LOCAL_FALLBACK_WORKSPACE_ID, "2025-01-01T00:00:00.000Z");
+    insertActivity.run("activity-recent", LOCAL_FALLBACK_WORKSPACE_ID, "2026-04-11T00:00:00.000Z");
 
     const retention = createDataRetentionService(database, { now: () => "2026-04-12T12:00:00.000Z" });
     const summary = retention.run();
@@ -171,7 +171,7 @@ describe("data retention service", () => {
           id, workspace_id, title, context_key, context_label, summary_text, created_at, updated_at, deleted_at
         ) VALUES (?, ?, 'Old thread', 'global', 'Global', '', ?, ?, ?)
       `,
-    ).run("thread-retention-escape", DEFAULT_WORKSPACE_ID, "2025-01-01T00:00:00.000Z", "2025-01-01T00:00:00.000Z", "2025-01-01T00:00:00.000Z");
+    ).run("thread-retention-escape", LOCAL_FALLBACK_WORKSPACE_ID, "2025-01-01T00:00:00.000Z", "2025-01-01T00:00:00.000Z", "2025-01-01T00:00:00.000Z");
 
     database.prepare(
       `

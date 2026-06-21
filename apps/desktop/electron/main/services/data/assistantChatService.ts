@@ -27,11 +27,11 @@ import type {
 import type { AssistantMemoryService } from "../ai/assistantMemoryService";
 import type { AssistantGatewayService } from "../ai/assistantGatewayService";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 import { assertPathWithinRoot } from "../../security/pathSafety";
 import { ensurePrivateDirectory, writePrivateFile } from "../../security/storagePrivacy";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
+const workspaceId = LOCAL_FALLBACK_WORKSPACE_ID;
 const defaultThreadTitle = "New thread";
 const interruptedMessage = "This response was interrupted before completion.";
 

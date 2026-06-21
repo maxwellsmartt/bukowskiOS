@@ -178,7 +178,7 @@ Casos sensibles:
 - cada payload remoto debe ser trazable a un `command_receipt` o `sync_outbox.id`
 
 ## Dependencias previas
-- `DEFAULT_WORKSPACE_ID` ya centralizado en código vivo
+- `LOCAL_FALLBACK_WORKSPACE_ID` ya centralizado en código vivo
 - retention básica para no dejar crecer indefinidamente `sent` outbox y telemetría auxiliar
 - hardening de packaging y recovery ya resueltos
 - hardening de startup local: la ventana de carga aparece antes de la inicialización SQLite y el bootstrap del project wizard ya tolera workspace demo ausente/referencias opcionales huérfanas
@@ -188,5 +188,5 @@ Casos sensibles:
 - `crítico`: falta validar el nuevo DMG en la Mac de Carlos; el log anterior fallaba en `apply project creation wizard migration` por FK antes de cargar renderer
 - `medio`: todavía no existe identidad real multi-workspace completa para todos los dominios, aunque Auth/Workspace y guards principales ya están activos
 - `medio`: `foundationSeed` sigue sembrando el workspace demo fijo
-- `medio`: Agents aún arrastra deuda de workspace activo / `DEFAULT_WORKSPACE_ID`
+- `medio`: Agents aún arrastra deuda de workspace activo / `LOCAL_FALLBACK_WORKSPACE_ID`
 - `bajo`: `packages/sync` sigue siendo más transport/boundary que engine completo de reconciliación

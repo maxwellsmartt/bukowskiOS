@@ -61,9 +61,9 @@ import { createProjectReadService } from "./projectReadService";
 import { deriveProjectUnitStatus, resolveScheduleWindowLabel } from "./projectScheduling";
 import { assertPathWithinRoot } from "../../security/pathSafety";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
+const workspaceId = LOCAL_FALLBACK_WORKSPACE_ID;
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -990,7 +990,7 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
 
   getGlobalSearch(query: GlobalSearchQuery): GlobalSearchGroup[] {
     const normalizedQuery = normalizeSearchText(query.query);
-    const workspaceId = query.workspaceId ?? DEFAULT_WORKSPACE_ID;
+    const workspaceId = query.workspaceId ?? LOCAL_FALLBACK_WORKSPACE_ID;
 
     if (!normalizedQuery) {
       return [];
@@ -1303,7 +1303,7 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
   },
 
   getRmaSnapshot(query: RmaSnapshotQuery = {}): RmaSnapshot {
-    const workspaceId = query.workspaceId ?? DEFAULT_WORKSPACE_ID;
+    const workspaceId = query.workspaceId ?? LOCAL_FALLBACK_WORKSPACE_ID;
     const normalizeRmaStatus = (status: string) => {
       switch (status) {
         case "Draft":
