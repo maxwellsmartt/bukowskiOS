@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { HelpMenu } from "@features/onboarding/HelpMenu";
 import { useConnectivity } from "@shared/hooks/useConnectivity";
+import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
@@ -17,7 +18,7 @@ import {
 } from "@shared/hooks/useRealtimeWorkspaceSync";
 import { useLocale } from "@shared/hooks/useLocale";
 import { resolveProjectColor } from "@shared/lib/projectColors";
-import { isSyncCursorStale, parseSyncTimestamp } from "@shared/lib/syncHealth";
+import { parseSyncTimestamp } from "@shared/lib/syncHealth";
 import type { AppDiagnosticsSnapshot, AppSyncPullCursorRow, AppSyncStatusSnapshot } from "@contracts";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { NotificationsButton } from "./NotificationsTray";
@@ -42,6 +43,10 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const { t } = useTranslation();
   const { formatDateTime } = useLocale();
   const isOnline = useConnectivity();
+  const { status: sessionStatus, isLocalFallback } = useSession();
+  // Cloud sync only actually runs when authenticated, online and not on the local
+  // fallback. When it can't, quiet/stale cursors are expected, not problems.
+  const canCloudSync = isOnline && sessionStatus === "authenticated" && !isLocalFallback;
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot | null>(null);
   const [pullCursors, setPullCursors] = useState<AppSyncPullCursorRow[]>([]);
   const [syncPopoverOpen, setSyncPopoverOpen] = useState(false);
@@ -181,9 +186,6 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     (cursor) => !activeWorkspaceId || cursor.workspaceId === activeWorkspaceId,
   );
   const inboundFailedCount = workspacePullCursors.filter((cursor) => cursor.lastError).length;
-  const inboundStaleCount = workspacePullCursors.filter(
-    (cursor) => !cursor.lastError && isSyncCursorStale(cursor),
-  ).length;
   const latestInboundCheck = workspacePullCursors[0]?.updatedAt ?? null;
   const latestSyncActivity = diagnostics?.lastSyncRunAt ?? latestInboundCheck;
   const outboundFailedCount = diagnostics?.syncOutboxFailedCount ?? 0;
@@ -221,18 +223,6 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       };
     }
 
-    if (inboundStaleCount > 0) {
-      return {
-        label: t("shell.topBar.syncStaleWithCount", {
-          count: inboundStaleCount,
-          defaultValue: `${inboundStaleCount} áreas desactualizadas`,
-        }),
-        className: "sync-control-review",
-        icon: AlertTriangle,
-        badge: inboundStaleCount,
-      };
-    }
-
     const queuedCount = (diagnostics?.syncOutboxPendingCount ?? 0) + (diagnostics?.syncOutboxProcessingCount ?? 0);
 
     if (queuedCount > 0) {
@@ -241,6 +231,18 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
         className: "sync-control-review",
         icon: AlertTriangle,
         badge: queuedCount,
+      };
+    }
+
+    // No cloud session (offline / local-only / signed out): calm state, no alarm.
+    if (!canCloudSync) {
+      return {
+        label: isOnline
+          ? t("shell.topBar.syncPopover.localOnly", { defaultValue: "Trabajando local" })
+          : t("shell.topBar.syncPopover.offline", { defaultValue: "Sin conexión" }),
+        className: "sync-control-healthy",
+        icon: CloudOff,
+        badge: null as number | null,
       };
     }
 
@@ -278,12 +280,12 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       badge: null as number | null,
     };
   }, [
+    canCloudSync,
     diagnostics,
     hasFreshRealtimeEvidence,
     hasFreshSyncEvidence,
     hasLoadedSyncSnapshot,
     inboundFailedCount,
-    inboundStaleCount,
     isOnline,
     latestSyncActivity,
     outboundFailedCount,

@@ -253,9 +253,18 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
     getCounts,
 
     listRows(limit = 25): AppSyncOutboxRow[] {
+      // Enrich file entities with their byte size/name, but only when the
+      // workspace_files table exists — older local databases may not have it yet,
+      // and a hard JOIN would throw "no such table" and break the whole queue read.
+      const hasWorkspaceFiles = Boolean(
+        db
+          .prepare("SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = 'workspace_files' LIMIT 1")
+          .get(),
+      );
       const rows = db
         .prepare(
-          `
+          hasWorkspaceFiles
+            ? `
             SELECT
               o.id,
               o.entity_type,
@@ -272,6 +281,24 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
             FROM sync_outbox o
             LEFT JOIN workspace_files wf
               ON o.entity_type = 'workspace_file' AND wf.id = o.entity_id
+            ORDER BY o.updated_at DESC, o.created_at DESC
+            LIMIT ?
+          `
+            : `
+            SELECT
+              o.id,
+              o.entity_type,
+              o.entity_id,
+              o.operation_type,
+              o.status,
+              o.attempt_count,
+              o.last_error,
+              o.next_retry_at,
+              o.updated_at,
+              o.payload_json,
+              NULL AS file_byte_size,
+              NULL AS file_name
+            FROM sync_outbox o
             ORDER BY o.updated_at DESC, o.created_at DESC
             LIMIT ?
           `,
