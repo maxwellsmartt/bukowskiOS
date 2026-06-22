@@ -77,7 +77,7 @@ import { createQuoteReadService } from "./quoteReadService";
 import { createFinanceMutationService } from "./financeMutationService";
 import { createCollaboratorFeeMutationService } from "./collaboratorFeeMutationService";
 import { createCollaboratorFeeReadService, type CollaboratorFeeReadService } from "./collaboratorFeeReadService";
-import { applyOperationalFilesMigration, createFileUploadService, type FileUploadService } from "./fileUploadService";
+import { applyOperationalFilesMigration, ensureWorkspaceFilesTable, createFileUploadService, type FileUploadService } from "./fileUploadService";
 import { createIncidentMutationService } from "./incidentMutationService";
 import { createPackingMutationService } from "./packingMutationService";
 import { cleanupPerformanceFoundationData, seedPerformanceFoundationData } from "./performanceFoundationSeed";
@@ -478,6 +478,10 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   runStartupStep("apply operational files migration", () =>
     applyTrackedStep(database, "runtime_operational_files_v2", () => applyOperationalFilesMigration(database)),
   );
+  // Self-heal (unconditional, idempotent): workspace_files was added to the
+  // tracked migration above after its version key already existed in some local
+  // databases, so those skip it and lack the table. Ensure it every boot.
+  runStartupStep("ensure workspace files schema", () => ensureWorkspaceFilesTable(database));
   const demoDataEnabled = isDemoDataEnabled();
   runStartupStep("seed foundation permissions", () => seedFoundationData(database, { includeDemoData: demoDataEnabled }));
   runStartupStep("bootstrap AI gateway foundation", () => bootstrapAIGatewayFoundation(database));

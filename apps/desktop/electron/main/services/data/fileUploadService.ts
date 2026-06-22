@@ -75,6 +75,41 @@ const inferFileType = (mimeType: string) => {
 
 const isPreviewableMimeType = (mimeType: string) => mimeType.startsWith("image/") || mimeType === "application/pdf";
 
+/**
+ * Idempotently ensures the workspace_files table (+ indexes) exists. Kept
+ * separate so it can run as an unconditional startup self-heal: the table was
+ * added to applyOperationalFilesMigration after its tracked version key already
+ * existed in some local databases, so those DBs skip the tracked step and would
+ * otherwise never get the table ("no such table: workspace_files").
+ */
+export const ensureWorkspaceFilesTable = (db: DatabaseSync) => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS workspace_files (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      domain TEXT NOT NULL CHECK (domain IN ('assets', 'incidents', 'finance', 'crew')),
+      entity_id TEXT NOT NULL,
+      storage_path TEXT,
+      storage_object_key TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      byte_size INTEGER NOT NULL DEFAULT 0 CHECK (byte_size >= 0),
+      content_hash TEXT,
+      status TEXT NOT NULL DEFAULT 'pending_upload' CHECK (status IN ('pending_upload', 'available', 'missing', 'deleted')),
+      created_by_user_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT,
+      UNIQUE (workspace_id, domain, entity_id, content_hash)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_workspace_files_entity
+      ON workspace_files(workspace_id, domain, entity_id, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_workspace_files_pull
+      ON workspace_files(workspace_id, updated_at, id);
+  `);
+};
+
 export const applyOperationalFilesMigration = (db: DatabaseSync) => {
   ensureColumn(db, "asset_files", "storage_path", "TEXT");
   ensureColumn(db, "asset_files", "original_name", "TEXT");
@@ -121,31 +156,7 @@ export const applyOperationalFilesMigration = (db: DatabaseSync) => {
     // crew_documents is created by another bootstrap; column added there/later.
   }
 
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS workspace_files (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-      domain TEXT NOT NULL CHECK (domain IN ('assets', 'incidents', 'finance', 'crew')),
-      entity_id TEXT NOT NULL,
-      storage_path TEXT,
-      storage_object_key TEXT NOT NULL,
-      original_name TEXT NOT NULL,
-      mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
-      byte_size INTEGER NOT NULL DEFAULT 0 CHECK (byte_size >= 0),
-      content_hash TEXT,
-      status TEXT NOT NULL DEFAULT 'pending_upload' CHECK (status IN ('pending_upload', 'available', 'missing', 'deleted')),
-      created_by_user_id TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      deleted_at TEXT,
-      UNIQUE (workspace_id, domain, entity_id, content_hash)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_workspace_files_entity
-      ON workspace_files(workspace_id, domain, entity_id, updated_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_workspace_files_pull
-      ON workspace_files(workspace_id, updated_at, id);
-  `);
+  ensureWorkspaceFilesTable(db);
 };
 
 export const createFileUploadService = (db: DatabaseSync, options: FileUploadServiceOptions) => {
