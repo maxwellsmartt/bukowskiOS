@@ -1,5 +1,7 @@
 # BukowskiOS — Roadmap de hardening y shippability v1
 
+> Los estados históricos de sync en este roadmap fueron reconciliados el 2026-06-22. Fuente vigente: [`sync-findings-register-2026-06-22.md`](./sync-findings-register-2026-06-22.md).
+
 ## Resumen ejecutivo
 - Meta inmediata: **internal alpha sólido**
 - Regla operativa: **no abrir más de 2 frentes grandes a la vez**
@@ -794,9 +796,8 @@
   - nueva prueba dedicada para retention de DB, outbox, runtime errors, memory y limpieza de adjuntos
   - el código vivo ya no depende de `workspace-metadata` en servicios y superficies operativas activas; el hardcode queda acotado al seed demo
 - Riesgos remanentes:
-  - `medio`: `foundationSeed` sigue usando el id demo fijo; eso es aceptable por ahora, pero sigue siendo deuda si más adelante sembramos workspaces reales
-  - `medio`: esto no implementa multi-workspace real, solo preparación segura
-  - `medio`: todavía no existe worker de sync ni reconciliación remota; el roadmap ya quedó definido, no ejecutado
+  - Reconciliado 2026-06-22: demo/fallback, worker remoto y reconciliación quedaron cerrados en código.
+  - Los riesgos vigentes son `SYNC-017` a `SYNC-020`: migración Storage, smoke, RLS y conflictos sensibles.
 
 ## Criterio de actualización
 Cada slice se actualiza al arrancar y al cerrar con:

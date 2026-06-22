@@ -1,5 +1,7 @@
 # Auth, Workspaces, Archiving & Notifications Overhaul Roadmap
 
+> Nota de reconciliación 2026-06-22: los findings de sync se mantienen en [`../foundation/sync-findings-register-2026-06-22.md`](../foundation/sync-findings-register-2026-06-22.md). Las entradas cronológicas y riesgos antiguos se conservan como historial; para estado vigente usar el registro canónico.
+
 ## Estado general
 
 **In progress**
@@ -269,11 +271,11 @@ Decisiones bloqueadas:
 ## Incompletos / deuda técnica
 
 - El schema remoto foundation, las Edge Functions y el flujo autenticado login -> create workspace ya fueron validados contra Supabase dev.
-- Guards de sesión/workspace ya existen, pero falta endurecer comportamiento prod sin fallback.
-- Validación workspace-scoped ya existe en main para Assets, Packing, Incidents, Projects, RMA read/mutations, Catalog IPC, Finance, Currency y Quotes; falta rediseñar Agents porque todavía arrastra `LOCAL_FALLBACK_WORKSPACE_ID`.
-- Aún no se ha iniciado reemplazo de `LOCAL_FALLBACK_WORKSPACE_ID`.
+- Guards de sesión/workspace existen; el fallback quedó explícitamente limitado al modo local mediante `LOCAL_FALLBACK_WORKSPACE_ID` y builds empaquetados ya no siembran demo por defecto (`60e784d1`).
+- Validación workspace-scoped existe para Assets, Packing, Incidents, Projects, RMA, Catalog, Finance, Currency y Quotes. La autorización efectiva de Agents/tools se valida dentro de `SYNC-019`; su modelo de producto continúa en el track de Agents.
+- El reemplazo semántico de `DEFAULT_WORKSPACE_ID` quedó cerrado; `LOCAL_FALLBACK_WORKSPACE_ID` permanece como contrato deliberado del modo local.
 - El worker ya escribe remoto en `public.sync_outbox` y, para filas `asset_event`, ahora proyecta snapshots en `public.assets`, `public.asset_current_state` y `public.asset_events`.
-- El worker ahora también proyecta snapshots operativos en `public.operational_snapshots` para Projects, Packing Slips, Incidents y RMAs. La migración `20260505130000_operational_snapshots.sql` ya fue aplicada por el usuario; el backfill idempotente ya existe en Sync Activity. El pull/apply fue endurecido el 2026-05-06 para no avanzar cursor con errores, recuperar cursores adelantados y tolerar FKs opcionales faltantes. Falta smoke con dos usuarios usando build actualizado.
+- El worker proyecta snapshots operativos en `public.operational_snapshots`; pull/apply, identidades, dependencias, clocks y tombstones están cerrados en código. Falta el smoke de `SYNC-018`.
 - Packaging hardening: la app ahora descarta bounds de ventana fuera de pantalla y muestra/focus la ventana aunque `ready-to-show` no dispare. Build arm64 interna ya fue generada; falta probar específicamente en la MacBook Air M4 de Carlos.
 - Startup hardening: la ventana `Starting bukowskiOS` carga antes de la base local y muestra logo/barra de carga. La migración runtime del project wizard ya no bloquea si el workspace demo no existe localmente o si hay referencias opcionales huérfanas en packing slips. Falta confirmar en máquina externa.
 - Team/Members hardening: Carlos fue activado como Admin remoto en `Metadata Cine2`. Queda pendiente empaquetar o correr app actualizada para validar que Invite, Suspend/Reactivate y Role change operan con UUIDs remotos y no con usuarios locales.
@@ -293,7 +295,7 @@ Decisiones bloqueadas:
 - La migración `20260416003000_asset_sync_snapshots.sql` ya fue aplicada y validada con una asignación real; el backfill histórico dejó remotas `public.assets`, `public.asset_current_state` y `public.asset_events` en paridad con SQLite para `Metadata Cine2`.
 - Falta validar visualmente en app que el cambio de workspace aísla assets creados en cada workspace.
 - Deuda técnica: los catálogos ya filtran por workspace en los reads/IPC revisados, pero los catálogos base por workspace todavía no tienen flujo formal de clonado/plantillas; Slice IC-6/Slice 3 debe cubrir creación guiada y bootstrap más claro.
-- Deuda sync Catalog: la captura inteligente desde Quotes guarda clientes/productoras en el Catálogo local. Falta confirmar o implementar push remoto de `clients` y `production_companies` para que esos datos nuevos aparezcan automáticamente en otras Macs del mismo workspace.
+- Sync Catalog quedó cubierto por migrations remotas, materialización y pull para clients, manufacturers, production companies, departments y crew (`SYNC-007`, `closed`).
 - Import CSV de assets ya existe como MVP probado con CSV real Rentman y ahora muestra preview/resumen antes de escribir; falta agregar template descargable, errores por fila más detallados y creación guiada de categorías/ubicaciones faltantes.
 - IC-3 agrega acciones single-asset desde la bandeja para Report issue / Create RMA; multi-incident y multi-RMA quedan explícitamente diferidos para no mezclar operaciones masivas con flujos que necesitan contexto de daño.
 - Documento de handoff creado en `docs/handoff/2026-04-15-auth-workspaces-assets-handoff.md`.

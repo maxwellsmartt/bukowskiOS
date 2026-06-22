@@ -1,5 +1,14 @@
 # BukowskiOS — Sync roadmap v1
 
+> Estado reconciliado el 2026-06-22. Fuente canónica de findings: [`sync-findings-register-2026-06-22.md`](./sync-findings-register-2026-06-22.md). Este roadmap conserva decisiones y evolución histórica; cualquier lista antigua de riesgos queda subordinada al registro canónico.
+
+## Estado vigente 2026-06-22
+
+- Implementación local de push/pull, clocks, identidades, tombstones, archivos y observabilidad: `closed`.
+- Inbox/preferences cloud-first y artefactos regenerables: `accepted`.
+- Aplicación de la migración `workspace_files`, smoke real multiusuario y validación RLS: `open`.
+- UX de conflictos sensibles reales: `open` como hardening; no justifica un merge genérico sin casos reproducibles.
+
 ## Estado actual
 - BukowskiOS es **local-first**
 - el contrato local ya existe vía `sync_outbox`
@@ -53,9 +62,11 @@ Se auditó la cobertura completa de pull/hidratación para instalaciones limpias
 - Documento: [`sync-pull-inbox-audit-2026-05-24.md`](./sync-pull-inbox-audit-2026-05-24.md)
 - Hallazgo principal inicial: catalog/asset/operational snapshots sí tenían pull local, pero Finance/Treasury no hidrataba una instalación limpia de forma completa.
 - Fix aplicado: Treasury, collaborator fees/payments, quotes, invoices, invoice payments, finance entries y currency settings ya tienen materialización remota y pull local por dominio.
-- Pendiente: catálogos fundacionales completos y estrategia explícita de deletes/tombstones para dominios donde no convenga hard delete.
+- Cerrado posteriormente: catálogos fundacionales y estrategia de deletes/tombstones (`SYNC-005`, `SYNC-007`).
 
-## Actualización 2026-06-08 - matriz de cobertura por pantalla
+## Actualización 2026-06-08 - matriz histórica de cobertura por pantalla
+
+> Esta matriz conserva el corte del 2026-06-08. Storage universal, tombstones, catálogos y UX stale avanzaron después; consultar el registro canónico para el estado vigente.
 
 Objetivo del slice: dejar una vista operativa clara de qué pantallas ya sincronizan datos entre Macs/usuarios del mismo workspace y qué falta validar antes de declarar "full workspace sync".
 
@@ -115,7 +126,7 @@ Qué probar:
 - marcar `failed` con error útil
 
 ### Fase 2 — Mappers por dominio
-Estado: **In progress**
+Estado: **Done**
 
 Objetivo:
 - separar payload local de payload remoto
@@ -133,7 +144,7 @@ Regla:
 - solo traducen payloads
 
 ### Fase 3 — Transport adapter real
-Estado: **In progress**
+Estado: **Done en código; validación operativa abierta**
 
 Objetivo:
 - conectar el outbox a un destino real sin cambiar dominio
@@ -149,15 +160,16 @@ Requisitos:
 - idempotency key por fila del outbox
 
 ### Fase 4 — Pull / reconciliation
-Estado: **In progress**
+Estado: **Done en código; hardening operativo abierto**
 
 Objetivo:
 - aceptar cambios remotos de vuelta
 
 Estado actual:
-- Catalog/asset pull usa cursor local y LWW.
-- Operational snapshots usa snapshots por entidad (`project`, `packing_slip`, `incident`, `rma_case`) y apply idempotente.
-- Falta smoke multiusuario real y UI de recuperación más clara cuando queden dependencias remotas faltantes.
+- Catalog/asset/finance/files pull usa cursores compuestos y apply idempotente.
+- Operational snapshots usa snapshots por entidad (`project`, `packing_slip`, `incident`, `rma_case`).
+- Tombstones convergen deletes y `workspace_files` cubre metadata/Storage/caché.
+- Quedan `SYNC-017` a `SYNC-020` como gates de infraestructura, smoke, RLS y conflictos sensibles.
 
 ## Estrategia de conflicto recomendada
 - default inicial: `last writer wins` solo para campos seguros
@@ -184,9 +196,12 @@ Casos sensibles:
 - hardening de startup local: la ventana de carga aparece antes de la inicialización SQLite y el bootstrap del project wizard ya tolera workspace demo ausente/referencias opcionales huérfanas
 
 ## Riesgos abiertos
-- `crítico`: falta smoke multiusuario con build empaquetado actualizado para confirmar que projects/packing/incidents/RMAs viajan entre máquinas
-- `crítico`: falta validar el nuevo DMG en la Mac de Carlos; el log anterior fallaba en `apply project creation wizard migration` por FK antes de cargar renderer
-- `medio`: todavía no existe identidad real multi-workspace completa para todos los dominios, aunque Auth/Workspace y guards principales ya están activos
-- `medio`: `foundationSeed` sigue sembrando el workspace demo fijo
-- `medio`: Agents aún arrastra deuda de workspace activo / `LOCAL_FALLBACK_WORKSPACE_ID`
-- `bajo`: `packages/sync` sigue siendo más transport/boundary que engine completo de reconciliación
+
+La lista histórica fue reemplazada por los findings `SYNC-017` a `SYNC-020` del registro canónico:
+
+- `SYNC-017`: migración y Storage de `workspace_files` en Supabase.
+- `SYNC-018`: smoke real multiusuario/multimáquina.
+- `SYNC-019`: validación RLS efectiva por rol.
+- `SYNC-020`: UX de conflictos sensibles reales.
+
+El DMG, OAuth/MFA y el modelo general de Agents pertenecen a otros tracks. El demo fijo y la contaminación de workspaces remotos quedaron cerrados en `60e784d1`.

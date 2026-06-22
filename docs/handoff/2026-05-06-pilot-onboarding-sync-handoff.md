@@ -1,5 +1,7 @@
 # Handoff — Pilot Onboarding, Sync, Team & Packaging
 
+> Handoff histórico. El estado vigente de sync fue reconciliado el 2026-06-22 en [`../foundation/sync-findings-register-2026-06-22.md`](../foundation/sync-findings-register-2026-06-22.md). Los pendientes de OAuth, MFA, packaging y modelo de Agents continúan en sus tracks, pero no deben contarse automáticamente como findings abiertos de sync.
+
 Fecha: 2026-05-06  
 Branch: `codex/project-creation-wizard-v1`  
 Último commit/push: `f27247f chore: harden pilot onboarding and sync`  

@@ -1,5 +1,7 @@
 # Handoff — Auth, Workspaces, Assets CSV & Sync
 
+> Handoff histórico. La clasificación vigente de sync está en [`../foundation/sync-findings-register-2026-06-22.md`](../foundation/sync-findings-register-2026-06-22.md); referencias a `LOCAL_FALLBACK_WORKSPACE_ID`, cobertura parcial o falta de snapshots reflejan el corte de abril, no el estado actual.
+
 Fecha: 2026-04-15  
 Branch: `codex/project-creation-wizard-v1`  
 Roadmap vivo: `docs/roadmap/auth-workspaces-notifications-overhaul.md`

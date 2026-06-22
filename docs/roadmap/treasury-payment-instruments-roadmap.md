@@ -1,5 +1,7 @@
 # Roadmap v4 — Medios de Pago, Conciliacion y Reembolsos
 
+> Los pendientes de sync/RLS/storage se clasifican en [`../foundation/sync-findings-register-2026-06-22.md`](../foundation/sync-findings-register-2026-06-22.md). Archivos está cerrado en código; migración remota, smoke y RLS siguen como `SYNC-017` a `SYNC-019`.
+
 ## Estado
 
 - **Fecha de apertura:** 2026-06-08

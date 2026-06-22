@@ -1,5 +1,16 @@
 # Sync Pull / Inbox Audit — 2026-05-24
 
+> Documento histórico reconciliado el 2026-06-22. La clasificación vigente de todos los findings está en [`sync-findings-register-2026-06-22.md`](./sync-findings-register-2026-06-22.md). Las afirmaciones en presente dentro de este documento describen el baseline de mayo y no deben interpretarse como estado actual.
+
+## Reconciliación 2026-06-22
+
+- Finance/Treasury y materialización de quotes/invoices/settings: `closed` (`SYNC-001`, `SYNC-002`).
+- Catálogos fundacionales: `closed` (`SYNC-007`).
+- Deletes/tombstones: `closed` (`SYNC-005`).
+- Inbox cloud-first: `accepted` (`SYNC-013`).
+- Smokes reales, RLS efectiva y migración/Storage de `workspace_files`: `open` (`SYNC-017` a `SYNC-019`).
+- El detalle histórico debajo se conserva como evidencia de cómo se detectaron los gaps.
+
 ## Objetivo
 
 Auditar qué datos de bukowskiOS ya pueden hidratar una instalación limpia desde Supabase y cuáles sólo salen por `sync_outbox` o viven directo en Supabase sin cache local.

@@ -1,5 +1,7 @@
 # Inventory Core Product Roadmap
 
+> Estado de sync reconciliado el 2026-06-22 en [`../foundation/sync-findings-register-2026-06-22.md`](../foundation/sync-findings-register-2026-06-22.md). Los smokes manuales mencionados aquí corresponden a `SYNC-018`; no implican que la implementación local siga incompleta.
+
 ## Estado general
 
 **Ready to return to main roadmap**
