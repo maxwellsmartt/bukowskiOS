@@ -549,6 +549,8 @@ app.whenReady().then(async () => {
     getSyncPullCursors: localDatabase.getSyncPullCursors,
     retrySyncOutboxRow: localDatabase.retrySyncOutboxRow,
     retryAllFailedSyncOutboxRows: localDatabase.retryAllFailedSyncOutboxRows,
+    getSyncConflicts: localDatabase.getSyncConflicts,
+    resolveSyncConflict: localDatabase.resolveSyncConflict,
     backfillOperationalSnapshots: localDatabase.backfillOperationalSnapshots,
     exportRecentLogs: localDatabase.exportRecentLogs,
     exportSupportBundle: localDatabase.exportSupportBundle,

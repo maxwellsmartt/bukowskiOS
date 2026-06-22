@@ -2,6 +2,7 @@ import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 
 import { getDesktopLogger } from "../logger";
 import { isLocalTimestampAtLeastAsNew } from "./syncTimestampPolicy";
+import { isSensitiveConflictEntity, recordSyncConflict } from "./syncConflictService";
 import { materializeTreasuryCounterpartyRules } from "./treasuryCounterpartyRuleMaterializer";
 
 const logger = getDesktopLogger("financial-domain-pull-service");
@@ -491,6 +492,24 @@ const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTab
         (table === "invoices" && hasPendingInvoicePaymentForInvoice(db, workspaceId, outboxEntityId))
       ) {
         result.skippedDueToOutboxCount += 1;
+        // Sensitive financial entities (e.g. financial_entry) capture the
+        // divergence for human review instead of silently keeping the local edit.
+        if (isSensitiveConflictEntity(config.entityType)) {
+          const entityId = String(outboxEntityId);
+          const localRow = db.prepare(`SELECT * FROM ${table} WHERE id = ? LIMIT 1`).get(entityId) as
+            | Record<string, unknown>
+            | undefined;
+          recordSyncConflict(db, {
+            workspaceId,
+            entityType: config.entityType,
+            entityId,
+            operationType: "update",
+            localUpdatedAt: (localRow?.updated_at as string | null | undefined) ?? null,
+            remoteUpdatedAt: cursorValue || null,
+            localSnapshot: localRow ?? null,
+            remoteSnapshot: rawRow,
+          });
+        }
         continue;
       }
 
@@ -555,6 +574,15 @@ const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTab
   }
 
   return result;
+};
+
+/**
+ * Force-applies a remote financial_entries row locally, bypassing the outbox/LWW
+ * guards. Used by the conflict review queue when the user keeps the cloud version.
+ */
+export const applyFinancialEntryLocally = (db: DatabaseSync, remoteRow: Record<string, unknown> | null) => {
+  if (!remoteRow) return;
+  upsertRow(db, "financial_entries", remoteRow, ["id"]);
 };
 
 export const createFinancialDomainPullService = (db: DatabaseSync) => ({

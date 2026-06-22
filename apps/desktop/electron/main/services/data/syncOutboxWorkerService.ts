@@ -257,18 +257,22 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
         .prepare(
           `
             SELECT
-              id,
-              entity_type,
-              entity_id,
-              operation_type,
-              status,
-              attempt_count,
-              last_error,
-              next_retry_at,
-              updated_at,
-              payload_json
-            FROM sync_outbox
-            ORDER BY updated_at DESC, created_at DESC
+              o.id,
+              o.entity_type,
+              o.entity_id,
+              o.operation_type,
+              o.status,
+              o.attempt_count,
+              o.last_error,
+              o.next_retry_at,
+              o.updated_at,
+              o.payload_json,
+              wf.byte_size AS file_byte_size,
+              wf.original_name AS file_name
+            FROM sync_outbox o
+            LEFT JOIN workspace_files wf
+              ON o.entity_type = 'workspace_file' AND wf.id = o.entity_id
+            ORDER BY o.updated_at DESC, o.created_at DESC
             LIMIT ?
           `,
         )
@@ -283,6 +287,8 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
         next_retry_at: string | null;
         updated_at: string;
         payload_json: string;
+        file_byte_size: number | null;
+        file_name: string | null;
       }>;
 
       return rows.map((row) => ({
@@ -296,6 +302,8 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
         nextRetryAt: row.next_retry_at,
         updatedAt: row.updated_at,
         payloadJson: sanitizeOutboxPayloadJson(row.payload_json),
+        byteSize: typeof row.file_byte_size === "number" ? row.file_byte_size : null,
+        fileName: row.file_name ?? null,
       }));
     },
 

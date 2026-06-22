@@ -33,6 +33,8 @@ export const ipcChannels = {
     getSyncStatusSnapshot: "bukowskiApp:getSyncStatusSnapshot",
     retrySyncOutboxRow: "bukowskiApp:retrySyncOutboxRow",
     retryAllFailedSyncOutboxRows: "bukowskiApp:retryAllFailedSyncOutboxRows",
+    getSyncConflicts: "bukowskiApp:getSyncConflicts",
+    resolveSyncConflict: "bukowskiApp:resolveSyncConflict",
     backfillOperationalSnapshots: "bukowskiApp:backfillOperationalSnapshots",
     exportWorkspaceData: "bukowskiApp:exportWorkspaceData",
     exportSupportBundle: "bukowskiApp:exportSupportBundle",

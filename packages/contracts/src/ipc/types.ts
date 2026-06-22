@@ -86,6 +86,10 @@ export type AppSyncOutboxRow = {
   nextRetryAt: string | null;
   updatedAt: string;
   payloadJson: string;
+  /** Transfer size in bytes for file entities (workspace_file); null otherwise. */
+  byteSize: number | null;
+  /** Human label for file entities (original filename); null otherwise. */
+  fileName: string | null;
 };
 
 export type AppSyncPullCursorRow = {
@@ -100,6 +104,35 @@ export type AppSyncPullCursorRow = {
 export type AppSyncStatusSnapshot = {
   diagnostics: AppDiagnosticsSnapshot;
   pullCursors: AppSyncPullCursorRow[];
+};
+
+export type AppSyncConflictResolution = "keep_local" | "take_remote";
+
+export type AppSyncConflictRow = {
+  id: string;
+  workspaceId: string;
+  entityType: string;
+  entityId: string;
+  operationType: string;
+  localUpdatedAt: string | null;
+  remoteUpdatedAt: string | null;
+  localSnapshotJson: string | null;
+  remoteSnapshotJson: string | null;
+  status: "open" | "resolved";
+  resolution: AppSyncConflictResolution | null;
+  detectedAt: string;
+  resolvedAt: string | null;
+};
+
+export type AppSyncConflictResolveCommand = {
+  conflictId: string;
+  resolution: AppSyncConflictResolution;
+};
+
+export type AppSyncConflictResolveResult = {
+  summary: string;
+  conflict: AppSyncConflictRow | null;
+  diagnostics: AppDiagnosticsSnapshot;
 };
 
 export type EnsureLocalWorkspaceInput = {

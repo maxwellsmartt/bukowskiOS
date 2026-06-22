@@ -1,20 +1,45 @@
-import { AlertTriangle, CheckCircle2, ChevronDown, CloudDownload, CloudUpload, RefreshCw, Search } from "lucide-react";
-import type { AppActionResult, AppDiagnosticsSnapshot, AppSyncOutboxRow, AppSyncPullCursorRow } from "@contracts";
-import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  AlertTriangle,
+  Boxes,
+  CheckCircle2,
+  ChevronDown,
+  Cloud,
+  CloudDownload,
+  CloudOff,
+  CloudUpload,
+  FileText,
+  GitMerge,
+  Package,
+  Receipt,
+  RefreshCw,
+  Search,
+  Wifi,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
+import type {
+  AppActionResult,
+  AppDiagnosticsSnapshot,
+  AppSyncConflictResolution,
+  AppSyncConflictRow,
+  AppSyncOutboxRow,
+  AppSyncPullCursorRow,
+} from "@contracts";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { DataTable } from "@shared/components/DataTable";
-import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { useLocale } from "@shared/hooks/useLocale";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
+import { useSyncConnectionState } from "@shared/hooks/useSyncConnectionState";
+import { requestImmediatePull } from "@shared/hooks/useWorkspaceDataRefresh";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
-import { isSyncCursorStale } from "@shared/lib/syncHealth";
 import { getSyncOutboxStatusLabel } from "@shared/labels/statusLabels";
 
 import { SettingsLayout } from "./SettingsLayout";
@@ -40,40 +65,7 @@ const emptyDiagnostics: AppDiagnosticsSnapshot = {
   internalBuildArtifacts: [],
 };
 
-const syncOutboxStatusLabel = (status: string, t: ReturnType<typeof useTranslation>["t"]) =>
-  t(`settings.sync.filters.${status}`, { defaultValue: getSyncOutboxStatusLabel(status) });
-
 type SyncFilter = "all" | "pending" | "processing" | "failed" | "sent";
-type SyncEntityFilter = "all" | string;
-
-type SyncDisclosureProps = {
-  children: ReactNode;
-  defaultOpen?: boolean;
-  summary: string;
-  title: string;
-};
-
-const SyncDisclosure = ({ children, defaultOpen = false, summary, title }: SyncDisclosureProps) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
-  return (
-    <section className={`settings-disclosure${isOpen ? " is-open" : ""}`}>
-      <button
-        aria-expanded={isOpen}
-        className="settings-disclosure-trigger"
-        onClick={() => setIsOpen((current) => !current)}
-        type="button"
-      >
-        <span>
-          <strong>{title}</strong>
-          <small>{summary}</small>
-        </span>
-        <ChevronDown size={17} aria-hidden="true" />
-      </button>
-      {isOpen ? <div className="settings-disclosure-body">{children}</div> : null}
-    </section>
-  );
-};
 
 const SYNC_FILTER_VALUES: SyncFilter[] = ["all", "pending", "processing", "failed", "sent"];
 
@@ -102,88 +94,39 @@ const INBOUND_COVERAGE = [
   "sync_tombstones",
 ] as const;
 
-type InboundCoverageId = (typeof INBOUND_COVERAGE)[number];
-
-/** Returns a stable status descriptor with i18n keys. Translation happens at render time. */
-const resolveOutboundStatus = (diagnostics: AppDiagnosticsSnapshot) => {
-  if (diagnostics.syncOutboxFailedCount > 0) {
-    return {
-      tone: "critical" as const,
-      labelKey: "settings.sync.outbound.needsAttention",
-      detailKey: "settings.sync.outbound.needsAttentionDetail",
-      detailCount: diagnostics.syncOutboxFailedCount,
-    };
+/** Friendly icon per outbox entity family. Falls back to the upload glyph. */
+const entityIcon = (entityType: string): LucideIcon => {
+  if (entityType.startsWith("asset")) return Boxes;
+  if (entityType.startsWith("packing")) return Package;
+  if (entityType === "incident") return AlertTriangle;
+  if (entityType.startsWith("rma")) return Wrench;
+  if (entityType.startsWith("workspace_file")) return FileText;
+  if (
+    entityType.startsWith("invoice") ||
+    entityType.startsWith("quote") ||
+    entityType.startsWith("financial") ||
+    entityType.startsWith("bank") ||
+    entityType.startsWith("transaction") ||
+    entityType.startsWith("collaborator") ||
+    entityType.startsWith("currency")
+  ) {
+    return Receipt;
   }
-
-  if (diagnostics.syncOutboxProcessingCount > 0) {
-    return {
-      tone: "info" as const,
-      labelKey: "settings.sync.outbound.uploading",
-      detailKey: "settings.sync.outbound.uploadingDetail",
-      detailCount: diagnostics.syncOutboxProcessingCount,
-    };
-  }
-
-  if (diagnostics.syncOutboxPendingCount > 0) {
-    return {
-      tone: "warning" as const,
-      labelKey: "settings.sync.outbound.waiting",
-      detailKey: "settings.sync.outbound.waitingDetail",
-      detailCount: diagnostics.syncOutboxPendingCount,
-    };
-  }
-
-  return {
-    tone: "success" as const,
-    labelKey: "settings.sync.outbound.upToDate",
-    detailKey: "settings.sync.outbound.upToDateDetail",
-    detailCount: 0,
-  };
+  return CloudUpload;
 };
 
-const resolveInboundStatus = (pullCursors: AppSyncPullCursorRow[]) => {
-  const failed = pullCursors.filter((row) => row.lastError);
-  const stale = pullCursors.filter((row) => !row.lastError && isSyncCursorStale(row));
-  const activeCursors = pullCursors.filter((row) => !row.lastError && !isSyncCursorStale(row));
-  const latest = activeCursors[0]?.updatedAt ?? pullCursors[0]?.updatedAt ?? null;
+const formatEntityLabel = (value: string) =>
+  value
+    .split("_")
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(" ");
 
-  if (failed.length > 0) {
-    return {
-      tone: "critical" as const,
-      labelKey: "settings.sync.inbound.needsAttention",
-      detailKey: "settings.sync.inbound.needsAttentionDetail",
-      detailCount: failed.length,
-      latest,
-    };
-  }
-
-  if (stale.length > 0) {
-    return {
-      tone: "warning" as const,
-      labelKey: "settings.sync.inbound.stale",
-      detailKey: "settings.sync.inbound.staleDetail",
-      detailCount: stale.length,
-      latest,
-    };
-  }
-
-  if (pullCursors.length > 0) {
-    return {
-      tone: "success" as const,
-      labelKey: "settings.sync.inbound.active",
-      detailKey: "settings.sync.inbound.activeDetail",
-      detailCount: pullCursors.length,
-      latest,
-    };
-  }
-
-  return {
-    tone: "warning" as const,
-    labelKey: "settings.sync.inbound.waiting",
-    detailKey: "settings.sync.inbound.waitingDetail",
-    detailCount: 0,
-    latest: null as string | null,
-  };
+const resolveEntityNavigationPath = (row: AppSyncOutboxRow) => {
+  if (row.entityType === "asset_event") return `/assets/${row.entityId}`;
+  if (row.entityType === "packing_slip") return `/packing-slips?focus=${row.entityId}`;
+  if (row.entityType === "incident") return `/incidents?focus=${row.entityId}`;
+  if (row.entityType === "financial_entry") return `/finance/entries?focus=${row.entityId}`;
+  return null;
 };
 
 const formatSyncStatusTone = (status: AppSyncOutboxRow["status"]) => {
@@ -195,50 +138,73 @@ const formatSyncStatusTone = (status: AppSyncOutboxRow["status"]) => {
 
 const normalizeText = (value: string) => value.trim().toLowerCase();
 
-const resolveEntityNavigationPath = (row: AppSyncOutboxRow) => {
-  if (row.entityType === "asset_event") return `/assets/${row.entityId}`;
-  if (row.entityType === "packing_slip") return `/packing-slips?focus=${row.entityId}`;
-  if (row.entityType === "incident") return `/incidents?focus=${row.entityId}`;
-  if (row.entityType === "financial_entry") return `/finance/entries?focus=${row.entityId}`;
-  return null;
+const prettyJson = (value: string | null) => {
+  if (!value) return "";
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
 };
 
-const formatEntityLabel = (value: string) =>
-  value
-    .split("_")
-    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
-    .join(" ");
+const formatBytes = (bytes: number) => {
+  if (!bytes || bytes < 0) return "0 KB";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value < 10 && unit > 0 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+};
+
+/** Determinate fill (%) for a per-file transfer bar, by outbox status. */
+const transferFillPercent = (status: AppSyncOutboxRow["status"]) => {
+  if (status === "sent") return 100;
+  if (status === "failed") return 100;
+  if (status === "processing") return 65;
+  return 8;
+};
 
 export const SyncOutboxPage = () => {
   const navigate = useNavigate();
   const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { status: sessionStatus, isLocalFallback } = useSession();
   const toast = useToast();
   const { t } = useTranslation();
   const { formatDateTime } = useLocale();
+  const connection = useSyncConnectionState();
+  // Inbound pulls only run when the session can actually reach the cloud. When it
+  // can't (offline / local-only / signed out), "stale" cursors are expected, not
+  // errors — so we never raise them as problems.
+  const canCloudSync = connection.isOnline && sessionStatus === "authenticated" && !isLocalFallback;
+
   const formatDateLabel = (value: string | null) => {
     if (!value) return t("common.never");
     return formatDateTime(value) || value;
   };
+
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
   const [rows, setRows] = useState<AppSyncOutboxRow[]>([]);
   const [pullCursors, setPullCursors] = useState<AppSyncPullCursorRow[]>([]);
+  const [conflicts, setConflicts] = useState<AppSyncConflictRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<SyncFilter>("all");
-  const [entityFilter, setEntityFilter] = useState<SyncEntityFilter>("all");
   const [search, setSearch] = useState("");
-  const [activeRowId, setActiveRowId] = useState<string | null>(null);
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [expandedConflictId, setExpandedConflictId] = useState<string | null>(null);
   const [retryingRowId, setRetryingRowId] = useState<string | null>(null);
-  const [isRetryingAllFailed, setIsRetryingAllFailed] = useState(false);
-  const [isRetryingVisible, setIsRetryingVisible] = useState(false);
+  const [resolvingConflictId, setResolvingConflictId] = useState<string | null>(null);
   const [isRunningLocalSync, setIsRunningLocalSync] = useState(false);
   const [isBackfillingOperational, setIsBackfillingOperational] = useState(false);
+  const [isFindingChanges, setIsFindingChanges] = useState(false);
+  const [retryProgress, setRetryProgress] = useState<{ done: number; total: number } | null>(null);
+  const [direction, setDirection] = useState<"up" | "down">("up");
   const deferredSearch = useDeferredValue(search);
 
   const load = async () => {
-    if (!window.bukowskiApp) {
-      return;
-    }
-
+    if (!window.bukowskiApp) return;
     try {
       const [nextSyncStatus, nextRows] = await Promise.all([
         window.bukowskiApp.getSyncStatusSnapshot(),
@@ -247,6 +213,15 @@ export const SyncOutboxPage = () => {
       setDiagnostics(nextSyncStatus.diagnostics);
       setRows(nextRows);
       setPullCursors(nextSyncStatus.pullCursors);
+      if (activeWorkspaceId) {
+        try {
+          setConflicts(await window.bukowskiApp.getSyncConflicts(activeWorkspaceId));
+        } catch {
+          /* conflicts are best-effort; keep the rest of the dashboard alive */
+        }
+      } else {
+        setConflicts([]);
+      }
       setError(null);
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, t("settings.sync.couldNotLoad")));
@@ -260,67 +235,77 @@ export const SyncOutboxPage = () => {
     { intervalMs: 10_000 },
   );
 
-  useEffect(() => {
-    if (!rows.length) {
-      setActiveRowId(null);
-      return;
-    }
+  const workspacePullCursors = useMemo(
+    () => pullCursors.filter((cursor) => !activeWorkspaceId || cursor.workspaceId === activeWorkspaceId),
+    [activeWorkspaceId, pullCursors],
+  );
 
-    if (activeRowId && rows.some((row) => row.id === activeRowId)) {
-      return;
-    }
-
-    setActiveRowId(rows[0]?.id ?? null);
-  }, [activeRowId, rows]);
-
-  const entityFilters = useMemo(
-    () => ["all", ...Array.from(new Set(rows.map((row) => row.entityType))).sort()],
-    [rows],
+  // A pull cursor is only a *problem* when it carries a real error. A cursor that
+  // simply has not received new rows in a while is healthy ("no news"), not stale —
+  // its updatedAt only advances when rows are applied, so age means quiet, not broken.
+  const inboundErrorCount = useMemo(
+    () => workspacePullCursors.filter((row) => row.lastError).length,
+    [workspacePullCursors],
+  );
+  const pullCursorByEntity = useMemo(
+    () => new Map(workspacePullCursors.map((cursor) => [cursor.entityType, cursor])),
+    [workspacePullCursors],
   );
 
   const visibleRows = useMemo(() => {
     const query = normalizeText(deferredSearch);
-
     return rows.filter((row) => {
-      if (filter !== "all" && row.status !== filter) {
-        return false;
-      }
-
-      if (entityFilter !== "all" && row.entityType !== entityFilter) {
-        return false;
-      }
-
-      if (!query) {
-        return true;
-      }
-
+      if (filter !== "all" && row.status !== filter) return false;
+      if (!query) return true;
       return [row.entityType, row.entityId, row.operationType, row.lastError ?? "", row.payloadJson]
         .join(" ")
         .toLowerCase()
         .includes(query);
     });
-  }, [deferredSearch, entityFilter, filter, rows]);
+  }, [deferredSearch, filter, rows]);
 
-  const activeRow = useMemo(() => visibleRows.find((row) => row.id === activeRowId) ?? null, [activeRowId, visibleRows]);
-  const outboundStatus = useMemo(() => resolveOutboundStatus(diagnostics), [diagnostics]);
-  const workspacePullCursors = useMemo(
-    () => pullCursors.filter((cursor) => !activeWorkspaceId || cursor.workspaceId === activeWorkspaceId),
-    [activeWorkspaceId, pullCursors],
-  );
-  const inboundStatus = useMemo(() => resolveInboundStatus(workspacePullCursors), [workspacePullCursors]);
-  const pullCursorByEntity = useMemo(
-    () => new Map(workspacePullCursors.map((cursor) => [cursor.entityType, cursor])),
-    [workspacePullCursors],
-  );
-  const visibleRetryableRows = useMemo(
-    () => visibleRows.filter((row) => row.status === "failed" || row.status === "processing"),
-    [visibleRows],
+  const retryableRows = useMemo(
+    () => rows.filter((row) => row.status === "failed" || row.status === "processing"),
+    [rows],
   );
 
-  const summarizeSelection = (row: AppSyncOutboxRow | null) => {
-    if (!row) return t("settings.sync.detailSelectPrompt");
-    return `${row.entityType} · ${row.operationType}`;
-  };
+  // File transfers carry real byte sizes — drive the torrent-style aggregate bar.
+  const uploadBytes = useMemo(() => {
+    const files = rows.filter((row) => row.byteSize != null);
+    const total = files.reduce((sum, row) => sum + (row.byteSize ?? 0), 0);
+    const done = files
+      .filter((row) => row.status === "sent")
+      .reduce((sum, row) => sum + (row.byteSize ?? 0), 0);
+    return { total, done, count: files.length, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
+  }, [rows]);
+
+  // Upload lane summary.
+  const outboundLane = useMemo(() => {
+    if (diagnostics.syncOutboxFailedCount > 0) return { tone: "critical" as const, key: "needsAttention" };
+    if (diagnostics.syncOutboxProcessingCount > 0) return { tone: "info" as const, key: "uploading" };
+    if (diagnostics.syncOutboxPendingCount > 0) return { tone: "warning" as const, key: "waiting" };
+    return { tone: "success" as const, key: "upToDate" };
+  }, [diagnostics]);
+
+  // Download lane summary — paused (not an error) when the cloud is unreachable.
+  const inboundLane = useMemo(() => {
+    if (!canCloudSync) return { tone: "neutral" as const, key: "paused" };
+    if (inboundErrorCount > 0) return { tone: "critical" as const, key: "needsAttention" };
+    if (workspacePullCursors.length > 0) return { tone: "success" as const, key: "active" };
+    return { tone: "warning" as const, key: "waiting" };
+  }, [canCloudSync, inboundErrorCount, workspacePullCursors.length]);
+
+  // One-sentence health verdict + the most useful action for it.
+  const health = useMemo(() => {
+    const realFailures = diagnostics.syncOutboxFailedCount + inboundErrorCount;
+    if (conflicts.length > 0) return { tone: "critical" as const, key: "conflicts", count: conflicts.length };
+    if (realFailures > 0) return { tone: "critical" as const, key: "failed", count: realFailures };
+    if (diagnostics.syncOutboxProcessingCount + diagnostics.syncOutboxPendingCount > 0) {
+      return { tone: "info" as const, key: "syncing", count: diagnostics.syncOutboxProcessingCount + diagnostics.syncOutboxPendingCount };
+    }
+    if (!canCloudSync) return { tone: "neutral" as const, key: "paused", count: 0 };
+    return { tone: "success" as const, key: "upToDate", count: 0 };
+  }, [canCloudSync, conflicts.length, diagnostics, inboundErrorCount]);
 
   const runAction = async (action: () => Promise<AppActionResult>, setPending: (value: boolean) => void) => {
     try {
@@ -329,8 +314,7 @@ export const SyncOutboxPage = () => {
       toast.success(t("settings.sync.toasts.actionComplete"), result.summary);
       setDiagnostics(result.diagnostics);
       setError(null);
-      const nextRows = await window.bukowskiApp!.getSyncOutboxRows();
-      setRows(nextRows);
+      await load();
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, t("settings.sync.couldNotCompleteAction")));
     } finally {
@@ -339,18 +323,14 @@ export const SyncOutboxPage = () => {
   };
 
   const retrySingleRow = async (rowId: string) => {
-    if (!window.bukowskiApp) {
-      return;
-    }
-
+    if (!window.bukowskiApp) return;
     try {
       setRetryingRowId(rowId);
       const result = await window.bukowskiApp.retrySyncOutboxRow(rowId);
       toast.success(t("settings.sync.toasts.rowQueued"), result.summary);
       setDiagnostics(result.diagnostics);
       setError(null);
-      const nextRows = await window.bukowskiApp.getSyncOutboxRows();
-      setRows(nextRows);
+      setRows(await window.bukowskiApp.getSyncOutboxRows());
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, t("settings.sync.couldNotRetryRow")));
     } finally {
@@ -358,59 +338,79 @@ export const SyncOutboxPage = () => {
     }
   };
 
-  const retryVisibleRows = async () => {
-    if (!window.bukowskiApp || !visibleRetryableRows.length) {
-      return;
-    }
-
+  // Retry every retryable outbox row with visible progress.
+  const retryAllRetryable = async () => {
+    if (!window.bukowskiApp || !retryableRows.length) return;
+    const total = retryableRows.length;
     try {
-      setIsRetryingVisible(true);
+      setRetryProgress({ done: 0, total });
       let lastResult: AppActionResult | null = null;
-
-      for (const row of visibleRetryableRows) {
-        lastResult = await window.bukowskiApp.retrySyncOutboxRow(row.id);
+      for (let index = 0; index < retryableRows.length; index += 1) {
+        lastResult = await window.bukowskiApp.retrySyncOutboxRow(retryableRows[index]!.id);
+        setRetryProgress({ done: index + 1, total });
       }
-
       if (lastResult) {
-        toast.success(
-          t("settings.sync.toasts.rowsQueuedTitle"),
-          t("settings.sync.toasts.rowsQueuedBody", { count: visibleRetryableRows.length }),
-        );
+        toast.success(t("settings.sync.toasts.rowsQueuedTitle"), t("settings.sync.toasts.rowsQueuedBody", { count: total }));
         setDiagnostics(lastResult.diagnostics);
       }
       setError(null);
-      const nextRows = await window.bukowskiApp.getSyncOutboxRows();
-      setRows(nextRows);
+      await load();
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, t("settings.sync.couldNotRetryVisible")));
     } finally {
-      setIsRetryingVisible(false);
+      setRetryProgress(null);
+    }
+  };
+
+  // Ask the background pull hooks to fetch remote changes now, then reload.
+  const findChanges = async () => {
+    if (!canCloudSync) return;
+    try {
+      setIsFindingChanges(true);
+      requestImmediatePull();
+      await new Promise((resolve) => setTimeout(resolve, 1800));
+      await load();
+      setError(null);
+    } finally {
+      setIsFindingChanges(false);
+    }
+  };
+
+  // Banner action for real failures: retry failed uploads AND refresh inbound.
+  const resolveFailures = async () => {
+    requestImmediatePull();
+    if (retryableRows.length) {
+      await retryAllRetryable();
+    } else {
+      await findChanges();
+    }
+  };
+
+  const resolveConflict = async (conflictId: string, resolution: AppSyncConflictResolution) => {
+    if (!window.bukowskiApp) return;
+    try {
+      setResolvingConflictId(conflictId);
+      const result = await window.bukowskiApp.resolveSyncConflict({ conflictId, resolution });
+      toast.success(t("settings.sync.conflicts.resolvedTitle"), result.summary);
+      setDiagnostics(result.diagnostics);
+      setError(null);
+      await load();
+    } catch (nextError) {
+      setError(getUserFacingErrorMessage(nextError, t("settings.sync.conflicts.couldNotResolve")));
+    } finally {
+      setResolvingConflictId(null);
     }
   };
 
   const backfillOperationalSnapshots = async () => {
-    if (!window.bukowskiApp || !isWorkspaceReady || !activeWorkspaceId) {
-      return;
-    }
-
+    if (!window.bukowskiApp || !isWorkspaceReady || !activeWorkspaceId) return;
     try {
       setIsBackfillingOperational(true);
-      const result = await window.bukowskiApp.backfillOperationalSnapshots({
-        workspaceId: activeWorkspaceId,
-      });
+      const result = await window.bukowskiApp.backfillOperationalSnapshots({ workspaceId: activeWorkspaceId });
       toast.success(t("settings.sync.toasts.backfillComplete"), result.summary);
       setDiagnostics(result.diagnostics);
       setError(null);
-      const [nextRows, nextSyncStatus] = await Promise.all([
-        window.bukowskiApp.getSyncOutboxRows(),
-        window.bukowskiApp.getSyncStatusSnapshot().catch(() => ({
-          diagnostics: result.diagnostics,
-          pullCursors,
-        })),
-      ]);
-      setRows(nextRows);
-      setDiagnostics(nextSyncStatus.diagnostics);
-      setPullCursors(nextSyncStatus.pullCursors);
+      await load();
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, t("settings.sync.couldNotBackfill")));
     } finally {
@@ -418,89 +418,79 @@ export const SyncOutboxPage = () => {
     }
   };
 
-  const isInboundCoverageId = (value: string): value is InboundCoverageId =>
-    (INBOUND_COVERAGE as readonly string[]).includes(value);
+  const describeEntity = (entityType: string) =>
+    t(`settings.sync.entityNames.${entityType}`, { defaultValue: formatEntityLabel(entityType) });
+  const describeOperation = (operation: string) =>
+    t(`settings.sync.operations.${operation}`, { defaultValue: operation });
+
+  const pillTone =
+    connection.tone === "offline" ? "offline" : !canCloudSync ? "paused" : connection.tone;
+  const connectionLabel =
+    pillTone === "paused"
+      ? isLocalFallback
+        ? t("settings.sync.connection.localOnly")
+        : t("settings.sync.connection.paused")
+      : t(`settings.sync.connection.${pillTone}`);
+  const ConnectionIcon = pillTone === "offline" ? CloudOff : pillTone === "paused" ? Cloud : pillTone === "live" ? Wifi : CloudUpload;
+
+  const syncOutboxStatusLabel = (status: string) =>
+    t(`settings.sync.filters.${status}`, { defaultValue: getSyncOutboxStatusLabel(status) });
 
   return (
-    <div className="page-stack settings-page">
+    <div className="page-stack settings-page sync-mc">
       <SectionHeader title={t("settings.sync.title")} />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
 
       <SettingsLayout>
-      <div className="sync-overview-grid">
-        <SurfaceCard className="sync-direction-card" title={t("settings.sync.outbound.cardTitle")}>
-          <div className="sync-direction-head">
-            <span className={`sync-direction-icon sync-direction-icon-${outboundStatus.tone}`}>
-              <CloudUpload size={18} />
-            </span>
-            <div>
-              <StatusBadge tone={outboundStatus.tone}>{t(outboundStatus.labelKey)}</StatusBadge>
-              <p>{t(outboundStatus.detailKey, { count: outboundStatus.detailCount })}</p>
-            </div>
-          </div>
-          <div className="sync-metric-row">
-            <span><strong>{diagnostics.syncOutboxPendingCount}</strong> {t("settings.sync.outbound.metrics.pending")}</span>
-            <span><strong>{diagnostics.syncOutboxProcessingCount}</strong> {t("settings.sync.outbound.metrics.uploading")}</span>
-            <span><strong>{diagnostics.syncOutboxFailedCount}</strong> {t("settings.sync.outbound.metrics.failed")}</span>
-          </div>
-          <small>{t("settings.sync.outbound.lastPass", { value: formatDateLabel(diagnostics.lastSyncRunAt) })}</small>
-        </SurfaceCard>
+        <div className="sync-mc-topbar">
+          <span className={`sync-conn-pill sync-conn-${pillTone}`}>
+            <span className="sync-conn-dot" aria-hidden="true" />
+            <ConnectionIcon size={14} />
+            <span>{connectionLabel}</span>
+          </span>
+          <small className="sync-mc-lastpass">{t("settings.sync.outbound.lastPass", { value: formatDateLabel(diagnostics.lastSyncRunAt) })}</small>
+        </div>
 
-        <SurfaceCard className="sync-direction-card" title={t("settings.sync.inbound.cardTitle")}>
-          <div className="sync-direction-head">
-            <span className={`sync-direction-icon sync-direction-icon-${inboundStatus.tone}`}>
-              <CloudDownload size={18} />
-            </span>
-            <div>
-              <StatusBadge tone={inboundStatus.tone}>{t(inboundStatus.labelKey)}</StatusBadge>
-              <p>{t(inboundStatus.detailKey, { count: inboundStatus.detailCount })}</p>
-            </div>
+        <div className={`sync-health-banner sync-health-${health.tone}`}>
+          <span className="sync-health-icon">
+            {health.tone === "success" ? (
+              <CheckCircle2 size={20} />
+            ) : health.tone === "info" ? (
+              <RefreshCw size={20} />
+            ) : health.tone === "neutral" ? (
+              <Cloud size={20} />
+            ) : (
+              <AlertTriangle size={20} />
+            )}
+          </span>
+          <div className="sync-health-text">
+            <strong>{t(`settings.sync.health.${health.key}.title`, { count: health.count })}</strong>
+            <p>{t(`settings.sync.health.${health.key}.detail`, { count: health.count })}</p>
           </div>
-          <div className="sync-metric-row">
-            <span><strong>{workspacePullCursors.length}</strong> {t("settings.sync.inbound.metrics.sources", { count: workspacePullCursors.length })}</span>
-            <span><strong>{workspacePullCursors.reduce((sum, row) => sum + row.lastPulledCount, 0)}</strong> {t("settings.sync.inbound.metrics.latest", { count: workspacePullCursors.reduce((sum, row) => sum + row.lastPulledCount, 0) })}</span>
-            <span><strong>{workspacePullCursors.filter((row) => row.lastError || isSyncCursorStale(row)).length}</strong> {t("settings.sync.inbound.metrics.errors", { count: workspacePullCursors.filter((row) => row.lastError || isSyncCursorStale(row)).length })}</span>
-          </div>
-          <small>{t("settings.sync.inbound.lastCheck", { value: formatDateLabel(inboundStatus.latest) })}</small>
-        </SurfaceCard>
-      </div>
+          {health.key === "failed" ? (
+            <button className="action-primary-button" disabled={Boolean(retryProgress) || isFindingChanges} onClick={() => void resolveFailures()} type="button">
+              <RefreshCw size={14} className={retryProgress || isFindingChanges ? "is-spinning" : undefined} />
+              <span>
+                {retryProgress ? t("settings.sync.actions.retryingProgress", { done: retryProgress.done, total: retryProgress.total }) : t("settings.sync.health.failed.action")}
+              </span>
+            </button>
+          ) : null}
+        </div>
 
-      <SyncDisclosure
-        title={t("settings.sync.actionsDisclosure.title")}
-        summary={
-          diagnostics.syncOutboxFailedCount
-            ? t("settings.sync.actionsDisclosure.summaryWithFailed", { count: diagnostics.syncOutboxFailedCount })
-            : t("settings.sync.actionsDisclosure.summaryDefault")
-        }
-      >
-        <div className="sync-action-row">
+        <div className="sync-actions-bar">
           <button
             className="action-primary-button"
             disabled={isRunningLocalSync}
             onClick={() => void runAction(() => window.bukowskiApp!.runLocalSync(), setIsRunningLocalSync)}
             type="button"
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={14} className={isRunningLocalSync ? "is-spinning" : undefined} />
             <span>{isRunningLocalSync ? t("settings.sync.actions.running") : t("settings.sync.actions.runUpload")}</span>
           </button>
-          <button
-            className="ghost-control"
-            disabled={!diagnostics.syncOutboxFailedCount || isRetryingAllFailed}
-            onClick={() => void runAction(() => window.bukowskiApp!.retryAllFailedSyncOutboxRows(), setIsRetryingAllFailed)}
-            type="button"
-          >
-            {isRetryingAllFailed ? t("settings.sync.actions.retryingFailed") : t("settings.sync.actions.retryFailed")}
-          </button>
-          <button
-            className="ghost-control"
-            disabled={!visibleRetryableRows.length || isRetryingVisible}
-            onClick={() => void retryVisibleRows()}
-            type="button"
-          >
-            {isRetryingVisible
-              ? t("settings.sync.actions.retryingVisible")
-              : t("settings.sync.actions.retryVisible", { count: visibleRetryableRows.length })}
+          <button className="ghost-control" disabled={!canCloudSync || isFindingChanges} onClick={() => void findChanges()} type="button">
+            <CloudDownload size={14} />
+            <span>{isFindingChanges ? t("settings.sync.actions.findingChanges") : t("settings.sync.actions.findChanges")}</span>
           </button>
           <button
             className="ghost-control"
@@ -511,72 +501,114 @@ export const SyncOutboxPage = () => {
             {isBackfillingOperational ? t("settings.sync.actions.backfilling") : t("settings.sync.actions.backfill")}
           </button>
         </div>
-      </SyncDisclosure>
 
-      <SyncDisclosure
-        title={t("settings.sync.coverageDisclosure.title")}
-        summary={t("settings.sync.coverageDisclosure.summary", {
-          count: INBOUND_COVERAGE.length,
-          errors: workspacePullCursors.filter((row) => row.lastError || isSyncCursorStale(row)).length,
-        })}
-      >
-        <SurfaceCard title={t("settings.sync.coverageCard")}>
-          <div className="sync-coverage-grid">
-            {INBOUND_COVERAGE.map((entityType) => {
-              const cursor = pullCursorByEntity.get(entityType);
-              const isStale = Boolean(cursor && !cursor.lastError && isSyncCursorStale(cursor));
-              const isActive = Boolean(cursor && !cursor.lastError && !isStale);
-              const hasError = Boolean(cursor?.lastError);
-              const label = t(`settings.sync.coverage.${entityType}.label`);
-              const detail = t(`settings.sync.coverage.${entityType}.detail`);
-              return (
-                <div className="sync-coverage-item" key={entityType}>
-                  <span className={`sync-coverage-icon${hasError ? " is-error" : isStale ? " is-stale" : isActive ? " is-active" : ""}`}>
-                    {hasError ? <AlertTriangle size={14} /> : isActive ? <CheckCircle2 size={14} /> : <CloudDownload size={14} />}
-                  </span>
-                  <div>
-                    <strong>{label}</strong>
-                    <small>
-                      {hasError
-                        ? cursor?.lastError
-                        : isStale
-                          ? t("settings.sync.coverageStale", { value: formatDateLabel(cursor?.updatedAt ?? null) })
-                          : cursor
-                          ? t("settings.sync.coverageRowsLatest", { count: cursor.lastPulledCount })
-                          : detail}
-                    </small>
+        {conflicts.length > 0 ? (
+          <SurfaceCard
+            className="sync-conflicts-card"
+            title={t("settings.sync.conflicts.title")}
+            subtitle={t("settings.sync.conflicts.subtitle", { count: conflicts.length })}
+          >
+            <div className="sync-conflict-list">
+              {conflicts.map((conflict) => {
+                const isOpen = expandedConflictId === conflict.id;
+                const isResolving = resolvingConflictId === conflict.id;
+                return (
+                  <div className="sync-conflict-row" key={conflict.id}>
+                    <div className="sync-conflict-head">
+                      <span className="sync-conflict-icon"><GitMerge size={16} /></span>
+                      <div className="sync-conflict-info">
+                        <strong>{describeEntity(conflict.entityType)}</strong>
+                        <small>{t("settings.sync.conflicts.explainer")}</small>
+                      </div>
+                    </div>
+                    <div className="sync-conflict-actions">
+                      <button className="ghost-control" disabled={isResolving} onClick={() => void resolveConflict(conflict.id, "keep_local")} type="button">
+                        {t("settings.sync.conflicts.keepMine")}
+                      </button>
+                      <button className="action-primary-button" disabled={isResolving} onClick={() => void resolveConflict(conflict.id, "take_remote")} type="button">
+                        {t("settings.sync.conflicts.takeCloud")}
+                      </button>
+                      <button className="ghost-control" onClick={() => setExpandedConflictId(isOpen ? null : conflict.id)} type="button">
+                        {isOpen ? t("settings.sync.conflicts.hideDiff") : t("settings.sync.conflicts.viewDiff")}
+                      </button>
+                    </div>
+                    {isOpen ? (
+                      <div className="sync-conflict-diff">
+                        <div>
+                          <span className="summary-label">{t("settings.sync.conflicts.mineLabel")}</span>
+                          <pre className="sync-outbox-payload">{prettyJson(conflict.localSnapshotJson)}</pre>
+                        </div>
+                        <div>
+                          <span className="summary-label">{t("settings.sync.conflicts.cloudLabel")}</span>
+                          <pre className="sync-outbox-payload">{prettyJson(conflict.remoteSnapshotJson)}</pre>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                  <StatusBadge tone={hasError ? "critical" : isStale ? "warning" : isActive ? "success" : "neutral"}>
-                    {hasError
-                      ? t("settings.sync.coverageBadge.error")
-                      : isStale
-                        ? t("settings.sync.coverageBadge.stale")
-                        : isActive
-                        ? t("settings.sync.coverageBadge.active")
-                        : t("settings.sync.coverageBadge.ready")}
-                  </StatusBadge>
-                </div>
-              );
-            })}
-          </div>
-        </SurfaceCard>
-      </SyncDisclosure>
+                );
+              })}
+            </div>
+          </SurfaceCard>
+        ) : null}
 
-      <SyncDisclosure
-        title={t("settings.sync.queueDisclosure.title")}
-        summary={t("settings.sync.queueDisclosure.summary", { visible: visibleRows.length, total: rows.length })}
-      >
-        <ResizableSideRailLayout className="split-layout" defaultWidth={420} maxWidth={680} minWidth={320} storageKey="sync-outbox-side-rail-width">
-          <SurfaceCard title={t("settings.sync.queueCardTitle")}>
-            <div className="sync-outbox-toolbar">
-              <div className="sync-outbox-filter-grid">
-                <label className="compact-filter-field">
+        <SurfaceCard className="sync-transfers-card" title={t("settings.sync.transfers.title")}>
+          <div className="sync-xfer-toggle" role="tablist" aria-label={t("settings.sync.transfers.title")}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={direction === "up"}
+              className={`sync-xfer-tab${direction === "up" ? " is-active" : ""}`}
+              onClick={() => setDirection("up")}
+            >
+              <span className={`sync-xfer-tab-icon sync-direction-icon-${outboundLane.tone}`}><CloudUpload size={16} /></span>
+              <span className="sync-xfer-tab-text">
+                <strong>{t("settings.sync.transfers.uploadsTab")}</strong>
+                <small>{t(`settings.sync.outbound.${outboundLane.key}`)}</small>
+              </span>
+              <span className="sync-xfer-count">{rows.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={direction === "down"}
+              className={`sync-xfer-tab${direction === "down" ? " is-active" : ""}`}
+              onClick={() => setDirection("down")}
+            >
+              <span className={`sync-xfer-tab-icon sync-direction-icon-${inboundLane.tone === "neutral" ? "info" : inboundLane.tone}`}><CloudDownload size={16} /></span>
+              <span className="sync-xfer-tab-text">
+                <strong>{t("settings.sync.transfers.downloadsTab")}</strong>
+                <small>{t(`settings.sync.inbound.${inboundLane.key}`)}</small>
+              </span>
+              <span className="sync-xfer-count">{workspacePullCursors.length}</span>
+            </button>
+          </div>
+
+          {direction === "up" ? (
+            <div className="sync-xfer-panel">
+              {uploadBytes.count > 0 ? (
+                <div className="sync-xfer-aggregate">
+                  <div className="sync-xfer-aggregate-head">
+                    <span>{t("settings.sync.transfers.filesProgress", { done: formatBytes(uploadBytes.done), total: formatBytes(uploadBytes.total), count: uploadBytes.count })}</span>
+                    <strong>{uploadBytes.pct}%</strong>
+                  </div>
+                  <div className="sync-xfer-track"><span className="sync-xfer-fill" style={{ width: `${uploadBytes.pct}%` }} /></div>
+                </div>
+              ) : null}
+
+              <div className="sync-feed-toolbar">
+                <label className="list-toolbar-search sync-feed-search" aria-label={t("settings.sync.queueToolbar.searchAria")}>
+                  <Search aria-hidden size={14} />
+                  <input
+                    className="list-toolbar-search-input"
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={t("settings.sync.queueToolbar.searchPlaceholder")}
+                    type="search"
+                    value={search}
+                  />
+                </label>
+                <label className="compact-filter-field sync-feed-filter">
                   <span>{t("settings.sync.queueToolbar.statusLabel")}</span>
-                  <select
-                    className="compact-filter-select"
-                    onChange={(event) => setFilter(event.target.value as SyncFilter)}
-                    value={filter}
-                  >
+                  <select className="compact-filter-select" onChange={(event) => setFilter(event.target.value as SyncFilter)} value={filter}>
                     {SYNC_FILTER_VALUES.map((value) => (
                       <option key={value} value={value}>
                         {t(`settings.sync.filters.${value}`)}
@@ -584,124 +616,123 @@ export const SyncOutboxPage = () => {
                     ))}
                   </select>
                 </label>
-                <label className="compact-filter-field">
-                  <span>{t("settings.sync.queueToolbar.entityLabel")}</span>
-                  <select
-                    className="compact-filter-select"
-                    onChange={(event) => setEntityFilter(event.target.value)}
-                    value={entityFilter}
-                  >
-                    {entityFilters.map((item) => (
-                      <option key={item} value={item}>
-                        {item === "all"
-                          ? t("settings.sync.filters.allEntities")
-                          : isInboundCoverageId(item)
-                            ? t(`settings.sync.coverage.${item}.label`)
-                            : formatEntityLabel(item)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
               </div>
-              <label className="list-toolbar-search sync-outbox-search" aria-label={t("settings.sync.queueToolbar.searchAria")}>
-                <Search aria-hidden size={14} />
-                <input
-                  className="list-toolbar-search-input"
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={t("settings.sync.queueToolbar.searchPlaceholder")}
-                  type="search"
-                  value={search}
-                />
-              </label>
+
+              {visibleRows.length === 0 ? (
+                <div className="empty-state">{t("settings.sync.queueEmpty")}</div>
+              ) : (
+                <div className="sync-feed-list">
+                  {visibleRows.map((row) => {
+                    const Icon = entityIcon(row.entityType);
+                    const isOpen = expandedRowId === row.id;
+                    const navPath = resolveEntityNavigationPath(row);
+                    const canRetry = row.status === "failed" || row.status === "processing";
+                    const isFile = row.byteSize != null;
+                    const title = row.fileName || describeEntity(row.entityType);
+                    return (
+                      <div className={`sync-feed-row${isOpen ? " is-open" : ""}`} key={row.id}>
+                        <button className="sync-feed-row-main" onClick={() => setExpandedRowId(isOpen ? null : row.id)} type="button">
+                          <span className="sync-feed-row-icon"><Icon size={18} /></span>
+                          <span className="sync-feed-row-text">
+                            <strong>{title}</strong>
+                            <small>{`${describeOperation(row.operationType)} · ${formatDateLabel(row.updatedAt)}`}</small>
+                          </span>
+                          {isFile ? <span className="sync-feed-size">{formatBytes(row.byteSize ?? 0)}</span> : null}
+                          <StatusBadge tone={formatSyncStatusTone(row.status)}>{syncOutboxStatusLabel(row.status)}</StatusBadge>
+                          <ChevronDown className="sync-feed-row-caret" size={16} aria-hidden="true" />
+                        </button>
+                        {isFile ? (
+                          <div className="sync-xfer-rowbar">
+                            <span className={`sync-xfer-fill is-${row.status}`} style={{ width: `${transferFillPercent(row.status)}%` }} />
+                          </div>
+                        ) : null}
+                        {isOpen ? (
+                          <div className="sync-feed-row-detail">
+                            <div className="summary-grid">
+                              <div className="summary-row">
+                                <span className="summary-label">{t("settings.sync.detail.attempts")}</span>
+                                <span className="summary-value">{row.attemptCount}</span>
+                              </div>
+                              <div className="summary-row">
+                                <span className="summary-label">{t("settings.sync.detail.nextRetry")}</span>
+                                <span className="summary-value">{formatDateLabel(row.nextRetryAt)}</span>
+                              </div>
+                              <div className="summary-row">
+                                <span className="summary-label">{t("settings.sync.queueColumns.entityId")}</span>
+                                <span className="summary-value">{row.entityId}</span>
+                              </div>
+                            </div>
+                            {row.lastError ? (
+                              <div className="form-inline-error">{t("settings.sync.detail.lastError", { message: row.lastError })}</div>
+                            ) : null}
+                            <div className="action-panel-actions action-panel-actions-start">
+                              {canRetry ? (
+                                <button className="ghost-control" disabled={retryingRowId === row.id} onClick={() => void retrySingleRow(row.id)} type="button">
+                                  {retryingRowId === row.id ? t("settings.sync.detail.retrying") : t("settings.sync.detail.retry")}
+                                </button>
+                              ) : null}
+                              {navPath ? (
+                                <button className="ghost-control" onClick={() => navigate(navPath)} type="button">
+                                  {t("settings.sync.detail.openEntity")}
+                                </button>
+                              ) : null}
+                            </div>
+                            <details className="sync-feed-tech">
+                              <summary>{t("settings.sync.feed.technical")}</summary>
+                              <pre className="sync-outbox-payload">{prettyJson(row.payloadJson)}</pre>
+                            </details>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-
-            <DataTable
-              activeRowId={activeRowId}
-              getRowId={(row) => row.id}
-              onRowClick={(row) => setActiveRowId(row.id)}
-              persistKey="sync-outbox"
-              columns={[
-                {
-                  key: "status",
-                  label: t("settings.sync.queueColumns.status"),
-                  render: (row) => <StatusBadge tone={formatSyncStatusTone(row.status)}>{syncOutboxStatusLabel(row.status, t)}</StatusBadge>,
-                },
-                { key: "entityType", label: t("settings.sync.queueColumns.entity"), render: (row) => row.entityType },
-                { key: "entityId", label: t("settings.sync.queueColumns.entityId"), render: (row) => row.entityId },
-                { key: "operationType", label: t("settings.sync.queueColumns.operation"), render: (row) => row.operationType },
-                { key: "attemptCount", label: t("settings.sync.queueColumns.attempts"), align: "right", render: (row) => row.attemptCount },
-                { key: "updatedAt", label: t("settings.sync.queueColumns.updated"), render: (row) => formatDateLabel(row.updatedAt) },
-              ]}
-              emptyMessage={t("settings.sync.queueEmpty")}
-              rows={visibleRows}
-            />
-          </SurfaceCard>
-
-          <SurfaceCard title={t("settings.sync.detailCardTitle")} subtitle={summarizeSelection(activeRow)}>
-            {!activeRow ? (
-              <div className="empty-state">{t("settings.sync.detailEmpty")}</div>
-            ) : (
-              <div className="sync-outbox-detail-stack">
-                <div className="summary-grid">
-                  <div className="summary-row">
-                    <span className="summary-label">{t("settings.sync.detail.status")}</span>
-                    <span className="summary-value">{syncOutboxStatusLabel(activeRow.status, t)}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">{t("settings.sync.detail.entity")}</span>
-                    <span className="summary-value">{activeRow.entityType}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">{t("settings.sync.detail.entityId")}</span>
-                    <span className="summary-value">{activeRow.entityId}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">{t("settings.sync.detail.operation")}</span>
-                    <span className="summary-value">{activeRow.operationType}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">{t("settings.sync.detail.attempts")}</span>
-                    <span className="summary-value">{activeRow.attemptCount}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">{t("settings.sync.detail.nextRetry")}</span>
-                    <span className="summary-value">{formatDateLabel(activeRow.nextRetryAt)}</span>
-                  </div>
-                </div>
-
-                {activeRow.lastError ? (
-                  <div className="form-inline-error">{t("settings.sync.detail.lastError", { message: activeRow.lastError })}</div>
-                ) : null}
-
-                <div className="action-panel-actions action-panel-actions-start">
-                  <button
-                    className="ghost-control"
-                    disabled={retryingRowId === activeRow.id || (activeRow.status !== "failed" && activeRow.status !== "processing")}
-                    onClick={() => void retrySingleRow(activeRow.id)}
-                    type="button"
-                  >
-                    {retryingRowId === activeRow.id ? t("settings.sync.detail.retrying") : t("settings.sync.detail.retry")}
-                  </button>
-                  {resolveEntityNavigationPath(activeRow) ? (
-                    <button
-                      className="ghost-control"
-                      onClick={() => navigate(resolveEntityNavigationPath(activeRow)!)}
-                      type="button"
-                    >
-                      {t("settings.sync.detail.openEntity")}
-                    </button>
-                  ) : null}
-                </div>
-
-                <div className="sync-outbox-payload-block">
-                  <span className="summary-label">{t("settings.sync.detail.payload")}</span>
-                  <pre className="sync-outbox-payload">{activeRow.payloadJson}</pre>
-                </div>
+          ) : (
+            <div className="sync-xfer-panel">
+              <p className="sync-xfer-note">{t("settings.sync.transfers.downloadNote")}</p>
+              <div className="sync-coverage-grid">
+                {INBOUND_COVERAGE.map((entityType) => {
+                  const cursor = pullCursorByEntity.get(entityType);
+                  const hasError = Boolean(cursor?.lastError);
+                  const isPaused = !canCloudSync && Boolean(cursor) && !hasError;
+                  const isActive = canCloudSync && Boolean(cursor) && !hasError;
+                  const label = t(`settings.sync.coverage.${entityType}.label`);
+                  const detail = t(`settings.sync.coverage.${entityType}.detail`);
+                  return (
+                    <div className="sync-coverage-item" key={entityType}>
+                      <span className={`sync-coverage-icon${hasError ? " is-error" : isActive ? " is-active" : ""}`}>
+                        {hasError ? <AlertTriangle size={14} /> : isActive ? <CheckCircle2 size={14} /> : <CloudDownload size={14} />}
+                      </span>
+                      <div>
+                        <strong>{label}</strong>
+                        <small>
+                          {hasError
+                            ? cursor?.lastError
+                            : isPaused
+                              ? t("settings.sync.coveragePaused", { value: formatDateLabel(cursor?.updatedAt ?? null) })
+                              : cursor
+                                ? t("settings.sync.coverageRowsLatest", { count: cursor.lastPulledCount })
+                                : detail}
+                        </small>
+                      </div>
+                      <StatusBadge tone={hasError ? "critical" : isActive ? "success" : "neutral"}>
+                        {hasError
+                          ? t("settings.sync.coverageBadge.error")
+                          : isActive
+                            ? t("settings.sync.coverageBadge.active")
+                            : isPaused
+                              ? t("settings.sync.coverageBadge.paused")
+                              : t("settings.sync.coverageBadge.ready")}
+                      </StatusBadge>
+                    </div>
+                  );
+                })}
               </div>
-            )}
-          </SurfaceCard>
-        </ResizableSideRailLayout>
-      </SyncDisclosure>
+            </div>
+          )}
+        </SurfaceCard>
       </SettingsLayout>
     </div>
   );

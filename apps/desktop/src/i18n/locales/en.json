@@ -5084,6 +5084,93 @@
       "couldNotRetryRow": "The app could not retry that local sync row.",
       "couldNotRetryVisible": "The app could not retry the visible local sync rows.",
       "couldNotBackfill": "The app could not backfill operational sync snapshots.",
+      "connection": {
+        "live": "Live · changes land instantly",
+        "degraded": "Connected · no realtime",
+        "offline": "Offline",
+        "checking": "Checking connection…",
+        "paused": "Cloud sync paused",
+        "localOnly": "Working locally"
+      },
+      "health": {
+        "upToDate": {
+          "title": "Everything is in sync",
+          "detail": "Every change on this machine is safe in the cloud and on the other machines."
+        },
+        "syncing": {
+          "title_one": "Syncing {{count}} change…",
+          "title_other": "Syncing {{count}} changes…",
+          "detail": "The app is moving your changes. Nothing for you to do."
+        },
+        "failed": {
+          "title_one": "{{count}} item needs your attention",
+          "title_other": "{{count}} items need your attention",
+          "detail": "Something could not sync. Retry to resolve it.",
+          "action": "Retry"
+        },
+        "stale": {
+          "title_one": "{{count}} area is out of date",
+          "title_other": "{{count}} areas are out of date",
+          "detail": "No cloud changes have arrived in a while. Check for changes to catch up."
+        },
+        "paused": {
+          "title": "Working on this machine only",
+          "detail": "No cloud connection right now. Your changes are saved locally and will upload once you reconnect."
+        },
+        "conflicts": {
+          "title_one": "{{count}} conflict needs your decision",
+          "title_other": "{{count}} conflicts need your decision",
+          "detail": "You and someone else edited the same thing. Choose which version to keep below."
+        }
+      },
+      "feed": {
+        "title": "Upload activity",
+        "subtitle": "{{visible}} visible · {{total}} total",
+        "technical": "Show technical data"
+      },
+      "transfers": {
+        "title": "Transfers",
+        "uploadsTab": "Uploads",
+        "downloadsTab": "Downloads",
+        "filesProgress": "{{done}} of {{total}} · {{count}} files",
+        "downloadNote": "Areas stay current in the background; files download when you open them."
+      },
+      "conflicts": {
+        "title": "Conflicts",
+        "subtitle_one": "{{count}} item edited in two places at once",
+        "subtitle_other": "{{count}} items edited in two places at once",
+        "explainer": "You and someone else edited this at the same time. Which one do we keep?",
+        "keepMine": "Keep mine",
+        "takeCloud": "Take the cloud version",
+        "viewDiff": "View differences",
+        "hideDiff": "Hide differences",
+        "mineLabel": "Your version",
+        "cloudLabel": "Cloud version",
+        "resolvedTitle": "Conflict resolved",
+        "couldNotResolve": "The app could not resolve that conflict."
+      },
+      "entityNames": {
+        "asset_event": "Equipment",
+        "packing_slip": "Packing slip",
+        "incident": "Incident",
+        "rma_case": "RMA case",
+        "financial_entry": "Financial entry",
+        "invoice_extraction": "Invoice",
+        "invoice": "Invoice",
+        "quote": "Quote",
+        "bank_account": "Bank account",
+        "bank_transaction": "Bank transaction",
+        "transaction_link": "Transaction link",
+        "collaborator_fee": "Collaborator fee",
+        "collaborator_payment": "Collaborator payment",
+        "workspace_file": "File"
+      },
+      "operations": {
+        "create": "Created",
+        "update": "Updated",
+        "upsert": "Saved",
+        "delete": "Deleted"
+      },
       "toasts": {
         "actionComplete": "Sync action complete",
         "rowQueued": "Sync row queued",
@@ -5132,6 +5219,7 @@
         "staleDetail_other": "{{count}} sources have not been checked for several minutes.",
         "waiting": "Waiting for first download",
         "waitingDetail": "Open a remote workspace and the app will start pulling supported data.",
+        "paused": "Paused",
         "metrics": {
           "sources_one": "data area",
           "sources_other": "data areas",
@@ -5156,12 +5244,16 @@
         "retryingVisible": "Retrying visible…",
         "retryVisible": "Retry visible ({{count}})",
         "backfilling": "Backfilling operational…",
+        "syncNow": "Sync now",
+        "findChanges": "Check for cloud changes",
+        "findingChanges": "Checking for changes…",
+        "retryingProgress": "Retrying {{done}}/{{total}}…",
         "backfill": "Backfill operational data"
       },
       "coverageDisclosure": {
         "title": "Download coverage",
-        "summary_one": "{{count}} data area · {{errors}} errors",
-        "summary_other": "{{count}} data areas · {{errors}} errors"
+        "summary_one": "{{count}} data area · {{errors}} with a problem",
+        "summary_other": "{{count}} data areas · {{errors}} with a problem"
       },
       "coverageCard": "Download coverage",
       "coverage": {
@@ -5256,11 +5348,13 @@
       },
       "coverageRowsLatest": "{{count}} rows in latest pull",
       "coverageStale": "Last checked: {{value}}",
+      "coveragePaused": "Paused since {{value}}",
       "coverageBadge": {
         "error": "Error",
         "active": "Active",
         "stale": "Stale",
         "ready": "Available",
+        "paused": "Paused",
         "planned": "Planned"
       },
       "queueDisclosure": {

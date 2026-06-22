@@ -24,6 +24,7 @@ import treasuryUndoJournalSql from "../migrations/0023_treasury_undo_journal.sql
 import treasuryFiscalFieldsSql from "../migrations/0024_treasury_fiscal_fields.sql?raw";
 import softwareLicensesSql from "../migrations/0025_software_licenses.sql?raw";
 import crewPayrollRatesSql from "../migrations/0026_crew_payroll_rates.sql?raw";
+import syncConflictsSql from "../migrations/0027_sync_conflicts.sql?raw";
 
 const foundationMigrations = [
   { version: "0001_foundation", sql: foundationCoreSql },
@@ -52,6 +53,7 @@ const foundationMigrations = [
   { version: "0024_treasury_fiscal_fields", sql: treasuryFiscalFieldsSql },
   { version: "0025_software_licenses", sql: softwareLicensesSql },
   { version: "0026_crew_payroll_rates", sql: crewPayrollRatesSql },
+  { version: "0027_sync_conflicts", sql: syncConflictsSql },
 ] as const;
 
 const foundationMigrationSql = foundationMigrations.map((migration) => migration.sql).join("\n\n");

@@ -43,12 +43,13 @@ import { applyAssetQuantityFoundationMigration } from "./assetQuantityFoundation
 import { applyAssetValuationFoundationMigration } from "./assetValuationFoundationBootstrap";
 import { createAssetMutationService } from "./assetMutationService";
 import { createAssetSnapshotPullService } from "./assetSnapshotPullService";
-import { createOperationalSnapshotService } from "./operationalSnapshotService";
+import { applyOperationalSnapshotLocally, createOperationalSnapshotService } from "./operationalSnapshotService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
 import { createCatalogMutationService } from "./catalogMutationService";
 import { createAutomationControlPlanePullService } from "./automationControlPlanePullService";
 import { createCatalogPullService } from "./catalogPullService";
-import { createFinancialDomainPullService } from "./financialDomainPullService";
+import { applyFinancialEntryLocally, createFinancialDomainPullService } from "./financialDomainPullService";
+import { createSyncConflictService } from "./syncConflictService";
 import { applyConnectorFoundationMigration, bootstrapConnectorFoundation } from "./connectorFoundationBootstrap";
 import { applyCrewCatalogFoundationMigration } from "./crewCatalogFoundationBootstrap";
 import { deduplicateCrewCatalog } from "./crewCatalogDeduplicationBackfill";
@@ -239,6 +240,10 @@ type LocalDatabaseRuntime = {
   getSyncPullCursors: () => AppSyncPullCursorRow[];
   retrySyncOutboxRow: (id: string) => Promise<AppDiagnosticsSnapshot>;
   retryAllFailedSyncOutboxRows: () => Promise<AppDiagnosticsSnapshot>;
+  getSyncConflicts: (workspaceId: string) => import("@contracts").AppSyncConflictRow[];
+  resolveSyncConflict: (
+    command: import("@contracts").AppSyncConflictResolveCommand,
+  ) => import("@contracts").AppSyncConflictResolveResult;
   backfillOperationalSnapshots: (
     input: import("@contracts").AppOperationalBackfillCommand,
   ) => Promise<import("@contracts").AppOperationalBackfillResult>;
@@ -1467,6 +1472,32 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   };
 
   const operationalSnapshots = createOperationalSnapshotService(database);
+  const syncConflicts = createSyncConflictService(database, {
+    appliers: {
+      packing_slip: (db, conflict) =>
+        applyOperationalSnapshotLocally(db, {
+          workspaceId: conflict.workspaceId,
+          entityType: "packing_slip",
+          entityId: conflict.entityId,
+          remoteSnapshot: conflict.remoteSnapshot,
+        }),
+      incident: (db, conflict) =>
+        applyOperationalSnapshotLocally(db, {
+          workspaceId: conflict.workspaceId,
+          entityType: "incident",
+          entityId: conflict.entityId,
+          remoteSnapshot: conflict.remoteSnapshot,
+        }),
+      rma_case: (db, conflict) =>
+        applyOperationalSnapshotLocally(db, {
+          workspaceId: conflict.workspaceId,
+          entityType: "rma_case",
+          entityId: conflict.entityId,
+          remoteSnapshot: conflict.remoteSnapshot,
+        }),
+      financial_entry: (db, conflict) => applyFinancialEntryLocally(db, conflict.remoteSnapshot),
+    },
+  });
   const appSettings = createAppSettingsStore(app.getPath("userData"));
   const resolveWorkspaceFileUpload = (
     row: { workspace_id: string; entity_type: string; entity_id: string; operation_type: string },
@@ -1628,6 +1659,22 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     const retriedCount = syncOutboxWorker.retryAllFailedRows();
     logger.info("Queued failed sync outbox rows for retry.", { retriedCount });
     return await runLocalSyncNow();
+  };
+
+  const getSyncConflicts = (workspaceId: string) => syncConflicts.listConflicts(workspaceId);
+
+  const resolveSyncConflict = (
+    command: import("@contracts").AppSyncConflictResolveCommand,
+  ): import("@contracts").AppSyncConflictResolveResult => {
+    const conflict = syncConflicts.resolveConflict(command.conflictId, command.resolution);
+    return {
+      summary:
+        command.resolution === "take_remote"
+          ? "Conflict resolved with the cloud version."
+          : "Conflict resolved keeping your version.",
+      conflict,
+      diagnostics: getDiagnosticsSnapshot(),
+    };
   };
 
   const backfillOperationalSnapshots = async (input: import("@contracts").AppOperationalBackfillCommand) => {
@@ -2101,6 +2148,8 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     getSyncPullCursors,
     retrySyncOutboxRow,
     retryAllFailedSyncOutboxRows,
+    getSyncConflicts,
+    resolveSyncConflict,
     backfillOperationalSnapshots,
     exportRecentLogs: (filePath: string) => supportDiagnostics.exportRecentLogs(filePath),
     exportSupportBundle: (directoryPath: string) => supportDiagnostics.exportSupportBundle(directoryPath),

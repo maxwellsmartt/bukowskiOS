@@ -55,6 +55,10 @@ type RegisterAppIpcOptions = {
   getSyncPullCursors: () => import("@contracts").AppSyncPullCursorRow[];
   retrySyncOutboxRow: (id: string) => Promise<import("@contracts").AppDiagnosticsSnapshot>;
   retryAllFailedSyncOutboxRows: () => Promise<import("@contracts").AppDiagnosticsSnapshot>;
+  getSyncConflicts: (workspaceId: string) => import("@contracts").AppSyncConflictRow[];
+  resolveSyncConflict: (
+    command: import("@contracts").AppSyncConflictResolveCommand,
+  ) => import("@contracts").AppSyncConflictResolveResult;
   backfillOperationalSnapshots: (
     input: import("@contracts").AppOperationalBackfillCommand,
   ) => Promise<import("@contracts").AppOperationalBackfillResult>;
@@ -428,6 +432,13 @@ const backfillOperationalSnapshotsSchema = z.object({
   workspaceId: z.string().trim().min(1),
 });
 
+const getSyncConflictsReadArgsSchema = z.tuple([z.string().trim().min(1)]);
+
+const resolveSyncConflictSchema = z.object({
+  conflictId: z.string().trim().min(1),
+  resolution: z.enum(["keep_local", "take_remote"]),
+});
+
 const ensureLocalWorkspacesSchema = z.array(
   z.object({
     id: z.string().trim().min(1),
@@ -524,6 +535,8 @@ export const registerAppIpc = ({
   getSyncPullCursors,
   retrySyncOutboxRow,
   retryAllFailedSyncOutboxRows,
+  getSyncConflicts,
+  resolveSyncConflict,
   backfillOperationalSnapshots,
   exportRecentLogs,
   exportSupportBundle,
@@ -993,6 +1006,18 @@ export const registerAppIpc = ({
       diagnostics: await retryAllFailedSyncOutboxRows(),
     }),
     "The app could not retry the failed local sync rows.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.app.getSyncConflicts,
+    getSyncConflictsReadArgsSchema,
+    (_event, workspaceId: string) => getSyncConflicts(workspaceId),
+    "The app could not load sync conflicts.",
+  );
+  safeHandle(
+    ipcChannels.app.resolveSyncConflict,
+    resolveSyncConflictSchema,
+    (_event, input) => resolveSyncConflict(input as import("@contracts").AppSyncConflictResolveCommand),
+    "The app could not resolve that sync conflict.",
   );
   safeHandle(
     ipcChannels.app.backfillOperationalSnapshots,

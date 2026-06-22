@@ -3,6 +3,7 @@ import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { getDesktopLogger } from "../logger";
 import { adoptCanonicalCatalogId, type CatalogEntityType } from "./catalogPullService";
 import { isLocalTimestampAtLeastAsNew } from "./syncTimestampPolicy";
+import { isSensitiveConflictEntity, recordSyncConflict } from "./syncConflictService";
 
 const logger = getDesktopLogger("operational-snapshot-service");
 
@@ -984,6 +985,35 @@ const applyRmaSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown>) =
   for (const row of (snapshot.assets as Record<string, unknown>[] | undefined) ?? []) upsertRow(db, "rma_case_assets", row);
 };
 
+/**
+ * Force-applies a remote operational snapshot locally, bypassing the outbox/LWW
+ * guards. Used by the conflict review queue when the user chooses the cloud
+ * version. An empty snapshot means the remote side deleted the entity.
+ */
+export const applyOperationalSnapshotLocally = (
+  db: DatabaseSync,
+  input: {
+    workspaceId: string;
+    entityType: OperationalSnapshotEntityType;
+    entityId: string;
+    remoteSnapshot: Record<string, unknown> | null;
+  },
+) => {
+  if (!input.remoteSnapshot || Object.keys(input.remoteSnapshot).length === 0) {
+    deleteOperationalSnapshotLocally(db, input.entityType, input.entityId);
+    return;
+  }
+  if (input.entityType === "project") {
+    applyProjectSnapshot(db, input.remoteSnapshot, { workspaceId: input.workspaceId, projectId: input.entityId });
+  } else if (input.entityType === "packing_slip") {
+    applyPackingSnapshot(db, input.remoteSnapshot);
+  } else if (input.entityType === "incident") {
+    applyIncidentSnapshot(db, input.remoteSnapshot);
+  } else if (input.entityType === "rma_case") {
+    applyRmaSnapshot(db, input.remoteSnapshot);
+  }
+};
+
 export const createOperationalSnapshotService = (db: DatabaseSync) => ({
   enqueueBackfill(workspaceId: string): OperationalBackfillResult {
     const entityTypes: OperationalSnapshotEntityType[] = ["project", "packing_slip", "incident", "rma_case"];
@@ -1062,6 +1092,28 @@ export const createOperationalSnapshotService = (db: DatabaseSync) => ({
 
         if (hasPendingOutbox(db, workspaceId, entityType, row.entity_id)) {
           result.skippedDueToOutboxCount += 1;
+          // A remote change arrived for an entity that still has an unpushed
+          // local change. For sensitive entities we capture both sides for human
+          // review instead of silently dropping the remote (last-writer-wins).
+          if (isSensitiveConflictEntity(entityType)) {
+            const localUpdatedAt = readLocalUpdatedAt(db, entityType, row.entity_id);
+            const localSnapshot = resolveOperationalSnapshot(db, {
+              workspace_id: workspaceId,
+              entity_type: entityType,
+              entity_id: row.entity_id,
+              updated_at: localUpdatedAt ?? row.updated_at,
+            });
+            recordSyncConflict(db, {
+              workspaceId,
+              entityType,
+              entityId: row.entity_id,
+              operationType: row.deleted_at ? "delete" : "update",
+              localUpdatedAt,
+              remoteUpdatedAt: row.updated_at,
+              localSnapshot: localSnapshot?.snapshot_json ?? null,
+              remoteSnapshot: row.deleted_at ? {} : row.snapshot_json,
+            });
+          }
           result.cursorAfter = row.updated_at;
           continue;
         }

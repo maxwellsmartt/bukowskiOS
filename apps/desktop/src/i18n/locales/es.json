@@ -5088,6 +5088,93 @@
       "couldNotRetryRow": "La app no pudo reintentar esa fila de sincronización.",
       "couldNotRetryVisible": "La app no pudo reintentar las filas visibles.",
       "couldNotBackfill": "La app no pudo hacer el backfill de los snapshots operativos.",
+      "connection": {
+        "live": "En vivo · cambios al instante",
+        "degraded": "Conectado · sin tiempo real",
+        "offline": "Sin conexión",
+        "checking": "Verificando conexión…",
+        "paused": "Sin conexión a la nube",
+        "localOnly": "Trabajando local"
+      },
+      "health": {
+        "upToDate": {
+          "title": "Todo sincronizado",
+          "detail": "Cada cambio de este equipo está a salvo en la nube y en los demás."
+        },
+        "syncing": {
+          "title_one": "Sincronizando {{count}} cambio…",
+          "title_other": "Sincronizando {{count}} cambios…",
+          "detail": "La app está moviendo tus cambios. No necesitas hacer nada."
+        },
+        "failed": {
+          "title_one": "{{count}} elemento necesita tu atención",
+          "title_other": "{{count}} elementos necesitan tu atención",
+          "detail": "Algo no se pudo sincronizar. Reintenta para resolverlo.",
+          "action": "Reintentar"
+        },
+        "stale": {
+          "title_one": "{{count}} área no se ha actualizado",
+          "title_other": "{{count}} áreas no se han actualizado",
+          "detail": "Hace un rato que no llegan cambios de la nube. Busca cambios para ponerte al día."
+        },
+        "paused": {
+          "title": "Trabajando solo en este equipo",
+          "detail": "Sin conexión a la nube por ahora. Tus cambios se guardan local y subirán cuando vuelvas a conectarte."
+        },
+        "conflicts": {
+          "title_one": "{{count}} conflicto necesita tu decisión",
+          "title_other": "{{count}} conflictos necesitan tu decisión",
+          "detail": "Tú y otra persona editaron lo mismo. Elige qué versión conservar abajo."
+        }
+      },
+      "feed": {
+        "title": "Actividad de subida",
+        "subtitle": "{{visible}} visibles · {{total}} en total",
+        "technical": "Ver datos técnicos"
+      },
+      "transfers": {
+        "title": "Transferencias",
+        "uploadsTab": "Subidas",
+        "downloadsTab": "Bajadas",
+        "filesProgress": "{{done}} de {{total}} · {{count}} archivos",
+        "downloadNote": "Las áreas se mantienen al día en segundo plano; los archivos se descargan al abrirlas."
+      },
+      "conflicts": {
+        "title": "Conflictos",
+        "subtitle_one": "{{count}} elemento editado en dos lugares a la vez",
+        "subtitle_other": "{{count}} elementos editados en dos lugares a la vez",
+        "explainer": "Tú y otra persona editaron esto al mismo tiempo. ¿Cuál conservamos?",
+        "keepMine": "Conservar lo mío",
+        "takeCloud": "Traer lo de la nube",
+        "viewDiff": "Ver diferencias",
+        "hideDiff": "Ocultar diferencias",
+        "mineLabel": "Tu versión",
+        "cloudLabel": "Versión de la nube",
+        "resolvedTitle": "Conflicto resuelto",
+        "couldNotResolve": "La app no pudo resolver ese conflicto."
+      },
+      "entityNames": {
+        "asset_event": "Equipo",
+        "packing_slip": "Hoja de empaque",
+        "incident": "Incidencia",
+        "rma_case": "Caso RMA",
+        "financial_entry": "Movimiento financiero",
+        "invoice_extraction": "Factura",
+        "invoice": "Factura",
+        "quote": "Cotización",
+        "bank_account": "Cuenta bancaria",
+        "bank_transaction": "Movimiento bancario",
+        "transaction_link": "Vínculo de transacción",
+        "collaborator_fee": "Honorario de colaborador",
+        "collaborator_payment": "Pago a colaborador",
+        "workspace_file": "Archivo"
+      },
+      "operations": {
+        "create": "Creado",
+        "update": "Actualizado",
+        "upsert": "Guardado",
+        "delete": "Eliminado"
+      },
       "toasts": {
         "actionComplete": "Acción de sincronización completada",
         "rowQueued": "Fila reencolada",
@@ -5136,6 +5223,7 @@
         "staleDetail_other": "{{count}} fuentes no se verifican desde hace varios minutos.",
         "waiting": "Esperando la primera bajada",
         "waitingDetail": "Abre un workspace remoto y la app empezará a traer los datos soportados.",
+        "paused": "En pausa",
         "metrics": {
           "sources_one": "área de datos",
           "sources_other": "áreas de datos",
@@ -5160,12 +5248,16 @@
         "retryingVisible": "Reintentando visibles…",
         "retryVisible": "Reintentar visibles ({{count}})",
         "backfilling": "Procesando backfill…",
+        "syncNow": "Sincronizar ahora",
+        "findChanges": "Buscar cambios en la nube",
+        "findingChanges": "Buscando cambios…",
+        "retryingProgress": "Reintentando {{done}}/{{total}}…",
         "backfill": "Hacer backfill de datos operativos"
       },
       "coverageDisclosure": {
         "title": "Cobertura de bajada",
-        "summary_one": "{{count}} área de datos · {{errors}} errores",
-        "summary_other": "{{count}} áreas de datos · {{errors}} errores"
+        "summary_one": "{{count}} área de datos · {{errors}} con problema",
+        "summary_other": "{{count}} áreas de datos · {{errors}} con problema"
       },
       "coverageCard": "Cobertura de bajada",
       "coverage": {
@@ -5260,11 +5352,13 @@
       },
       "coverageRowsLatest": "{{count}} filas en la última bajada",
       "coverageStale": "Última verificación: {{value}}",
+      "coveragePaused": "En pausa desde {{value}}",
       "coverageBadge": {
         "error": "Error",
         "active": "Activa",
         "stale": "Desactualizada",
         "ready": "Disponible",
+        "paused": "En pausa",
         "planned": "Planeada"
       },
       "queueDisclosure": {

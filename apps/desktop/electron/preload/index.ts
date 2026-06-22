@@ -62,6 +62,9 @@ import type {
   AppSyncPullCursorRow,
   AppSyncStatusSnapshot,
   AppSyncOutboxRow,
+  AppSyncConflictRow,
+  AppSyncConflictResolveCommand,
+  AppSyncConflictResolveResult,
   AppUploadUserAvatarCommand,
   AppUploadWorkspaceImageAssetCommand,
   AppUpsertUserProfileCommand,
@@ -277,6 +280,10 @@ const bukowskiApp = {
     ipcRenderer.invoke(ipcChannels.app.retrySyncOutboxRow, id) as Promise<AppActionResult>,
   retryAllFailedSyncOutboxRows: () =>
     ipcRenderer.invoke(ipcChannels.app.retryAllFailedSyncOutboxRows) as Promise<AppActionResult>,
+  getSyncConflicts: (workspaceId: string) =>
+    ipcRenderer.invoke(ipcChannels.app.getSyncConflicts, workspaceId) as Promise<AppSyncConflictRow[]>,
+  resolveSyncConflict: (command: AppSyncConflictResolveCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.resolveSyncConflict, command) as Promise<AppSyncConflictResolveResult>,
   backfillOperationalSnapshots: (input: AppOperationalBackfillCommand) =>
     ipcRenderer.invoke(ipcChannels.app.backfillOperationalSnapshots, input) as Promise<AppOperationalBackfillResult>,
   exportWorkspaceData: () => ipcRenderer.invoke(ipcChannels.app.exportWorkspaceData) as Promise<AppExportResult>,

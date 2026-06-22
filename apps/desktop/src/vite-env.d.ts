@@ -211,6 +211,10 @@ declare global {
       getSyncStatusSnapshot: () => Promise<import("@contracts").AppSyncStatusSnapshot>;
       retrySyncOutboxRow: (id: string) => Promise<AppActionResult>;
       retryAllFailedSyncOutboxRows: () => Promise<AppActionResult>;
+      getSyncConflicts: (workspaceId: string) => Promise<import("@contracts").AppSyncConflictRow[]>;
+      resolveSyncConflict: (
+        command: import("@contracts").AppSyncConflictResolveCommand,
+      ) => Promise<import("@contracts").AppSyncConflictResolveResult>;
       backfillOperationalSnapshots: (
         input: AppOperationalBackfillCommand,
       ) => Promise<AppOperationalBackfillResult>;
