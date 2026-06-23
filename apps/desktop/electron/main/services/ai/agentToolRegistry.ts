@@ -1225,6 +1225,38 @@ export const createAgentToolRegistry = (
       },
     },
     {
+      name: "assess_repair_or_replace",
+      requiredPermission: "incidents.read",
+      description:
+        "Decision support for a damaged asset: compares the incident's repair cost to the asset's replacement value and failure history, and recommends repair vs replace. Pass incident_id (preferred) or asset_id.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          incident_id: { type: "string" },
+          asset_id: { type: "string" },
+        },
+      },
+      execute: (args) => {
+        const assessment = foundationReads.assessRepairOrReplace({
+          incidentId: asOptionalString(args.incident_id),
+          assetId: asOptionalString(args.asset_id),
+        });
+
+        if (!assessment) {
+          return {
+            summary: "Could not assess: provide a valid incident_id or asset_id with a linked asset.",
+            payload: { found: false },
+          };
+        }
+
+        return {
+          summary: `Recommendation for ${assessment.asset.name}: ${assessment.recommendation}. ${assessment.reason}`,
+          payload: { found: true, ...assessment },
+        };
+      },
+    },
+    {
       name: "get_financial_exposure_summary",
       requiredPermission: "finance.read",
       description: "Return a compact finance exposure summary by project.",

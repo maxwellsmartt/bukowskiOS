@@ -3736,6 +3736,106 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
     };
   },
 
+  // Decision support: bridges an incident's repair cost to the asset's
+  // replacement value and failure history to recommend repair vs replace.
+  assessRepairOrReplace(input: { incidentId?: string | null; assetId?: string | null }) {
+    const incident = input?.incidentId
+      ? (db
+          .prepare(
+            `SELECT id, title, status, cost_estimate, currency, asset_id FROM incidents WHERE id = ? LIMIT 1`,
+          )
+          .get(input.incidentId) as
+          | { id: string; title: string; status: string; cost_estimate: number | null; currency: string | null; asset_id: string | null }
+          | undefined)
+      : undefined;
+
+    const assetId = (input?.assetId ?? incident?.asset_id ?? "").trim();
+    if (!assetId) {
+      return null;
+    }
+
+    const asset = db
+      .prepare(
+        `SELECT id, name, internal_code, purchase_price, additional_costs, replacement_value, current_book_value
+           FROM assets WHERE id = ? LIMIT 1`,
+      )
+      .get(assetId) as
+      | {
+          id: string;
+          name: string;
+          internal_code: string | null;
+          purchase_price: number | null;
+          additional_costs: number | null;
+          replacement_value: number | null;
+          current_book_value: number | null;
+        }
+      | undefined;
+
+    if (!asset) {
+      return null;
+    }
+
+    const replacementValue =
+      asset.current_book_value ??
+      asset.replacement_value ??
+      ((asset.purchase_price ?? 0) + (asset.additional_costs ?? 0) || null);
+    const repairCost = typeof incident?.cost_estimate === "number" ? incident.cost_estimate : null;
+
+    const incidentCounts = db
+      .prepare(
+        `SELECT
+           COUNT(*) AS total,
+           SUM(CASE WHEN status IN ('Open', 'In review') THEN 1 ELSE 0 END) AS open
+         FROM incidents WHERE asset_id = ?`,
+      )
+      .get(assetId) as { total: number; open: number };
+    const totalIncidents = incidentCounts?.total ?? 0;
+    const openIncidents = incidentCounts?.open ?? 0;
+
+    const ratio = repairCost !== null && replacementValue ? repairCost / replacementValue : null;
+
+    // Recommendation: replace when repairing costs a large share of replacement
+    // value, or when the asset fails chronically; repair when clearly cheaper;
+    // otherwise flag for human review when data is incomplete.
+    let recommendation: "repair" | "replace" | "review";
+    let reason: string;
+    if (ratio === null) {
+      recommendation = "review";
+      reason = repairCost === null
+        ? "El incidente aún no tiene costo de reparación estimado; estímalo para poder comparar."
+        : "El activo no tiene valor de reemplazo/registro; complétalo para poder comparar.";
+    } else if (ratio >= 0.6) {
+      recommendation = "replace";
+      reason = `Reparar cuesta ~${Math.round(ratio * 100)}% del valor de reemplazo; conviene reemplazar.`;
+    } else if (totalIncidents >= 3) {
+      recommendation = "replace";
+      reason = `El activo acumula ${totalIncidents} incidentes (fallas recurrentes); reemplazar reduce riesgo operativo.`;
+    } else {
+      recommendation = "repair";
+      reason = `Reparar cuesta ~${Math.round(ratio * 100)}% del valor de reemplazo; reparar es más económico.`;
+    }
+
+    return {
+      asset: {
+        id: asset.id,
+        name: asset.name,
+        code: asset.internal_code ?? "—",
+        replacementValueAmount: replacementValue,
+        replacementValue: formatCurrency(replacementValue),
+      },
+      incident: incident
+        ? { id: incident.id, title: incident.title, status: incident.status }
+        : null,
+      repairCostAmount: repairCost,
+      repairCost: formatCurrency(repairCost),
+      repairToReplaceRatio: ratio !== null ? Math.round(ratio * 100) / 100 : null,
+      totalIncidents,
+      openIncidents,
+      recommendation,
+      reason,
+    };
+  },
+
   getOpenInvoices(limit = 8) {
     const rows = db
       .prepare(
