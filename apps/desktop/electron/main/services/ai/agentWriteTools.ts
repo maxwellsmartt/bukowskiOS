@@ -15,6 +15,8 @@ import type { createProjectMutationService } from "../data/projectMutationServic
 import type { createAssetMutationService } from "../data/assetMutationService";
 import type { createFinanceMutationService } from "../data/financeMutationService";
 import type { createQuoteMutationService } from "../data/quoteMutationService";
+import type { createInvoiceMutationService } from "../data/invoiceMutationService";
+import type { createQuoteReadService } from "../data/quoteReadService";
 import type { createTreasuryMutationService } from "../data/treasuryMutationService";
 import type { createNotificationLocalService } from "../data/notificationLocalService";
 import type { CommunicationsSendService } from "../data/communicationsSendService";
@@ -37,6 +39,8 @@ export type AgentWriteServices = {
   assets: ReturnType<typeof createAssetMutationService>;
   finance: ReturnType<typeof createFinanceMutationService>;
   quotes: ReturnType<typeof createQuoteMutationService>;
+  invoices?: ReturnType<typeof createInvoiceMutationService>;
+  quoteReads?: Pick<ReturnType<typeof createQuoteReadService>, "getQuoteDetail">;
   treasury: ReturnType<typeof createTreasuryMutationService>;
   notifications?: NotificationTaskToolsService;
   communications?: CommunicationsSendService;
@@ -215,6 +219,20 @@ const requireNotifications = (services: AgentWriteServices) => {
   return services.notifications;
 };
 
+const requireInvoices = (services: AgentWriteServices) => {
+  if (!services.invoices) {
+    throw new Error("Invoice creation is not available on this device.");
+  }
+  return services.invoices;
+};
+
+const requireQuoteReads = (services: AgentWriteServices) => {
+  if (!services.quoteReads) {
+    throw new Error("Quote detail reads are not available on this device.");
+  }
+  return services.quoteReads;
+};
+
 const normalizeNonNegativeInteger = (value: unknown, fallback: number) => {
   const nextValue = asNumber(value);
   if (nextValue === undefined) {
@@ -256,6 +274,27 @@ const buildAssetSelections = (value: unknown) =>
         })
         .filter((entry) => entry.assetId)
     : [];
+
+const buildQuoteItems = (value: unknown) => {
+  const rawItems = Array.isArray(value) ? value : [];
+  return rawItems.map((entry, index) => {
+    const item = entry as Record<string, unknown>;
+    return {
+      sortOrder: index,
+      quantity: asNumber(item.quantity) ?? 1,
+      title: asString(item.title),
+      description: asOptionalString(item.description) ?? null,
+      durationValue: asNumber(item.duration_value) ?? null,
+      durationUnit: normalizeQuoteDurationUnit(item.duration_unit),
+      unitPrice: asNumber(item.unit_price) ?? 0,
+      discountRate: asNumber(item.discount_rate) ?? null,
+      discountAmount: asNumber(item.discount_amount) ?? null,
+      taxBehavior: normalizeQuoteTaxBehavior(item.tax_behavior),
+      taxRate: asNumber(item.tax_rate) ?? null,
+      notes: asOptionalString(item.notes) ?? null,
+    };
+  });
+};
 
 export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteToolDefinition[] => [
   {
@@ -1455,24 +1494,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
       const workspaceId = requireWorkspaceId(context);
       const currency = (asOptionalString(args.currency) ?? "DOP").toUpperCase();
       const baseCurrency = (asOptionalString(args.base_currency) ?? currency).toUpperCase();
-      const rawItems = Array.isArray(args.items) ? args.items : [];
-      const items = rawItems.map((entry, index) => {
-        const item = entry as Record<string, unknown>;
-        return {
-          sortOrder: index,
-          quantity: asNumber(item.quantity) ?? 1,
-          title: asString(item.title),
-          description: asOptionalString(item.description) ?? null,
-          durationValue: asNumber(item.duration_value) ?? null,
-          durationUnit: normalizeQuoteDurationUnit(item.duration_unit),
-          unitPrice: asNumber(item.unit_price) ?? 0,
-          discountRate: asNumber(item.discount_rate) ?? null,
-          discountAmount: asNumber(item.discount_amount) ?? null,
-          taxBehavior: normalizeQuoteTaxBehavior(item.tax_behavior),
-          taxRate: asNumber(item.tax_rate) ?? null,
-          notes: asOptionalString(item.notes) ?? null,
-        };
-      });
+      const items = buildQuoteItems(args.items);
 
       const result = services.quotes.createQuote({
         commandId: newCommandId("agent-quote"),
@@ -1554,6 +1576,163 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
       return {
         summary: result.summary,
         payload: { quoteId: result.quoteId, quoteNumber: result.quoteNumber, repeated: result.repeated },
+      };
+    },
+  },
+
+  {
+    name: "update_quote_draft",
+    requiredPermission: "finance.manage",
+    description:
+      "Update a saved quote draft. Requires approval. Use get_quote_detail first and pass the full intended draft header/items; only draft quotes can be edited.",
+    requiresApproval: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["quote_id", "client_name", "items"],
+      properties: {
+        quote_id: { type: "string" },
+        change_summary: { type: "string" },
+        quote_date: { type: "string", description: "YYYY-MM-DD. Defaults to today." },
+        validity_days: { type: "number" },
+        client_id: { type: "string" },
+        client_name: { type: "string" },
+        client_rnc: { type: "string" },
+        production_company_id: { type: "string" },
+        production_company_name: { type: "string" },
+        production_pur: { type: "string" },
+        workspace_sirecine: { type: "string" },
+        attention_name: { type: "string" },
+        attention_phone: { type: "string" },
+        project_id: { type: "string" },
+        project_name: { type: "string" },
+        production_name: { type: "string" },
+        description: { type: "string" },
+        package_title: { type: "string" },
+        currency: { type: "string", description: "Defaults to DOP." },
+        base_currency: { type: "string", description: "Defaults to currency." },
+        exchange_rate: { type: "number", description: "Defaults to 1." },
+        tax_profile: { type: "string", enum: ["film_law_exempt", "standard_itbis", "mixed", "manual"] },
+        itbis_rate: { type: "number", description: "Defaults to 0.18." },
+        tax_added_to_total: { type: "boolean", description: "Defaults to true." },
+        tax_notes: { type: "string" },
+        discount_rate: { type: "number" },
+        discount_amount: { type: "number" },
+        observations: { type: "string" },
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["title", "quantity", "unit_price"],
+            properties: {
+              title: { type: "string" },
+              description: { type: "string" },
+              quantity: { type: "number" },
+              unit_price: { type: "number" },
+              duration_value: { type: "number" },
+              duration_unit: { type: "string", enum: ["day", "week", "month", "unit", "flat"] },
+              discount_rate: { type: "number" },
+              discount_amount: { type: "number" },
+              tax_behavior: { type: "string", enum: ["follows_quote", "taxable", "exempt", "show_only", "included"] },
+              tax_rate: { type: "number" },
+              notes: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const quoteId = asString(args.quote_id);
+      if (!quoteId) throw new Error("quote_id is required.");
+      const currency = (asOptionalString(args.currency) ?? "DOP").toUpperCase();
+      const baseCurrency = (asOptionalString(args.base_currency) ?? currency).toUpperCase();
+      const items = buildQuoteItems(args.items);
+
+      const result = services.quotes.updateQuote({
+        commandId: newCommandId("agent-quote-update"),
+        workspaceId,
+        quoteId,
+        actorType: "agent",
+        sourceChannel: resolveSourceChannel(context),
+        quoteDate: asOptionalString(args.quote_date) ?? currentDateOnly(),
+        validityDays: Math.max(1, Math.floor(asNumber(args.validity_days) ?? 30)),
+        clientId: asOptionalString(args.client_id) ?? null,
+        clientNameSnapshot: asString(args.client_name),
+        clientRncSnapshot: asOptionalString(args.client_rnc) ?? null,
+        productionCompanyId: asOptionalString(args.production_company_id) ?? null,
+        productionCompanyNameSnapshot: asOptionalString(args.production_company_name) ?? null,
+        productionPurSnapshot: asOptionalString(args.production_pur) ?? null,
+        workspaceSirecineSnapshot: asOptionalString(args.workspace_sirecine) ?? null,
+        attentionName: asOptionalString(args.attention_name) ?? null,
+        attentionPhone: asOptionalString(args.attention_phone) ?? null,
+        projectId: resolveOptionalProjectId(services, workspaceId, args.project_id),
+        projectNameSnapshot: asOptionalString(args.project_name) ?? null,
+        productionName: asOptionalString(args.production_name) ?? null,
+        description: asOptionalString(args.description) ?? null,
+        packageTitle: asOptionalString(args.package_title) ?? null,
+        currency,
+        baseCurrency,
+        exchangeRate: asNumber(args.exchange_rate) ?? 1,
+        exchangeRateSource: "manual",
+        exchangeRateType: "manual",
+        exchangeRateEffectiveDate: null,
+        taxProfile: normalizeQuoteTaxProfile(args.tax_profile),
+        itbisRate: asNumber(args.itbis_rate) ?? 0.18,
+        taxAddedToTotal: asBoolean(args.tax_added_to_total) ?? true,
+        taxNotes: asOptionalString(args.tax_notes) ?? null,
+        discountRate: asNumber(args.discount_rate) ?? null,
+        discountAmount: asNumber(args.discount_amount) ?? null,
+        observations: asOptionalString(args.observations) ?? null,
+        items,
+        changeSummary: asOptionalString(args.change_summary) ?? "Updated by agent.",
+      });
+
+      return {
+        summary: result.summary,
+        payload: { quoteId: result.quoteId, quoteNumber: result.quoteNumber, repeated: result.repeated },
+      };
+    },
+  },
+
+  {
+    name: "create_invoice_from_quote",
+    requiredPermission: "invoices.create",
+    description:
+      "Create a draft invoice from an approved quote. Requires approval. The quote must be approved and must not already have an active invoice.",
+    requiresApproval: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["quote_id"],
+      properties: {
+        quote_id: { type: "string" },
+        issue_date: { type: "string", description: "YYYY-MM-DD. Defaults to today." },
+        payment_terms_days: { type: "number", description: "Defaults to quote/invoice service fallback." },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const quoteId = asString(args.quote_id);
+      if (!quoteId) throw new Error("quote_id is required.");
+      const quote = requireQuoteReads(services).getQuoteDetail(workspaceId, quoteId);
+      if (!quote) throw new Error("Quote not found.");
+      if (quote.status !== "approved") {
+        throw new Error(`Only approved quotes can generate invoices (current status: ${quote.status}).`);
+      }
+
+      const result = requireInvoices(services).createInvoiceFromQuote(quote, {
+        commandId: newCommandId("agent-invoice-from-quote"),
+        actorType: "agent",
+        sourceChannel: resolveSourceChannel(context),
+        issueDate: asOptionalString(args.issue_date),
+        paymentTermsDays: asNumber(args.payment_terms_days),
+      });
+
+      return {
+        summary: result.summary,
+        payload: { invoiceId: result.invoiceId, invoiceNumber: result.invoiceNumber, repeated: result.repeated },
       };
     },
   },

@@ -1,5 +1,5 @@
 {
-  "version": "v8",
+  "version": "v9",
   "system_managed_fields": [
     "agent_key",
     "agent_type",
@@ -86,6 +86,8 @@
         "assign_move_assets",
         "update_project_unit",
         "delete_project_unit",
+        "update_quote_draft",
+        "create_invoice_from_quote",
         "get_financial_priorities"
       ],
       "allowed_domains_json": [
@@ -260,8 +262,8 @@
       "emoji": "$",
       "icon_key": "banknote",
       "agent_type": "specialist",
-      "role_summary": "Reads operational financial exposure, costs and replacement-value signals.",
-      "mission": "Read operational financial exposure, cost estimates, replacement values, and project-linked economic signals.",
+      "role_summary": "Reads operational financial exposure and prepares quote/invoice lifecycle actions with approval.",
+      "mission": "Read operational financial exposure, cost estimates, replacement values, project-linked economic signals, and prepare safe quote/invoice lifecycle actions when authorized.",
       "soul": "The Finance Agent is not accounting yet. It translates operations into money.",
       "domain_key": "finance",
       "provider_key": "openai",
@@ -288,6 +290,10 @@
         "search_quotes",
         "explain_quote_total",
         "prepare_quote_draft",
+        "create_quote",
+        "update_quote_draft",
+        "set_quote_status",
+        "create_invoice_from_quote",
         "get_project_detail",
         "get_financial_priorities"
       ],
@@ -310,10 +316,10 @@
         "Project exposure",
         "Incidents with financial impact"
       ],
-      "notes": "Not full accounting. Focused on operational financial visibility.",
-      "base_prompt": "You are the Finance Agent inside BukowskiOS. You specialize in operational financial visibility: exchange rates, estimated costs, financial exposure, replacement values, project-linked economic signals, and incident-related cost awareness. You are not a full accounting engine in this phase. Use read-only tools and respond with grounded, compact financial summaries. For exchange-rate questions, always call get_exchange_rates, compare_exchange_rates, or get_exchange_rate_history first. Explain buy vs sell clearly: buy is what the bank pays when Metadata sells USD/EUR for DOP; sell is what Metadata pays when buying USD/EUR with DOP.",
+      "notes": "Not full accounting. Focused on operational financial visibility plus quote/invoice lifecycle actions behind approval.",
+      "base_prompt": "You are the Finance Agent inside BukowskiOS. You specialize in operational financial visibility: exchange rates, estimated costs, financial exposure, replacement values, project-linked economic signals, quote drafts, quote status, and invoice handoff from approved quotes. You are not a full accounting engine in this phase. Use read tools first and respond with grounded, compact financial summaries. Any mutation such as create_quote, update_quote_draft, set_quote_status, or create_invoice_from_quote requires approval and effective permissions; never claim it happened until the tool result confirms execution. For exchange-rate questions, always call get_exchange_rates, compare_exchange_rates, or get_exchange_rate_history first. Explain buy vs sell clearly: buy is what the bank pays when Metadata sells USD/EUR for DOP; sell is what Metadata pays when buying USD/EUR with DOP.",
       "can_create_draft_runs": true,
-      "can_execute_write_actions": false,
+      "can_execute_write_actions": true,
       "is_system_agent": true,
       "visibility": "public",
       "is_supervisor": false,
@@ -471,6 +477,7 @@
         "search_assets",
         "create_packing_slip",
         "create_quote",
+        "update_quote_draft",
         "ask_user_choice",
         "get_project_detail",
         "get_project_conflicts",
@@ -478,6 +485,7 @@
         "search_active_projects",
         "get_asset_availability",
         "set_quote_status",
+        "create_invoice_from_quote",
         "get_quote_detail"
       ],
       "allowed_domains_json": [

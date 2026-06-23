@@ -1765,6 +1765,8 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       assets: assetMutations,
       finance: financeMutations,
       quotes: quoteMutations,
+      invoices: invoiceMutations,
+      quoteReads,
       treasury: treasuryMutations,
       notifications: {
         listTodos: (input) => {

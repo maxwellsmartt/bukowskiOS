@@ -8,6 +8,9 @@ import { createAgentReadService } from "../../electron/main/services/data/agentR
 import { createAssetMutationService } from "../../electron/main/services/data/assetMutationService";
 import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
 import { applyNotificationLocalMigration, createNotificationLocalService } from "../../electron/main/services/data/notificationLocalService";
+import { createQuoteMutationService } from "../../electron/main/services/data/quoteMutationService";
+import { createQuoteReadService } from "../../electron/main/services/data/quoteReadService";
+import { createInvoiceMutationService } from "../../electron/main/services/data/invoiceMutationService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("agent tool registry", () => {
@@ -119,6 +122,8 @@ describe("agent tool registry", () => {
         "complete_todo",
         "update_reminder",
         "cancel_reminder",
+        "update_quote_draft",
+        "create_invoice_from_quote",
       ]),
     );
 
@@ -136,6 +141,8 @@ describe("agent tool registry", () => {
     expect(registry.requiresApproval("complete_todo")).toBe(false);
     expect(registry.requiresApproval("update_reminder")).toBe(false);
     expect(registry.requiresApproval("cancel_reminder")).toBe(false);
+    expect(registry.requiresApproval("update_quote_draft")).toBe(true);
+    expect(registry.requiresApproval("create_invoice_from_quote")).toBe(true);
     expect(registry.requiresApproval("get_asset_availability")).toBe(false);
 
     const approvalRequiredToolNames = [
@@ -149,12 +156,129 @@ describe("agent tool registry", () => {
       "assign_move_assets",
       "update_project_unit",
       "delete_project_unit",
+      "update_quote_draft",
+      "create_invoice_from_quote",
     ];
     const writeDefs = registry.definitions.filter((tool) => approvalRequiredToolNames.includes(tool.name));
     expect(writeDefs).toHaveLength(approvalRequiredToolNames.length);
     for (const tool of writeDefs) {
       expect((tool as { requiresApproval?: boolean }).requiresApproval).toBe(true);
     }
+
+    cleanup();
+  });
+
+  it("updates quote drafts and creates invoices from approved quotes with separate permissions", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-finance-writes");
+    const secretStore = { hasProviderSecret: () => false };
+    const noopMutation = (label: string) =>
+      new Proxy({}, {
+        get: () => () => {
+          throw new Error(`mutation '${label}' should not be invoked in this test`);
+        },
+      });
+    const quoteMutations = createQuoteMutationService(database);
+    const quoteReads = createQuoteReadService(database);
+    const invoiceMutations = createInvoiceMutationService(database);
+    const created = quoteMutations.createQuote({
+      commandId: "cmd-agent-finance-quote-create",
+      workspaceId: "workspace-metadata",
+      actorType: "agent",
+      sourceChannel: "desktop",
+      quoteDate: "2026-06-23",
+      validityDays: 15,
+      clientNameSnapshot: "Metadata Client",
+      currency: "DOP",
+      baseCurrency: "DOP",
+      exchangeRate: 1,
+      exchangeRateSource: "manual",
+      exchangeRateType: "manual",
+      taxProfile: "standard_itbis",
+      itbisRate: 0.18,
+      taxAddedToTotal: true,
+      items: [
+        {
+          sortOrder: 0,
+          quantity: 1,
+          title: "Camera package",
+          unitPrice: 1000,
+          taxBehavior: "follows_quote",
+        },
+      ],
+    });
+
+    const registry = createAgentToolRegistry(createFoundationReadService(database), {
+      getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      writeServices: {
+        quotes: quoteMutations,
+        quoteReads,
+        invoices: invoiceMutations,
+        assets: noopMutation("assets"),
+        packing: noopMutation("packing"),
+        projects: noopMutation("projects"),
+        incidents: noopMutation("incidents"),
+        rma: noopMutation("rma"),
+        finance: noopMutation("finance"),
+        treasury: noopMutation("treasury"),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    });
+
+    const updateResult = registry.execute(
+      "update_quote_draft",
+      JSON.stringify({
+        quote_id: created.quoteId,
+        client_name: "Metadata Client Updated",
+        quote_date: "2026-06-23",
+        validity_days: 20,
+        currency: "DOP",
+        base_currency: "DOP",
+        exchange_rate: 1,
+        items: [{ title: "Camera package updated", quantity: 2, unit_price: 1200 }],
+      }),
+      { workspaceId: "workspace-metadata", userPermissions: ["finance.manage"] },
+      { allowedToolNames: ["update_quote_draft"] },
+    );
+
+    expect(updateResult.result.payload.quoteId).toBe(created.quoteId);
+    expect(quoteReads.getQuoteDetail("workspace-metadata", created.quoteId)?.items[0]?.quantity).toBe(2);
+
+    quoteMutations.setStatus({
+      commandId: "cmd-agent-finance-quote-sent",
+      workspaceId: "workspace-metadata",
+      actorType: "agent",
+      sourceChannel: "desktop",
+      quoteId: created.quoteId,
+      status: "sent",
+    });
+    quoteMutations.setStatus({
+      commandId: "cmd-agent-finance-quote-approved",
+      workspaceId: "workspace-metadata",
+      actorType: "agent",
+      sourceChannel: "desktop",
+      quoteId: created.quoteId,
+      status: "approved",
+    });
+
+    expect(() =>
+      registry.execute(
+        "create_invoice_from_quote",
+        JSON.stringify({ quote_id: created.quoteId }),
+        { workspaceId: "workspace-metadata", userPermissions: ["finance.manage"] },
+        { allowedToolNames: ["create_invoice_from_quote"] },
+      ),
+    ).toThrow("Blocked. This action requires the invoices.create permission.");
+
+    const invoiceResult = registry.execute(
+      "create_invoice_from_quote",
+      JSON.stringify({ quote_id: created.quoteId, issue_date: "2026-06-24" }),
+      { workspaceId: "workspace-metadata", userPermissions: ["invoices.create"] },
+      { allowedToolNames: ["create_invoice_from_quote"] },
+    );
+
+    expect(invoiceResult.result.payload.invoiceId).toMatch(/^invoice-/);
+    expect(invoiceResult.result.payload.invoiceNumber).toMatch(/^2026-/);
 
     cleanup();
   });
