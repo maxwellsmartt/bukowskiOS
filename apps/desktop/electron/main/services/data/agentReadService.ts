@@ -223,6 +223,7 @@ const toRosterRow = (
         : statusContext?.busyAgentIds.has(row.id)
           ? "working"
           : "idle",
+    modelKey: row.model_key,
     modelLabel: row.model_label,
     approvalMode: row.approval_mode,
     toolsSummary: tools.join(" · "),

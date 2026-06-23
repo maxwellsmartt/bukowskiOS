@@ -23,6 +23,10 @@ const inferDomain = (mission: string) => {
     return "incidents";
   }
 
+  if (/(treasury|bank|cash|reconcil|deductible|dgii|statement|tesorer|banco|movimiento)/.test(normalized)) {
+    return "treasury";
+  }
+
   if (/(finance|budget|cost|expense|reserve)/.test(normalized)) {
     return "finance";
   }
@@ -38,18 +42,69 @@ const inferDomain = (mission: string) => {
   return "assets";
 };
 
+// Real tool names from the registry (must match agentToolRegistry / agentWriteTools),
+// so a freshly created agent can actually call tools. These mirror the system
+// agents' default toolsets per domain.
 const defaultToolsByDomain: Record<string, string[]> = {
-  assets: ["assets.read", "packing.read", "compare.prepare"],
-  incidents: ["incidents.read", "maintenance.watch", "rma.prepare"],
-  finance: ["finance.read", "entries.review", "exposure.review"],
-  projects: ["projects.read", "timeline.review", "units.review"],
-  communications: ["connector.email", "connector.notifications", "draft.compose"],
+  assets: [
+    "search_assets",
+    "get_asset_detail",
+    "get_asset_availability",
+    "get_asset_location",
+    "get_kit_contents",
+    "get_maintenance_queue",
+    "ask_user_choice",
+  ],
+  incidents: [
+    "get_open_incidents",
+    "get_incident_detail",
+    "get_incident_timeline",
+    "get_incidents_missing_cost_estimate",
+    "search_incidents",
+    "search_assets",
+    "ask_user_choice",
+  ],
+  finance: [
+    "get_financial_exposure_summary",
+    "get_budget_vs_actual",
+    "get_financial_health",
+    "get_expense_breakdown",
+    "get_project_financials",
+    "search_projects",
+  ],
+  treasury: [
+    "get_treasury_overview",
+    "list_bank_accounts",
+    "list_bank_movements",
+    "get_treasury_review_queue",
+    "get_deductible_ledger",
+    "search_projects",
+    "ask_user_choice",
+  ],
+  projects: [
+    "search_projects",
+    "get_project_detail",
+    "get_project_schedule",
+    "get_project_units",
+    "get_schedule_conflicts",
+    "get_project_conflicts",
+    "ask_user_choice",
+  ],
+  communications: [
+    "list_recipients",
+    "get_thread_context",
+    "preview_send_targets",
+    "get_delivery_status",
+    "draft_message",
+    "send_message",
+  ],
 };
 
 const defaultDomainsByDomain: Record<string, string[]> = {
   assets: ["assets", "packing_slips", "catalog"],
   incidents: ["incidents", "maintenance", "rma"],
   finance: ["finance"],
+  treasury: ["treasury", "finance", "projects"],
   projects: ["projects", "schedule", "units"],
   communications: ["connectors", "notifications"],
 };
@@ -58,6 +113,7 @@ const defaultModelByDomain: Record<string, string> = {
   assets: "openai:gpt-5-mini",
   incidents: "anthropic:claude-sonnet-4-20250514",
   finance: "openai:gpt-5-mini",
+  treasury: "openai:gpt-5.2",
   projects: "anthropic:claude-sonnet-4-20250514",
   communications: "openclaw:command",
 };
@@ -102,7 +158,7 @@ const buildDraftFromMission = (mission: string, t: TFunction): AgentDraft => {
     role: defaultRole,
     mission: missionText || t("agents.wizard.defaults.mission"),
     domain,
-    allowedTools: defaultToolsByDomain[domain] ?? ["workspace.search"],
+    allowedTools: defaultToolsByDomain[domain] ?? ["search_projects", "search_assets", "ask_user_choice"],
     allowedDomains: defaultDomainsByDomain[domain] ?? [domain],
     status: "active",
     approvalMode: domain === "communications" ? "needs_approval" : "supervised",
@@ -115,11 +171,9 @@ const buildDraftFromAgent = (agent: AgentRosterRow): AgentDraft => ({
   agentId: agent.agentId,
   displayName: agent.displayName,
   emoji: agent.emoji,
-  modelKey: agent.modelLabel.toLowerCase().includes("claude")
-    ? "anthropic:claude-sonnet-4-20250514"
-    : agent.modelLabel.toLowerCase().includes("openclaw")
-      ? "openclaw:command"
-      : "openai:gpt-5-mini",
+  // Use the agent's actual model key so editing never silently downgrades the
+  // model (e.g. GPT-5.2 → mini, or Opus → Sonnet).
+  modelKey: agent.modelKey || "openai:gpt-5-mini",
   role: agent.role,
   mission: agent.mission,
   domain: agent.domain,

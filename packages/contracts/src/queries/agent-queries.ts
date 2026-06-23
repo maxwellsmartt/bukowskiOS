@@ -164,6 +164,7 @@ export type AgentRosterRow = {
   providerKey: string;
   status: AgentStatus;
   operationalState: "idle" | "working" | "not_working";
+  modelKey: string;
   modelLabel: string;
   approvalMode: AgentApprovalMode;
   toolsSummary: string;

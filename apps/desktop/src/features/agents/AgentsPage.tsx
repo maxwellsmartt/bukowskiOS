@@ -178,6 +178,7 @@ export const AgentsPage = () => {
 
         {selectedAgentId ? (
           <SurfaceCard
+            className="agents-detail-card agents-detail-card-glass"
             title={detail.agent?.displayName ?? t("agents.team.loadingAgent")}
             aside={
               <div className="surface-card-actions">
@@ -219,7 +220,17 @@ export const AgentsPage = () => {
               <div className="agent-detail-meta">
                 <div>
                   <span className="agent-detail-kicker">{t("agents.team.tools")}</span>
-                  <strong>{detail.tools.join(" · ") || t("agents.team.noToolsDefined")}</strong>
+                  {detail.tools.length ? (
+                    <div className="agent-tool-chips">
+                      {detail.tools.map((tool) => (
+                        <span className="agent-tool-chip" key={tool}>
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <strong>{t("agents.team.noToolsDefined")}</strong>
+                  )}
                   {(() => {
                     const writeTools = detail.tools.filter((tool) =>
                       /^(create_|update_|return_|assign_|release_|delegate_)/.test(tool),

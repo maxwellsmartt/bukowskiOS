@@ -13940,12 +13940,57 @@ button.timeline-signal-chip:focus-visible {
 
 .agent-detail-meta {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
+/* Each label/value pair reads as a calm bordered tile so the detail card is
+   scannable and organized rather than a flat run of text. */
 .agent-detail-meta > div {
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 13%, transparent);
+  border-radius: var(--radius-md, 12px);
+  background: color-mix(in srgb, var(--text-muted) 4%, transparent);
+}
+
+.agent-detail-meta > div > strong {
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+/* Frosted-glass treatment for the selected-agent detail card (team map and the
+   Automation › Team directory), so the inspected agent reads as an elevated
+   surface above the graph/list behind it. */
+.agents-detail-card-glass {
+  border: 1px solid var(--glass-panel-border);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  box-shadow: var(--glass-panel-shadow);
+}
+
+/* Allowed tools rendered as wrapped chips instead of a dot-joined string. */
+.agent-tool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-tool-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  white-space: nowrap;
 }
 
 .agent-detail-actions,

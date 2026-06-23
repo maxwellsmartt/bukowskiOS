@@ -809,7 +809,7 @@ export const AgentsMissionControlPage = () => {
 
         {selectedAgent ? (
           <SurfaceCard
-            className="agents-detail-card"
+            className="agents-detail-card agents-detail-card-glass"
             title={selectedAgent.displayName}
             subtitle={selectedAgent.role}
             aside={
@@ -867,7 +867,17 @@ export const AgentsMissionControlPage = () => {
                 </div>
                 <div>
                   <span className="agent-detail-kicker">{t("agents.team.allowedTools")}</span>
-                  <strong>{detail.tools.join(" · ") || t("agents.team.noToolsAssigned")}</strong>
+                  {detail.tools.length ? (
+                    <div className="agent-tool-chips">
+                      {detail.tools.map((tool) => (
+                        <span className="agent-tool-chip" key={tool}>
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <strong>{t("agents.team.noToolsAssigned")}</strong>
+                  )}
                 </div>
               </div>
 
