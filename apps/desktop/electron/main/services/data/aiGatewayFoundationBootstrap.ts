@@ -466,6 +466,39 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
       )
   `);
 
+  // One-time, version-gated correction of the tool allowlist. `allowed_tools_json`
+  // is user-overridable, so we never clobber it on routine boots — but when the
+  // config version advances we additively MERGE in any tools the new defaults
+  // add (never removing tools an admin chose), so capability fixes reach existing
+  // workspaces without discarding customizations. Runs before seed_version is
+  // bumped by updateSystemAgent below, then won't run again for this version.
+  const readAgentReseedRow = db.prepare(
+    `SELECT seed_version, allowed_tools_json, allowed_domains_json, is_system_agent
+       FROM agents WHERE workspace_id = ? AND id = ?`,
+  );
+  const applyReseededAllowlist = db.prepare(
+    `UPDATE agents SET allowed_tools_json = ?, allowed_domains_json = ?, updated_at = ?
+       WHERE workspace_id = ? AND id = ?`,
+  );
+  const activatePausedAgent = db.prepare(
+    `UPDATE agents SET status = 'active', updated_at = ?
+       WHERE workspace_id = ? AND id = ? AND status = 'paused'`,
+  );
+  const mergeAllowlistJson = (storedJson: string | null, configList: readonly string[]) => {
+    let stored: string[] = [];
+    try {
+      const parsed = JSON.parse(storedJson ?? "[]");
+      if (Array.isArray(parsed)) stored = parsed.filter((value): value is string => typeof value === "string");
+    } catch {
+      stored = [];
+    }
+    const merged = [...stored];
+    for (const item of configList) {
+      if (!merged.includes(item)) merged.push(item);
+    }
+    return JSON.stringify(merged);
+  };
+
   workspaceRows.forEach((workspace) => {
     agentConfig.agents.forEach((agentConfigRow) => {
       const agent = buildSystemAgentRecord(agentConfigRow);
@@ -504,6 +537,24 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
         now,
         now,
       );
+
+      // Additive allowlist merge for system agents on a config version bump.
+      const existingRow = readAgentReseedRow.get(workspace.id, agentId) as
+        | { seed_version: string | null; allowed_tools_json: string | null; allowed_domains_json: string | null; is_system_agent: number }
+        | undefined;
+      if (existingRow && existingRow.is_system_agent === 1 && existingRow.seed_version !== agent.seedVersion) {
+        applyReseededAllowlist.run(
+          mergeAllowlistJson(existingRow.allowed_tools_json, agentConfigRow.allowed_tools_json),
+          mergeAllowlistJson(existingRow.allowed_domains_json, agentConfigRow.allowed_domains_json),
+          now,
+          workspace.id,
+          agentId,
+        );
+        // Communications was paused until outbound send existed; now it does.
+        if (agent.agentKey === "communications-agent") {
+          activatePausedAgent.run(now, workspace.id, agentId);
+        }
+      }
 
       updateSystemAgent.run(
         agent.agentKey,

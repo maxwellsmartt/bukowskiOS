@@ -44,11 +44,43 @@ describe("agent provider config", () => {
       "assets-agent",
       "incidents-maintenance-agent",
       "finance-agent",
+      "treasury-agent",
       "communications-agent",
       "projects-scheduling-agent",
       "bugs-agent",
       "product-agent",
     ]);
+
+    cleanup();
+  });
+
+  it("additively merges new default tools on a version bump while preserving admin customizations", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-allowlist-reseed");
+
+    // Simulate a pre-existing install (older seed_version) where an admin had a
+    // narrow tool list plus one custom tool not in the config defaults.
+    database
+      .prepare(
+        `UPDATE agents
+           SET seed_version = 'v1',
+               allowed_tools_json = ?
+         WHERE workspace_id = 'workspace-metadata' AND agent_key = 'assets-agent'`,
+      )
+      .run(JSON.stringify(["search_assets", "custom_admin_tool"]));
+
+    bootstrapAIGatewayFoundation(database);
+
+    const row = database
+      .prepare("SELECT seed_version, allowed_tools_json FROM agents WHERE workspace_id = 'workspace-metadata' AND agent_key = 'assets-agent'")
+      .get() as { seed_version: string; allowed_tools_json: string };
+    const tools = JSON.parse(row.allowed_tools_json) as string[];
+
+    expect(row.seed_version).toBe("v2");
+    // Admin's custom tool preserved.
+    expect(tools).toContain("custom_admin_tool");
+    // New default capabilities merged in.
+    expect(tools).toContain("get_asset_availability");
+    expect(tools).toContain("get_maintenance_queue");
 
     cleanup();
   });

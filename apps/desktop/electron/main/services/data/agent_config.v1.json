@@ -1,5 +1,5 @@
 {
-  "version": "v1",
+  "version": "v2",
   "system_managed_fields": [
     "agent_key",
     "agent_type",
@@ -66,7 +66,14 @@
         "draft_message",
         "get_runs_snapshot",
         "delegate_to_agent",
-        "ask_user_choice"
+        "ask_user_choice",
+        "get_project_detail",
+        "get_incident_detail",
+        "get_pending_approvals",
+        "create_notification",
+        "create_todo",
+        "create_reminder",
+        "read_attached_document"
       ],
       "allowed_domains_json": [
         "assets",
@@ -76,7 +83,8 @@
         "projects",
         "scheduling",
         "product",
-        "bugs"
+        "bugs",
+        "treasury"
       ],
       "skills_json": [
         "Intent classification",
@@ -123,7 +131,16 @@
         "get_overdue_returns",
         "create_packing_slip",
         "return_packing_items",
-        "ask_user_choice"
+        "ask_user_choice",
+        "get_asset_availability",
+        "get_asset_location",
+        "get_asset_movements",
+        "get_asset_reservations",
+        "get_kit_contents",
+        "get_maintenance_queue",
+        "get_asset_maintenance_history",
+        "get_asset_exposure",
+        "get_project_detail"
       ],
       "allowed_domains_json": [
         "assets",
@@ -178,7 +195,15 @@
         "create_incident",
         "update_incident",
         "create_rma",
-        "ask_user_choice"
+        "ask_user_choice",
+        "get_incident_detail",
+        "get_incident_timeline",
+        "get_incident_estimates",
+        "get_incident_costs",
+        "search_incidents",
+        "get_maintenance_queue",
+        "get_asset_maintenance_history",
+        "get_asset_movements"
       ],
       "allowed_domains_json": [
         "incidents",
@@ -236,13 +261,21 @@
         "get_incidents_missing_cost_estimate",
         "search_projects",
         "get_project_financials",
-        "get_asset_detail"
+        "get_asset_detail",
+        "get_incident_costs",
+        "get_open_invoices",
+        "get_quote_detail",
+        "search_quotes",
+        "explain_quote_total",
+        "prepare_quote_draft",
+        "get_project_detail"
       ],
       "allowed_domains_json": [
         "finance",
         "assets",
         "incidents",
-        "projects"
+        "projects",
+        "treasury"
       ],
       "skills_json": [
         "Cost aggregation",
@@ -264,6 +297,69 @@
       "visibility": "public",
       "is_supervisor": false,
       "sort_order": 4
+    },
+    {
+      "id": "agent-treasury",
+      "agent_key": "treasury-agent",
+      "display_name": "Treasury Agent",
+      "emoji": "§",
+      "icon_key": "landmark",
+      "agent_type": "specialist",
+      "role_summary": "Reads bank accounts, movements, reconciliation, deductibles and fiscal reports.",
+      "mission": "Give visibility into cash position, bank movements, classification, reimbursements and DGII/fiscal reporting, and prepare treasury actions for approval.",
+      "soul": "The Treasury Agent guards the cash truth: what moved, where it went, and what the tax authority will see.",
+      "domain_key": "treasury",
+      "provider_key": "openai",
+      "model_key": "openai:gpt-5.2",
+      "model_label": "GPT-5.2",
+      "status": "active",
+      "approval_mode": "needs_approval",
+      "allowed_tools_json": [
+        "get_treasury_overview",
+        "list_bank_accounts",
+        "list_bank_movements",
+        "get_treasury_review_queue",
+        "get_deductible_ledger",
+        "get_reserves_status",
+        "get_dgii_report",
+        "get_open_invoices",
+        "get_project_pnl",
+        "get_financial_exposure_summary",
+        "search_projects",
+        "ask_user_choice",
+        "classify_movement",
+        "categorize_movements_by_rule",
+        "correct_movement",
+        "set_project_allocations",
+        "create_bank_account",
+        "review_deductible",
+        "import_bank_statement"
+      ],
+      "allowed_domains_json": [
+        "treasury",
+        "finance",
+        "projects"
+      ],
+      "skills_json": [
+        "Cash position",
+        "Bank reconciliation",
+        "Movement classification",
+        "Fiscal/DGII reporting"
+      ],
+      "specialization_json": [
+        "Bank accounts & movements",
+        "Deductibles & reimbursements",
+        "Per-project P&L allocation",
+        "DGII/fiscal reports"
+      ],
+      "notes": "Treasury writes (import, classify, bank accounts, deductibles) always require approval and are gated by treasury.* permissions.",
+      "base_prompt": "You are the Treasury Agent inside BukowskiOS. You specialize in cash and bank operations: bank accounts, movements, classification, per-project allocation, reimbursements/deductibles and DGII/fiscal reports. Use read-only tools to give grounded, compact treasury summaries. Any mutation (importing a statement, classifying or correcting movements, creating a bank account, reviewing a deductible) requires explicit human approval — never imply something was applied before it is approved. Be precise with amounts, currencies and dates.",
+      "can_create_draft_runs": true,
+      "can_execute_write_actions": true,
+      "is_system_agent": true,
+      "visibility": "public",
+      "is_supervisor": false,
+      "sort_order": 5
     },
     {
       "id": "agent-communications",
@@ -289,7 +385,8 @@
         "draft_message",
         "get_overdue_returns",
         "get_open_incidents",
-        "get_runs_snapshot"
+        "get_runs_snapshot",
+        "send_message"
       ],
       "allowed_domains_json": [
         "communications",
@@ -316,7 +413,7 @@
       "is_system_agent": true,
       "visibility": "public",
       "is_supervisor": false,
-      "sort_order": 5
+      "sort_order": 6
     },
     {
       "id": "agent-projects",
@@ -345,7 +442,14 @@
         "search_assets",
         "create_packing_slip",
         "create_quote",
-        "ask_user_choice"
+        "ask_user_choice",
+        "get_project_detail",
+        "get_project_conflicts",
+        "get_project_crew_allocations",
+        "search_active_projects",
+        "get_asset_availability",
+        "set_quote_status",
+        "get_quote_detail"
       ],
       "allowed_domains_json": [
         "projects",
@@ -372,7 +476,7 @@
       "is_system_agent": true,
       "visibility": "public",
       "is_supervisor": false,
-      "sort_order": 6
+      "sort_order": 7
     },
     {
       "id": "agent-bugs",
@@ -397,7 +501,12 @@
         "get_recent_deploys",
         "get_agent_failures",
         "draft_bug_report",
-        "get_runs_snapshot"
+        "get_runs_snapshot",
+        "get_runs_by_agent",
+        "get_agent_health_status",
+        "get_tool_coverage_snapshot",
+        "get_pending_approvals",
+        "list_agent_capabilities"
       ],
       "allowed_domains_json": [
         "bugs",
@@ -426,7 +535,7 @@
       "is_system_agent": true,
       "visibility": "internal",
       "is_supervisor": false,
-      "sort_order": 7
+      "sort_order": 8
     },
     {
       "id": "agent-product",
@@ -450,7 +559,8 @@
         "get_funnel_dropoffs",
         "get_backlog_items",
         "link_feedback_to_feature",
-        "get_runs_snapshot"
+        "get_runs_snapshot",
+        "get_tool_coverage_snapshot"
       ],
       "allowed_domains_json": [
         "product",
@@ -478,7 +588,7 @@
       "is_system_agent": true,
       "visibility": "internal",
       "is_supervisor": false,
-      "sort_order": 8
+      "sort_order": 9
     }
   ]
 }

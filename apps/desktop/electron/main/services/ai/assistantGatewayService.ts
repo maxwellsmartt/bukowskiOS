@@ -1546,7 +1546,7 @@ export const createAssistantGatewayService = (
         previousResponseId,
         tools: supervisorToolDefinitions,
         toolChoice: "auto",
-        maxOutputTokens: 900,
+        maxOutputTokens: 1500,
         textFormat: orchestrationSchema,
       },
     );
@@ -1702,7 +1702,7 @@ export const createAssistantGatewayService = (
           input: outputs,
           tools: supervisorToolDefinitions,
           toolChoice: "auto",
-          maxOutputTokens: 900,
+          maxOutputTokens: 1500,
           textFormat: orchestrationSchema,
         },
       );
@@ -1906,7 +1906,7 @@ export const createAssistantGatewayService = (
             input: specialistInput,
             tools: targetToolDefinitions,
             toolChoice: specialistMustUseTool ? "required" : "auto",
-            maxOutputTokens: 700,
+            maxOutputTokens: 3000,
           },
         );
         let specialistResult = initialSpecialistProviderResponse.result;
@@ -2030,7 +2030,7 @@ export const createAssistantGatewayService = (
               input: outputs,
               tools: targetToolDefinitions,
               toolChoice: "auto",
-              maxOutputTokens: 700,
+              maxOutputTokens: 3000,
             },
           );
           specialistResult = nextSpecialistProviderResponse.result;
