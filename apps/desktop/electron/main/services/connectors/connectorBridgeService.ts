@@ -58,37 +58,6 @@ const parseJsonObject = (value: string | null) => {
   }
 };
 
-const classifyRequiredPermissions = (message: string) => {
-  const normalized = message.toLowerCase();
-  const permissions = new Set<string>();
-
-  if (/(finance|budget|cost|spend|reserve|burn)/.test(normalized)) {
-    permissions.add("finance.read");
-  }
-
-  if (/(incident|damage|report issue|reporta|reportar|aver[ií]a|broken|damaged|se me da[nñ]o)/.test(normalized)) {
-    permissions.add("incidents.create");
-  }
-
-  if (/(incident|damage|rma|repair|maintenance)/.test(normalized)) {
-    permissions.add("incidents.read");
-  }
-
-  if (/(\brma\b|warranty|repair case|manufacturer)/.test(normalized)) {
-    permissions.add(/(create|open|genera|generar|crear|report)/.test(normalized) ? "rma.create" : "rma.read");
-  }
-
-  if (/(packing slip|packing|picklist|dispatch|checkout)/.test(normalized)) {
-    permissions.add(/(create|issue|genera|generar|crear|emit)/.test(normalized) ? "packing-slips.create" : "packing-slips.read");
-  }
-
-  if (!permissions.size) {
-    permissions.add("assets.read");
-  }
-
-  return Array.from(permissions);
-};
-
 const summarizePermissions = (permissions: string[]) => {
   if (!permissions.length) {
     return "No internal permissions";
@@ -904,34 +873,16 @@ export const createConnectorBridgeService = (
         return { status: "blocked", threadId: null, correlationId, replyText };
       }
 
+      // Role gating is enforced downstream by the assistant gateway against the
+      // linked user's actual permissions (identical to the in-app path): tools
+      // the role cannot use are hidden from the model and hard-blocked on call.
+      // We pass the linked identity as the actor and let that single source of
+      // truth decide — no fragile keyword pre-check that misses Spanish or write
+      // actions. `permissions` is still summarized for the audit/source trail.
       const permissions = (identity.permission_keys ?? "")
         .split(",")
         .map((value) => value.trim())
         .filter(Boolean);
-      const requiredPermissions = classifyRequiredPermissions(input.message);
-      const missingPermissions = requiredPermissions.filter((permission) => !permissions.includes(permission));
-      if (missingPermissions.length) {
-        const primaryMissingPermission = missingPermissions[0] ?? "assets.read";
-        const replyText =
-          primaryMissingPermission === "finance.read"
-            ? "Bloqueado. Tu rol no permite consultar finanzas."
-            : primaryMissingPermission.startsWith("packing-slips")
-              ? "Bloqueado. Tu rol no permite trabajar con packing slips."
-              : primaryMissingPermission.startsWith("rma")
-                ? "Bloqueado. Tu rol no permite crear o consultar RMAs."
-            : "Bloqueado. Tu rol no permite esta consulta u orden.";
-        upsertReceipt({
-          workspaceId,
-          direction: "inbound",
-          externalMessageId: input.externalMessageId,
-          channelId,
-          correlationId,
-          status: "permission_blocked",
-          threadId: null,
-          payload: { reply_text: replyText, required_permissions: requiredPermissions, missing_permissions: missingPermissions },
-        });
-        return { status: "blocked", threadId: null, correlationId, replyText };
-      }
 
       const forceNewThread = /\b(new thread|nuevo hilo|nuevo chat)\b/i.test(input.message);
       const threadId = resolveBoundThreadId(workspaceId, input.externalUserId, channelId, forceNewThread);
@@ -1010,7 +961,6 @@ export const createConnectorBridgeService = (
         payload: {
           reply_text: replyTextWithRecovery,
           reply_to_message_id: input.replyToMessageId ?? null,
-          required_permissions: requiredPermissions,
           recovered_from_reconnect: recoveredFromReconnect,
         },
       });
