@@ -102,6 +102,7 @@ export const createOperationalAlertsService = (
           WHERE wm.workspace_id = ?
             AND wm.status = 'active'
             AND r.key IN ('admin', 'supervisor')
+            AND wm.user_id <> 'user-ops'
         `,
       )
       .all(workspaceId) as Array<{ user_id: string }>;

@@ -1092,6 +1092,13 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       return accumulator;
     }, {});
 
+  // Personal rows (notifications/todos/reminders) belonging to non-UUID local
+  // system actors — e.g. the "user-ops" AI agent — must never be pushed to
+  // Supabase: the remote user_id column is a uuid and rejects them with a 400,
+  // which jams the sync outbox. These rows are local-only by design.
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const isSyncableActorId = (value: unknown): boolean => typeof value === "string" && uuidPattern.test(value);
+
   const resolveSupabaseDomainUpserts = (
     row: { entity_type: string; entity_id: string },
   ): SupabaseDomainUpsert[] | null => {
@@ -1319,22 +1326,24 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         return upserts;
       }
       case "notification": {
-        const rows = selectAll("SELECT * FROM notifications WHERE id = ?", row.entity_id).map((r) =>
-          parseJsonColumn(r, ["source_ref"]),
-        );
+        const rows = selectAll("SELECT * FROM notifications WHERE id = ?", row.entity_id)
+          .filter((r) => isSyncableActorId(r.user_id))
+          .map((r) => parseJsonColumn(r, ["source_ref"]));
         return rows.length ? [{ table: "notifications", onConflict: "id", rows }] : [];
       }
       case "todo": {
-        const rows = selectAll("SELECT * FROM todos WHERE id = ?", row.entity_id).map((r) =>
-          parseJsonColumn(r, ["agent_action_ref"]),
-        );
+        const rows = selectAll("SELECT * FROM todos WHERE id = ?", row.entity_id)
+          .filter((r) => isSyncableActorId(r.user_id))
+          .map((r) => parseJsonColumn(r, ["agent_action_ref"]));
         return rows.length ? [{ table: "todos", onConflict: "id", rows }] : [];
       }
       case "reminder": {
         if (row.entity_id.startsWith("treasury-card-payment-")) {
           return [];
         }
-        const rows = selectAll("SELECT * FROM reminders WHERE id = ?", row.entity_id);
+        const rows = selectAll("SELECT * FROM reminders WHERE id = ?", row.entity_id).filter((r) =>
+          isSyncableActorId(r.user_id),
+        );
         return rows.length ? [{ table: "reminders", onConflict: "id", rows }] : [];
       }
       case "agent": {

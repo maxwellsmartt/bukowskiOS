@@ -1447,6 +1447,7 @@ export const createAgentMutationService = (
             AND wm.status = 'active'
             AND r.key = 'admin'
             AND wm.user_id <> ?
+            AND wm.user_id <> 'user-ops'
         `,
       )
       .all(workspaceId, requesterUserId) as Array<{ user_id: string }>;
