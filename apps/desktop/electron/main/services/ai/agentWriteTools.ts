@@ -193,6 +193,48 @@ const requireWorkspaceId = (context: AIGatewayToolContext): string => {
   return workspaceId;
 };
 
+const normalizeNonNegativeInteger = (value: unknown, fallback: number) => {
+  const nextValue = asNumber(value);
+  if (nextValue === undefined) {
+    return fallback;
+  }
+  return Math.max(0, Math.floor(nextValue));
+};
+
+const buildAssetEditorInput = (args: Record<string, unknown>) => ({
+  name: asString(args.name),
+  internalCode: asString(args.internal_code),
+  categoryId: asString(args.category_id),
+  brand: asOptionalString(args.brand),
+  model: asOptionalString(args.model),
+  serialNumber: asOptionalString(args.serial_number),
+  description: asOptionalString(args.description),
+  defaultLocationId: asOptionalString(args.default_location_id),
+  conditionStatus: asOptionalString(args.condition_status) ?? "Good",
+  notes: asOptionalString(args.notes),
+  purchasePrice: asNumber(args.purchase_price),
+  additionalCosts: asNumber(args.additional_costs),
+  replacementValue: asNumber(args.replacement_value),
+  currentBookValue: asNumber(args.current_book_value),
+  ownershipType: asOptionalString(args.ownership_type),
+  qrCodeValue: asOptionalString(args.qr_code_value),
+  isActive: asBoolean(args.is_active),
+  totalQuantity: normalizeNonNegativeInteger(args.total_quantity, 1),
+});
+
+const buildAssetSelections = (value: unknown) =>
+  Array.isArray(value)
+    ? value
+        .map((entry) => {
+          const item = entry as Record<string, unknown>;
+          return {
+            assetId: asString(item.asset_id),
+            quantity: Math.max(1, Math.floor(asNumber(item.quantity) ?? 1)),
+          };
+        })
+        .filter((entry) => entry.assetId)
+    : [];
+
 export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteToolDefinition[] => [
   {
     name: "create_notification",
@@ -382,6 +424,222 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
           skipped: result.skipped,
           deliveredCount: result.delivered.length,
           skippedCount: result.skipped.length,
+        },
+      };
+    },
+  },
+
+  {
+    name: "create_asset",
+    requiredPermission: "assets.manage",
+    description:
+      "Create a new asset/equipment record in inventory. Requires approval. Use only after resolving category/location ids and collecting the required profile fields.",
+    requiresApproval: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["name", "internal_code", "category_id"],
+      properties: {
+        name: { type: "string" },
+        internal_code: { type: "string", description: "Unique internal asset code, e.g. CAM-ALEXA-01." },
+        category_id: { type: "string", description: "Existing asset category id." },
+        brand: { type: "string" },
+        model: { type: "string" },
+        serial_number: { type: "string" },
+        description: { type: "string" },
+        default_location_id: { type: "string" },
+        condition_status: { type: "string", description: "Defaults to Good." },
+        notes: { type: "string" },
+        purchase_price: { type: "number" },
+        additional_costs: { type: "number" },
+        replacement_value: { type: "number" },
+        current_book_value: { type: "number" },
+        ownership_type: { type: "string" },
+        qr_code_value: { type: "string" },
+        is_active: { type: "boolean" },
+        total_quantity: { type: "number", description: "Defaults to 1." },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const input = buildAssetEditorInput(args);
+      if (!input.name) throw new Error("Asset name is required.");
+      if (!input.internalCode) throw new Error("Asset internal_code is required.");
+      if (!input.categoryId) throw new Error("Asset category_id is required.");
+
+      const result = services.assets.createAsset({
+        commandId: newCommandId("agent-asset-create"),
+        workspaceId,
+        ...input,
+        actorType: "agent",
+        sourceChannel: resolveSourceChannel(context),
+      });
+
+      return {
+        summary: result.summary,
+        payload: { assetId: result.assetId, repeated: result.repeated },
+      };
+    },
+  },
+
+  {
+    name: "update_asset",
+    requiredPermission: "assets.manage",
+    description:
+      "Update an existing asset profile. Requires approval. Use get_asset_detail first and pass unchanged required fields such as name, internal_code and category_id.",
+    requiresApproval: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["asset_id", "name", "internal_code", "category_id"],
+      properties: {
+        asset_id: { type: "string" },
+        name: { type: "string" },
+        internal_code: { type: "string" },
+        category_id: { type: "string" },
+        brand: { type: "string" },
+        model: { type: "string" },
+        serial_number: { type: "string" },
+        description: { type: "string" },
+        default_location_id: { type: "string" },
+        condition_status: { type: "string", description: "Defaults to Good if omitted." },
+        notes: { type: "string" },
+        purchase_price: { type: "number" },
+        additional_costs: { type: "number" },
+        replacement_value: { type: "number" },
+        current_book_value: { type: "number" },
+        ownership_type: { type: "string" },
+        qr_code_value: { type: "string" },
+        is_active: { type: "boolean" },
+        total_quantity: { type: "number" },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const assetId = asString(args.asset_id);
+      const input = buildAssetEditorInput(args);
+      if (!assetId) throw new Error("asset_id is required.");
+      if (!input.name) throw new Error("Asset name is required.");
+      if (!input.internalCode) throw new Error("Asset internal_code is required.");
+      if (!input.categoryId) throw new Error("Asset category_id is required.");
+
+      const result = services.assets.updateAsset({
+        commandId: newCommandId("agent-asset-update"),
+        workspaceId,
+        assetId,
+        ...input,
+        actorType: "agent",
+        sourceChannel: resolveSourceChannel(context),
+      });
+
+      return {
+        summary: result.summary,
+        payload: { assetId: result.assetId, repeated: result.repeated },
+      };
+    },
+  },
+
+  {
+    name: "archive_asset",
+    requiredPermission: "assets.manage",
+    description:
+      "Archive an asset from the live registry. Requires approval. The asset must not be assigned, checked out, in a kit flow, or have open incidents.",
+    requiresApproval: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["asset_id"],
+      properties: {
+        asset_id: { type: "string" },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const assetId = asString(args.asset_id);
+      if (!assetId) throw new Error("asset_id is required.");
+
+      const result = services.assets.archiveAsset({
+        commandId: newCommandId("agent-asset-archive"),
+        workspaceId,
+        assetId,
+        actorType: "agent",
+        sourceChannel: resolveSourceChannel(context),
+      });
+
+      return {
+        summary: result.summary,
+        payload: { assetId: result.assetId, repeated: result.repeated },
+      };
+    },
+  },
+
+  {
+    name: "assign_move_assets",
+    requiredPermission: "assets.manage",
+    description:
+      "Assign assets to a project/unit/department/user or move assets to another location. Requires approval. Use search_assets/get_asset_detail first to resolve ids and available quantities.",
+    requiresApproval: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["asset_ids", "mode"],
+      properties: {
+        asset_ids: { type: "array", items: { type: "string" } },
+        asset_selections: {
+          type: "array",
+          description: "Optional per-asset quantities; defaults to one per asset when omitted.",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["asset_id", "quantity"],
+            properties: {
+              asset_id: { type: "string" },
+              quantity: { type: "number" },
+            },
+          },
+        },
+        mode: { type: "string", enum: ["assign", "move"] },
+        project_id: { type: "string" },
+        project_unit_id: { type: "string" },
+        department_id: { type: "string" },
+        assigned_to_user_id: { type: "string" },
+        target_location_id: { type: "string" },
+        expected_return_at: { type: "string" },
+        notes: { type: "string" },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const assetIds = asStringArray(args.asset_ids);
+      const mode = asString(args.mode);
+      if (!assetIds.length) throw new Error("At least one asset_id is required.");
+      if (mode !== "assign" && mode !== "move") throw new Error("mode must be assign or move.");
+
+      const result = services.assets.assignMoveAssets({
+        commandId: newCommandId("agent-assets-assign-move"),
+        workspaceId,
+        assetIds,
+        assetSelections: buildAssetSelections(args.asset_selections),
+        mode,
+        projectId: resolveOptionalProjectId(services, workspaceId, args.project_id) ?? undefined,
+        projectUnitId: asOptionalString(args.project_unit_id),
+        departmentId: asOptionalString(args.department_id),
+        assignedToUserId: asOptionalString(args.assigned_to_user_id),
+        targetLocationId: asOptionalString(args.target_location_id),
+        expectedReturnAt: asOptionalString(args.expected_return_at),
+        notes: asOptionalString(args.notes),
+        actorType: "agent",
+        sourceChannel: resolveSourceChannel(context),
+      });
+
+      return {
+        summary: result.warningSummary ? `${result.summary} ${result.warningSummary}` : result.summary,
+        payload: {
+          eventType: result.eventType,
+          processedAssetIds: result.processedAssetIds,
+          repeated: result.repeated,
+          conflictCount: result.conflictCount,
+          warnings: result.warnings ?? [],
         },
       };
     },

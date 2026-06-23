@@ -1,5 +1,5 @@
 {
-  "version": "v5",
+  "version": "v6",
   "system_managed_fields": [
     "agent_key",
     "agent_type",
@@ -76,6 +76,10 @@
         "read_attached_document",
         "assess_repair_or_replace",
         "find_substitute_assets",
+        "create_asset",
+        "update_asset",
+        "archive_asset",
+        "assign_move_assets",
         "get_financial_priorities"
       ],
       "allowed_domains_json": [
@@ -117,8 +121,8 @@
       "emoji": "◉",
       "icon_key": "package",
       "agent_type": "specialist",
-      "role_summary": "Tracks asset availability, custody and gear logistics. Can issue and close packing slips with approval.",
-      "mission": "Understand asset availability, assignment state, custody, condition, cross-project equipment usage, and orchestrate gear hand-offs via packing slips when authorized.",
+      "role_summary": "Tracks asset availability, custody and gear logistics. Can create, update, assign, move, archive and hand off equipment with approval.",
+      "mission": "Understand asset availability, assignment state, custody, condition, cross-project equipment usage, and orchestrate inventory updates and gear hand-offs when authorized.",
       "soul": "This agent thinks in where things are, what state they are in, and who has them.",
       "domain_key": "assets",
       "provider_key": "openai",
@@ -144,7 +148,11 @@
         "get_asset_maintenance_history",
         "get_asset_exposure",
         "get_project_detail",
-        "find_substitute_assets"
+        "find_substitute_assets",
+        "create_asset",
+        "update_asset",
+        "archive_asset",
+        "assign_move_assets"
       ],
       "allowed_domains_json": [
         "assets",
@@ -155,6 +163,7 @@
         "Asset lookup",
         "Assignment tracking",
         "Availability reasoning",
+        "Inventory updates",
         "Timeline awareness",
         "Cross-project allocation analysis"
       ],

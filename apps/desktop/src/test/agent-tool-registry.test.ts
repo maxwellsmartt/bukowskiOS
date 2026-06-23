@@ -5,6 +5,7 @@ import { createCurrencyMutationService } from "../../electron/main/services/data
 import { createCurrencyReadService } from "../../electron/main/services/data/currencyReadService";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createAgentReadService } from "../../electron/main/services/data/agentReadService";
+import { createAssetMutationService } from "../../electron/main/services/data/assetMutationService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("agent tool registry", () => {
@@ -106,6 +107,10 @@ describe("agent tool registry", () => {
         "update_incident",
         "create_rma",
         "create_packing_slip",
+        "create_asset",
+        "update_asset",
+        "archive_asset",
+        "assign_move_assets",
       ]),
     );
 
@@ -113,14 +118,129 @@ describe("agent tool registry", () => {
     expect(registry.requiresApproval("update_incident")).toBe(true);
     expect(registry.requiresApproval("create_rma")).toBe(true);
     expect(registry.requiresApproval("create_packing_slip")).toBe(true);
+    expect(registry.requiresApproval("create_asset")).toBe(true);
+    expect(registry.requiresApproval("update_asset")).toBe(true);
+    expect(registry.requiresApproval("archive_asset")).toBe(true);
+    expect(registry.requiresApproval("assign_move_assets")).toBe(true);
     expect(registry.requiresApproval("get_asset_availability")).toBe(false);
 
-    const approvalRequiredToolNames = ["create_incident", "update_incident", "create_rma", "create_packing_slip"];
+    const approvalRequiredToolNames = [
+      "create_incident",
+      "update_incident",
+      "create_rma",
+      "create_packing_slip",
+      "create_asset",
+      "update_asset",
+      "archive_asset",
+      "assign_move_assets",
+    ];
     const writeDefs = registry.definitions.filter((tool) => approvalRequiredToolNames.includes(tool.name));
     expect(writeDefs).toHaveLength(approvalRequiredToolNames.length);
     for (const tool of writeDefs) {
       expect((tool as { requiresApproval?: boolean }).requiresApproval).toBe(true);
     }
+
+    cleanup();
+  });
+
+  it("executes asset write tools through the audited asset mutation service", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-asset-writes");
+    const secretStore = { hasProviderSecret: () => false };
+    const noopMutation = (label: string) =>
+      new Proxy({}, {
+        get: () => () => {
+          throw new Error(`mutation '${label}' should not be invoked in this test`);
+        },
+      });
+    const reads = createFoundationReadService(database);
+    const registry = createAgentToolRegistry(reads, {
+      getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      writeServices: {
+        assets: createAssetMutationService(database),
+        packing: noopMutation("packing"),
+        projects: noopMutation("projects"),
+        incidents: noopMutation("incidents"),
+        rma: noopMutation("rma"),
+        finance: noopMutation("finance"),
+        quotes: noopMutation("quotes"),
+        treasury: noopMutation("treasury"),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    });
+
+    expect(() =>
+      registry.execute(
+        "create_asset",
+        JSON.stringify({
+          name: "Agent managed monitor",
+          internal_code: "AGT-MON-01",
+          category_id: "cat-lighting",
+        }),
+        { workspaceId: "workspace-metadata", userPermissions: ["assets.read"] },
+        { allowedToolNames: ["create_asset"] },
+      ),
+    ).toThrow("Blocked. This action requires the assets.manage permission.");
+
+    const createResult = registry.execute(
+      "create_asset",
+      JSON.stringify({
+        name: "Agent managed monitor",
+        internal_code: "AGT-MON-01",
+        category_id: "cat-lighting",
+        default_location_id: "loc-warehouse-a",
+        condition_status: "Good",
+        total_quantity: 1,
+      }),
+      { workspaceId: "workspace-metadata", userPermissions: ["assets.manage"] },
+      { allowedToolNames: ["create_asset"] },
+    );
+    const assetId = createResult.result.payload.assetId as string;
+
+    expect(assetId).toMatch(/^asset-/);
+    expect(reads.getAssetDetail(assetId).asset?.code).toBe("AGT-MON-01");
+
+    const updateResult = registry.execute(
+      "update_asset",
+      JSON.stringify({
+        asset_id: assetId,
+        name: "Agent managed monitor updated",
+        internal_code: "AGT-MON-01",
+        category_id: "cat-lighting",
+        default_location_id: "loc-warehouse-a",
+        condition_status: "Review",
+      }),
+      { workspaceId: "workspace-metadata", userPermissions: ["assets.manage"] },
+      { allowedToolNames: ["update_asset"] },
+    );
+
+    expect(updateResult.result.payload.assetId).toBe(assetId);
+    expect(reads.getAssetDetail(assetId).asset?.condition).toBe("Review");
+
+    const assignResult = registry.execute(
+      "assign_move_assets",
+      JSON.stringify({
+        asset_ids: [assetId],
+        mode: "assign",
+        project_id: "project-aurora",
+        assigned_to_user_id: "user-paola",
+      }),
+      { workspaceId: "workspace-metadata", userPermissions: ["assets.manage"] },
+      { allowedToolNames: ["assign_move_assets"] },
+    );
+
+    expect(assignResult.result.payload.processedAssetIds).toEqual([assetId]);
+    expect(assignResult.result.payload.eventType).toBe("assigned");
+
+    const event = database
+      .prepare("SELECT actor_type, source_channel FROM asset_events WHERE asset_id = ? ORDER BY created_at DESC LIMIT 1")
+      .get(assetId) as { actor_type: string; source_channel: string } | undefined;
+    expect(event).toEqual({ actor_type: "agent", source_channel: "desktop" });
+
+    const receipt = database
+      .prepare("SELECT outcome_status FROM command_receipts WHERE command_id LIKE 'agent-assets-assign-move-%' ORDER BY executed_at DESC LIMIT 1")
+      .get() as { outcome_status: string } | undefined;
+    expect(receipt?.outcome_status).toBe("success");
 
     cleanup();
   });
