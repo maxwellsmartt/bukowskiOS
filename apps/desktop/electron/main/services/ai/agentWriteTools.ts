@@ -16,6 +16,7 @@ import type { createAssetMutationService } from "../data/assetMutationService";
 import type { createFinanceMutationService } from "../data/financeMutationService";
 import type { createQuoteMutationService } from "../data/quoteMutationService";
 import type { createTreasuryMutationService } from "../data/treasuryMutationService";
+import type { CommunicationsSendService } from "../data/communicationsSendService";
 
 type ProjectLookupService = {
   findByCode(workspaceId: string, code: string): { id: string; code: string; name: string; status: string } | null;
@@ -31,6 +32,7 @@ export type AgentWriteServices = {
   finance: ReturnType<typeof createFinanceMutationService>;
   quotes: ReturnType<typeof createQuoteMutationService>;
   treasury: ReturnType<typeof createTreasuryMutationService>;
+  communications?: CommunicationsSendService;
   projectLookup?: ProjectLookupService;
 };
 
@@ -60,6 +62,8 @@ const asOptionalString = (value: unknown) => {
   const next = asString(value);
   return next || undefined;
 };
+const asStringArray = (value: unknown) =>
+  Array.isArray(value) ? value.map((item) => asString(item)).filter(Boolean) : [];
 const asNumber = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
 const asBoolean = (value: unknown) => (typeof value === "boolean" ? value : undefined);
 const asPriority = (value: unknown) => {
@@ -320,6 +324,64 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
               correlationId: context.correlationId ?? null,
             },
           },
+        },
+      };
+    },
+  },
+
+  {
+    name: "send_message",
+    requiredPermission: "communications.send",
+    description:
+      "Send an operational message to one or more teammates. Delivers an in-app notification to each recipient and also pushes to their Telegram when they linked it. Use recipient ids from list_recipients/preview_send_targets (e.g. 'user:...', 'crew:...'). External clients/manufacturers cannot be reached this way. Requires human approval before sending.",
+    requiresApproval: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["recipient_ids", "body"],
+      properties: {
+        recipient_ids: {
+          type: "array",
+          items: { type: "string" },
+          description: "Recipient keys such as 'user:<id>' or 'crew:<id>' from the recipient tools.",
+        },
+        subject: { type: "string", description: "Short subject/headline for the message." },
+        body: { type: "string", description: "The full message to deliver." },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      if (!services.communications) {
+        throw new Error("Messaging is not available on this device.");
+      }
+      const recipientIds = asStringArray(args.recipient_ids);
+      const body = asString(args.body);
+      if (!recipientIds.length) {
+        throw new Error("At least one recipient is required.");
+      }
+      if (!body) {
+        throw new Error("The message body is required.");
+      }
+
+      const result = services.communications.sendToRecipients({
+        workspaceId,
+        recipientKeys: recipientIds,
+        subject: asString(args.subject),
+        body,
+      });
+
+      const deliveredLabels = result.delivered.map((entry) => entry.label);
+      const summary = result.delivered.length
+        ? `Sent to ${deliveredLabels.join(", ")}${result.skipped.length ? ` · ${result.skipped.length} could not be reached` : ""}.`
+        : "No recipients could be reached.";
+
+      return {
+        summary,
+        payload: {
+          delivered: result.delivered,
+          skipped: result.skipped,
+          deliveredCount: result.delivered.length,
+          skippedCount: result.skipped.length,
         },
       };
     },

@@ -612,6 +612,16 @@ export const createTelegramConnectorService = (
   });
 
   return {
+    // Outbound send used by agent messaging (send_message tool). Mirrors the
+    // bridge delivery adapter so teammates can be reached on Telegram directly.
+    async sendTelegramMessage(input: { workspaceId: string; externalChannelId: string; body: string }) {
+      const externalMessageId = await sendTelegramReply(input.externalChannelId, input.body, input.workspaceId);
+      return {
+        externalMessageId:
+          externalMessageId ??
+          buildScopedTelegramMessageId(input.workspaceId, input.externalChannelId, `fallback-${Date.now().toString(36)}`),
+      };
+    },
     async testConnection(input?: { workspaceId?: string }) {
       const workspaceId = input?.workspaceId ?? defaultWorkspaceId;
       const response = await callTelegram<TelegramGetMeResponse>("getMe", undefined, workspaceId);

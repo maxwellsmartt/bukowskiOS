@@ -27,6 +27,7 @@ import { createAssistantMemoryService } from "../ai/assistantMemoryService";
 import { createAssistantAudioTranscriptionService } from "../ai/assistantAudioTranscriptionService";
 import { createAssistantGatewaySessionStore } from "../ai/assistantGatewaySessionStore";
 import { createAgentToolRegistry } from "../ai/agentToolRegistry";
+import { createCommunicationsSendService, type CommunicationsSendService } from "./communicationsSendService";
 import { createAISecretStore } from "../ai/aiSecretStore";
 import { createAnthropicProviderService } from "../ai/anthropicProviderService";
 import { createOpenAIProviderService } from "../ai/openaiProviderService";
@@ -1736,6 +1737,9 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   const treasuryReads = createTreasuryReadService(database);
   const packingMutations = createPackingMutationService(database);
   const rmaMutations = createRmaMutationService(database);
+  // Created later (needs notifications + telegram). Tools only call it at
+  // execution time, well after startup, so a deferred holder is safe here.
+  let communicationsSend: CommunicationsSendService | null = null;
   const toolRegistry = createAgentToolRegistry(foundationReads, {
     getRunsList: () => agentReads.getRunsList(),
     currencyReads,
@@ -1750,6 +1754,14 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       finance: financeMutations,
       quotes: quoteMutations,
       treasury: treasuryMutations,
+      communications: {
+        sendToRecipients: (input) => {
+          if (!communicationsSend) {
+            throw new Error("Messaging is not available on this device.");
+          }
+          return communicationsSend.sendToRecipients(input);
+        },
+      },
       projectLookup: {
         findByCode(workspaceId, code) {
           const row = database
@@ -1878,6 +1890,12 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   });
   const softwareLicenses = createSoftwareLicenseService(database);
   const notifications = createNotificationLocalService(database);
+  // Now that notifications and Telegram exist, wire the deferred messaging
+  // service the send_message agent tool calls (see the holder above).
+  communicationsSend = createCommunicationsSendService(database, {
+    notifications,
+    telegram: { sendTelegramMessage: telegramConnectorService.sendTelegramMessage },
+  });
   const documentStorage = createSupabaseDocumentStorage({
     supabaseUrl: isSupabaseSyncEnabled() ? process.env.VITE_SUPABASE_URL : undefined,
     bucket: "workspace-documents",

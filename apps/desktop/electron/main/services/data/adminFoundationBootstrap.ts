@@ -36,6 +36,7 @@ const operationalPermissions = [
   ["perm-treasury-reimbursements-review", "treasury.reimbursements.review", "Review reimbursements", "Adjust deductible amounts and fiscal status"],
   ["perm-treasury-export", "treasury.export", "Export treasury reports", "Export treasury data and reports"],
   ["perm-agents-manage", "agents.manage", "Manage agents", "Configure agents, AI providers, connectors and approval modes"],
+  ["perm-communications-send", "communications.send", "Send messages", "Let agents send operational messages to teammates (in-app and Telegram)"],
 ] as const;
 
 const operationalRoles = [
@@ -78,6 +79,7 @@ const operationalRolePermissions = [
   ["role-admin", "perm-treasury-reimbursements-review"],
   ["role-admin", "perm-treasury-export"],
   ["role-admin", "perm-agents-manage"],
+  ["role-admin", "perm-communications-send"],
   ["role-crew", "perm-projects-read"],
   ["role-crew", "perm-assets-read"],
   ["role-crew", "perm-incidents-read"],
@@ -93,6 +95,7 @@ const operationalRolePermissions = [
   ["role-supervisor", "perm-rma-create"],
   ["role-supervisor", "perm-packing-read"],
   ["role-supervisor", "perm-packing-create"],
+  ["role-supervisor", "perm-communications-send"],
   ["role-finance-viewer", "perm-finance-read"],
   ["role-finance-viewer", "perm-invoices-read"],
   ["role-finance-viewer", "perm-invoices-export"],

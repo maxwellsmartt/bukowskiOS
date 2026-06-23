@@ -39,6 +39,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   "treasury.reimbursements.review": "revisar reembolsos",
   "treasury.export": "exportar reportes de tesorería",
   "agents.manage": "administrar agentes",
+  "communications.send": "enviar mensajes al equipo",
 };
 
 export const describePermission = (permission: string): string => PERMISSION_LABELS[permission] ?? permission;
