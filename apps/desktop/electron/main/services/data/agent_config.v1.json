@@ -1,5 +1,5 @@
 {
-  "version": "v7",
+  "version": "v8",
   "system_managed_fields": [
     "agent_key",
     "agent_type",
@@ -73,6 +73,10 @@
         "create_notification",
         "create_todo",
         "create_reminder",
+        "list_todos",
+        "complete_todo",
+        "update_reminder",
+        "cancel_reminder",
         "read_attached_document",
         "assess_repair_or_replace",
         "find_substitute_assets",
@@ -403,6 +407,12 @@
         "get_overdue_returns",
         "get_open_incidents",
         "get_runs_snapshot",
+        "create_todo",
+        "create_reminder",
+        "list_todos",
+        "complete_todo",
+        "update_reminder",
+        "cancel_reminder",
         "send_message"
       ],
       "allowed_domains_json": [

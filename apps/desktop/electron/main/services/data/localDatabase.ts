@@ -1751,6 +1751,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   // Created later (needs notifications + telegram). Tools only call it at
   // execution time, well after startup, so a deferred holder is safe here.
   let communicationsSend: CommunicationsSendService | null = null;
+  let notificationTools: NotificationLocalService | null = null;
   const toolRegistry = createAgentToolRegistry(foundationReads, {
     getRunsList: () => agentReads.getRunsList(),
     currencyReads,
@@ -1765,6 +1766,38 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       finance: financeMutations,
       quotes: quoteMutations,
       treasury: treasuryMutations,
+      notifications: {
+        listTodos: (input) => {
+          if (!notificationTools) {
+            throw new Error("Todos and reminders are not available on this device.");
+          }
+          return notificationTools.listTodos(input);
+        },
+        listReminders: (input) => {
+          if (!notificationTools) {
+            throw new Error("Todos and reminders are not available on this device.");
+          }
+          return notificationTools.listReminders(input);
+        },
+        updateTodo: (input) => {
+          if (!notificationTools) {
+            throw new Error("Todos and reminders are not available on this device.");
+          }
+          return notificationTools.updateTodo(input);
+        },
+        updateReminder: (input) => {
+          if (!notificationTools) {
+            throw new Error("Todos and reminders are not available on this device.");
+          }
+          return notificationTools.updateReminder(input);
+        },
+        deleteReminder: (input) => {
+          if (!notificationTools) {
+            throw new Error("Todos and reminders are not available on this device.");
+          }
+          return notificationTools.deleteReminder(input);
+        },
+      },
       communications: {
         sendToRecipients: (input) => {
           if (!communicationsSend) {
@@ -1901,6 +1934,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   });
   const softwareLicenses = createSoftwareLicenseService(database);
   const notifications = createNotificationLocalService(database);
+  notificationTools = notifications;
   // Now that notifications and Telegram exist, wire the deferred messaging
   // service the send_message agent tool calls (see the holder above).
   communicationsSend = createCommunicationsSendService(database, {

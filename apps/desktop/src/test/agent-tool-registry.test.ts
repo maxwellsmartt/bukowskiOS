@@ -7,6 +7,7 @@ import { createFoundationReadService } from "../../electron/main/services/data/f
 import { createAgentReadService } from "../../electron/main/services/data/agentReadService";
 import { createAssetMutationService } from "../../electron/main/services/data/assetMutationService";
 import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
+import { applyNotificationLocalMigration, createNotificationLocalService } from "../../electron/main/services/data/notificationLocalService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("agent tool registry", () => {
@@ -114,6 +115,10 @@ describe("agent tool registry", () => {
         "assign_move_assets",
         "update_project_unit",
         "delete_project_unit",
+        "list_todos",
+        "complete_todo",
+        "update_reminder",
+        "cancel_reminder",
       ]),
     );
 
@@ -127,6 +132,10 @@ describe("agent tool registry", () => {
     expect(registry.requiresApproval("assign_move_assets")).toBe(true);
     expect(registry.requiresApproval("update_project_unit")).toBe(true);
     expect(registry.requiresApproval("delete_project_unit")).toBe(true);
+    expect(registry.requiresApproval("list_todos")).toBe(false);
+    expect(registry.requiresApproval("complete_todo")).toBe(false);
+    expect(registry.requiresApproval("update_reminder")).toBe(false);
+    expect(registry.requiresApproval("cancel_reminder")).toBe(false);
     expect(registry.requiresApproval("get_asset_availability")).toBe(false);
 
     const approvalRequiredToolNames = [
@@ -146,6 +155,118 @@ describe("agent tool registry", () => {
     for (const tool of writeDefs) {
       expect((tool as { requiresApproval?: boolean }).requiresApproval).toBe(true);
     }
+
+    cleanup();
+  });
+
+  it("manages personal todos and reminders for the acting user", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-tasks");
+    const secretStore = { hasProviderSecret: () => false };
+    const noopMutation = (label: string) =>
+      new Proxy({}, {
+        get: () => () => {
+          throw new Error(`mutation '${label}' should not be invoked in this test`);
+        },
+      });
+    applyNotificationLocalMigration(database);
+    const notifications = createNotificationLocalService(database);
+    const todo = notifications.createTodo({
+      userId: "user-paola",
+      workspaceId: "workspace-metadata",
+      title: "Confirm return window",
+      createdBy: "agent",
+    });
+    const reminder = notifications.createReminder({
+      userId: "user-paola",
+      workspaceId: "workspace-metadata",
+      title: "Call crew",
+      remindAt: "2026-06-24T14:00:00.000Z",
+      createdBy: "agent",
+    });
+    notifications.createTodo({
+      userId: "user-carlos",
+      workspaceId: "workspace-metadata",
+      title: "Private task",
+      createdBy: "user",
+    });
+
+    const registry = createAgentToolRegistry(createFoundationReadService(database), {
+      getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      writeServices: {
+        notifications,
+        assets: noopMutation("assets"),
+        packing: noopMutation("packing"),
+        projects: noopMutation("projects"),
+        incidents: noopMutation("incidents"),
+        rma: noopMutation("rma"),
+        finance: noopMutation("finance"),
+        quotes: noopMutation("quotes"),
+        treasury: noopMutation("treasury"),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    });
+
+    expect(() =>
+      registry.execute(
+        "list_todos",
+        "{}",
+        { workspaceId: "workspace-metadata" },
+        { allowedToolNames: ["list_todos"] },
+      ),
+    ).toThrow("This personal task action requires an authenticated user.");
+
+    const listResult = registry.execute(
+      "list_todos",
+      JSON.stringify({ limit: 10 }),
+      { workspaceId: "workspace-metadata", sourceActorUserId: "user-paola" },
+      { allowedToolNames: ["list_todos"] },
+    );
+
+    expect((listResult.result.payload.todos as Array<{ id: string }>).map((row) => row.id)).toEqual([todo.id]);
+    expect((listResult.result.payload.reminders as Array<{ id: string }>).map((row) => row.id)).toEqual([reminder.id]);
+
+    registry.execute(
+      "complete_todo",
+      JSON.stringify({ todo_id: todo.id, completed_at: "2026-06-23T20:00:00.000Z" }),
+      { workspaceId: "workspace-metadata", sourceActorUserId: "user-paola" },
+      { allowedToolNames: ["complete_todo"] },
+    );
+    expect(notifications.listTodos({ userId: "user-paola", workspaceId: "workspace-metadata" })[0]?.completedAt).toBe(
+      "2026-06-23T20:00:00.000Z",
+    );
+
+    registry.execute(
+      "update_reminder",
+      JSON.stringify({
+        reminder_id: reminder.id,
+        title: "Call crew updated",
+        remind_at: "2026-06-24T15:00:00.000Z",
+      }),
+      { workspaceId: "workspace-metadata", sourceActorUserId: "user-paola" },
+      { allowedToolNames: ["update_reminder"] },
+    );
+    expect(notifications.listReminders({ userId: "user-paola", workspaceId: "workspace-metadata" })[0]?.title).toBe(
+      "Call crew updated",
+    );
+
+    registry.execute(
+      "cancel_reminder",
+      JSON.stringify({ reminder_id: reminder.id }),
+      { workspaceId: "workspace-metadata", sourceActorUserId: "user-paola" },
+      { allowedToolNames: ["cancel_reminder"] },
+    );
+    expect(notifications.listReminders({ userId: "user-paola", workspaceId: "workspace-metadata" })).toEqual([]);
+
+    const outboxRows = database
+      .prepare("SELECT entity_type, operation_type FROM sync_outbox WHERE entity_id IN (?, ?) ORDER BY entity_type, operation_type")
+      .all(todo.id, reminder.id) as Array<{ entity_type: string; operation_type: string }>;
+    expect(outboxRows).toEqual(
+      expect.arrayContaining([
+        { entity_type: "todo", operation_type: "upsert" },
+        { entity_type: "reminder", operation_type: "delete" },
+      ]),
+    );
 
     cleanup();
   });

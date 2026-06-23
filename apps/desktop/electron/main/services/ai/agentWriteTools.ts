@@ -16,12 +16,18 @@ import type { createAssetMutationService } from "../data/assetMutationService";
 import type { createFinanceMutationService } from "../data/financeMutationService";
 import type { createQuoteMutationService } from "../data/quoteMutationService";
 import type { createTreasuryMutationService } from "../data/treasuryMutationService";
+import type { createNotificationLocalService } from "../data/notificationLocalService";
 import type { CommunicationsSendService } from "../data/communicationsSendService";
 
 type ProjectLookupService = {
   findByCode(workspaceId: string, code: string): { id: string; code: string; name: string; status: string } | null;
   findByIdentifier?(workspaceId: string, identifier: string): { id: string; code: string; name: string; status: string } | null;
 };
+
+type NotificationTaskToolsService = Pick<
+  ReturnType<typeof createNotificationLocalService>,
+  "listTodos" | "listReminders" | "updateTodo" | "updateReminder" | "deleteReminder"
+>;
 
 export type AgentWriteServices = {
   packing: ReturnType<typeof createPackingMutationService>;
@@ -32,6 +38,7 @@ export type AgentWriteServices = {
   finance: ReturnType<typeof createFinanceMutationService>;
   quotes: ReturnType<typeof createQuoteMutationService>;
   treasury: ReturnType<typeof createTreasuryMutationService>;
+  notifications?: NotificationTaskToolsService;
   communications?: CommunicationsSendService;
   projectLookup?: ProjectLookupService;
 };
@@ -191,6 +198,21 @@ const requireWorkspaceId = (context: AIGatewayToolContext): string => {
     throw new Error("Tool requires an active workspace. Ask the user to select one before retrying.");
   }
   return workspaceId;
+};
+
+const requireActorUserId = (context: AIGatewayToolContext): string => {
+  const userId = context.sourceActorUserId?.trim();
+  if (!userId) {
+    throw new Error("This personal task action requires an authenticated user. Ask the user to sign in before retrying.");
+  }
+  return userId;
+};
+
+const requireNotifications = (services: AgentWriteServices) => {
+  if (!services.notifications) {
+    throw new Error("Todos and reminders are not available on this device.");
+  }
+  return services.notifications;
 };
 
 const normalizeNonNegativeInteger = (value: unknown, fallback: number) => {
@@ -367,6 +389,169 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
             },
           },
         },
+      };
+    },
+  },
+
+  {
+    name: "list_todos",
+    description:
+      "List the current user's personal todos and reminders in the active workspace. Use this before completing todos or updating/cancelling reminders so ids are grounded.",
+    requiresApproval: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        limit: { type: "number", description: "Maximum rows per list. Defaults to 20." },
+        include_completed: { type: "boolean", description: "Defaults to false." },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const userId = requireActorUserId(context);
+      const notifications = requireNotifications(services);
+      const limit = Math.max(1, Math.min(50, Math.floor(asNumber(args.limit) ?? 20)));
+      const includeCompleted = asBoolean(args.include_completed) ?? false;
+      const todos = notifications
+        .listTodos({ userId, workspaceId, limit })
+        .filter((todo) => includeCompleted || !todo.completedAt)
+        .map((todo) => ({
+          id: todo.id,
+          title: todo.title,
+          notes: todo.notes,
+          dueAt: todo.dueAt,
+          priority: todo.priority,
+          completedAt: todo.completedAt,
+          createdBy: todo.createdBy,
+        }));
+      const reminders = notifications
+        .listReminders({ userId, workspaceId, limit })
+        .filter((reminder) => includeCompleted || !reminder.completedAt)
+        .map((reminder) => ({
+          id: reminder.id,
+          title: reminder.title,
+          body: reminder.body,
+          remindAt: reminder.remindAt,
+          recurrenceRule: reminder.recurrenceRule,
+          snoozedUntil: reminder.snoozedUntil,
+          completedAt: reminder.completedAt,
+          createdBy: reminder.createdBy,
+        }));
+
+      return {
+        summary: `Loaded ${todos.length} todo(s) and ${reminders.length} reminder(s).`,
+        payload: { todos, reminders },
+      };
+    },
+  },
+
+  {
+    name: "complete_todo",
+    description:
+      "Mark one of the current user's personal todos as completed. Use list_todos first to resolve the todo id.",
+    requiresApproval: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["todo_id"],
+      properties: {
+        todo_id: { type: "string" },
+        completed_at: { type: "string", description: "Optional ISO timestamp. Defaults to now." },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const userId = requireActorUserId(context);
+      const notifications = requireNotifications(services);
+      const todoId = asString(args.todo_id);
+      if (!todoId) throw new Error("todo_id is required.");
+      const completedAt = asOptionalString(args.completed_at) ?? new Date().toISOString();
+
+      notifications.updateTodo({ userId, workspaceId, id: todoId, completedAt });
+
+      return {
+        summary: `Todo ${todoId} completed.`,
+        payload: { todoId, completedAt },
+      };
+    },
+  },
+
+  {
+    name: "update_reminder",
+    description:
+      "Update one of the current user's personal reminders. Use list_todos first to resolve the reminder id.",
+    requiresApproval: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["reminder_id"],
+      properties: {
+        reminder_id: { type: "string" },
+        title: { type: "string" },
+        body: { type: "string" },
+        remind_at: { type: "string", description: "ISO timestamp." },
+        recurrence_rule: { type: "string" },
+        snoozed_until: { type: "string" },
+        completed_at: { type: "string" },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const userId = requireActorUserId(context);
+      const notifications = requireNotifications(services);
+      const reminderId = asString(args.reminder_id);
+      if (!reminderId) throw new Error("reminder_id is required.");
+
+      notifications.updateReminder({
+        userId,
+        workspaceId,
+        id: reminderId,
+        title: asOptionalString(args.title),
+        body: Object.prototype.hasOwnProperty.call(args, "body") ? asOptionalString(args.body) ?? null : undefined,
+        remindAt: asOptionalString(args.remind_at),
+        recurrenceRule: Object.prototype.hasOwnProperty.call(args, "recurrence_rule")
+          ? asOptionalString(args.recurrence_rule) ?? null
+          : undefined,
+        snoozedUntil: Object.prototype.hasOwnProperty.call(args, "snoozed_until")
+          ? asOptionalString(args.snoozed_until) ?? null
+          : undefined,
+        completedAt: Object.prototype.hasOwnProperty.call(args, "completed_at")
+          ? asOptionalString(args.completed_at) ?? null
+          : undefined,
+      });
+
+      return {
+        summary: `Reminder ${reminderId} updated.`,
+        payload: { reminderId },
+      };
+    },
+  },
+
+  {
+    name: "cancel_reminder",
+    description:
+      "Cancel/delete one of the current user's personal reminders. Use list_todos first to resolve the reminder id.",
+    requiresApproval: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["reminder_id"],
+      properties: {
+        reminder_id: { type: "string" },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const userId = requireActorUserId(context);
+      const notifications = requireNotifications(services);
+      const reminderId = asString(args.reminder_id);
+      if (!reminderId) throw new Error("reminder_id is required.");
+
+      notifications.deleteReminder({ userId, workspaceId, id: reminderId });
+
+      return {
+        summary: `Reminder ${reminderId} cancelled.`,
+        payload: { reminderId },
       };
     },
   },
