@@ -2945,6 +2945,16 @@
       "noExecutionYet": "Aquí todavía no se ejecuta nada real. Sólo se registra tu decisión de forma limpia en el flujo.",
       "ifApproved": "Si se aprueba"
     },
+    "permission": {
+      "eyebrow": "Acceso restringido",
+      "title": "Tu rol no incluye permiso para {{permission}}.",
+      "body": "Un administrador puede concederte el acceso en Ajustes › Equipo y acceso. También puedes solicitarlo aquí.",
+      "requestAccess": "Solicitar acceso",
+      "requesting": "Enviando solicitud…",
+      "requested": "Solicitud enviada a los administradores.",
+      "alreadyRequested": "Ya enviaste esta solicitud; los administradores la están revisando.",
+      "requestFailed": "No se pudo enviar la solicitud de acceso."
+    },
     "approvalResult": {
       "denied": "Denegado. Este borrador supervisado se detiene aquí y no ejecuta nada.",
       "approvedForSession": "Aprobado por esta sesión. Seguimientos similares en este hilo pueden continuar sin volver a preguntar para este especialista.",

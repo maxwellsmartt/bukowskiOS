@@ -1,6 +1,8 @@
 import type { AIGatewayToolContext, AIGatewayToolCallTrace } from "@contracts";
 import type { AgentRunRow } from "@contracts";
 
+import { PermissionDeniedError } from "./agentPermissions";
+
 import type { FoundationReadService } from "../data/foundationReadService";
 import type { CurrencyReadService } from "../data/currencyReadService";
 import type { QuoteReadService } from "../data/quoteReadService";
@@ -43,7 +45,7 @@ const assertToolPermission = (tool: ToolDefinition, context: AIGatewayToolContex
   }
 
   if (!hasUserPermission(context, tool.requiredPermission)) {
-    throw new Error(`Tool ${tool.name} requires ${tool.requiredPermission}.`);
+    throw new PermissionDeniedError(tool.requiredPermission, tool.name);
   }
 };
 

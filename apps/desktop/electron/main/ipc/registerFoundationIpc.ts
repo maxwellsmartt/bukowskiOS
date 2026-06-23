@@ -135,6 +135,7 @@ import {
   previewCatalogCsvImportSchema,
   rmaSnapshotReadArgsSchema,
   reviewAgentRunSchema,
+  requestAgentPermissionSchema,
   refreshAiProviderModelsSchema,
   refreshCurrencyRatesSchema,
   saveAiProviderConfigSchema,
@@ -185,6 +186,7 @@ import type {
   CreateDraftRunFromChatCommand,
   CreateConnectorLinkTokenCommand,
   RecordRuntimeErrorCommand,
+  RequestAgentPermissionCommand,
   ReviewAgentRunCommand,
   SendAssistantChatTurnCommand,
   TranscribeAssistantAudioCommand,
@@ -652,6 +654,7 @@ type RegisterFoundationIpcOptions = {
     renameAssistantThread: (input: RenameAssistantThreadCommand) => AssistantChatSnapshot;
     sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) => Promise<AssistantChatSnapshot>;
     reviewRun: (input: ReviewAgentRunCommand, approverUserId?: string | null) => unknown;
+    requestPermission: (input: RequestAgentPermissionCommand, requesterUserId: string | null) => unknown;
     sendAssistantMessage: (input: AssistantGatewayRequest) => Promise<AssistantGatewayResponse>;
     createDraftRunFromChat: (input: CreateDraftRunFromChatCommand) => unknown;
   };
@@ -1086,6 +1089,13 @@ export const registerFoundationIpc = ({
     // gateway checks who is actually signed in, never a client-supplied id.
     const approverUserId = await workspaceAccess.getCurrentUserId("review agent runs");
     return agentMutations.reviewRun(input, approverUserId);
+  });
+  safeHandle(ipcChannels.agents.requestPermission, requestAgentPermissionSchema, async (_event, input) => {
+    // Any authenticated workspace member may ask for access; the requester is
+    // resolved server-side so the notification credits the real signed-in user.
+    await assertAgentReadAccess(input.workspaceId, "request agent access");
+    const requesterUserId = await workspaceAccess.getCurrentUserId("request agent access");
+    return agentMutations.requestPermission(input, requesterUserId);
   });
   safeHandle(
     ipcChannels.agents.sendAssistantMessage,

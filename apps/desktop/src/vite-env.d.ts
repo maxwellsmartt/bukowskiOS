@@ -118,6 +118,8 @@ import type {
   ReportIncidentResult,
   ResolveIncidentCommand,
   ReviewAgentRunCommand,
+  RequestAgentPermissionCommand,
+  RequestAgentPermissionResult,
   RefreshAIProviderModelsCommand,
   AgentRunReviewResult,
   ReturnPackingSlipItemsCommand,
@@ -326,6 +328,7 @@ declare global {
       sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) => Promise<AssistantChatSnapshot>;
       transcribeAudio: (input: TranscribeAssistantAudioCommand) => Promise<AssistantAudioTranscriptionResult>;
       reviewRun: (input: ReviewAgentRunCommand) => Promise<AgentRunReviewResult>;
+      requestAgentPermission: (input: RequestAgentPermissionCommand) => Promise<RequestAgentPermissionResult>;
       sendAssistantMessage: (input: AssistantGatewayRequest) => Promise<AssistantGatewayResponse>;
       createDraftRunFromChat: (input: CreateDraftRunFromChatCommand) => Promise<DraftRunFromChatResult>;
     };

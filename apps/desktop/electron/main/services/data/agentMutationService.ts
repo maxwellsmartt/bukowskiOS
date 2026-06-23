@@ -18,6 +18,9 @@ import type {
   CreateDraftRunFromChatCommand,
   DeleteAssistantThreadCommand,
   DraftRunFromChatResult,
+  NotificationCreateCommand,
+  RequestAgentPermissionCommand,
+  RequestAgentPermissionResult,
   ReviewAgentRunCommand,
   SaveConnectorConfigCommand,
   SaveAIProviderConfigCommand,
@@ -38,6 +41,7 @@ import type { AssistantGatewayService } from "../ai/assistantGatewayService";
 import { normalizeOpenAIBaseUrl, type OpenAIProviderService } from "../ai/openaiProviderService";
 import type { ConnectorBridgeService } from "../connectors/connectorBridgeService";
 import type { TelegramConnectorService } from "../connectors/telegramConnectorService";
+import { describePermission } from "../ai/agentPermissions";
 
 import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
@@ -438,6 +442,9 @@ export const createAgentMutationService = (
     assistantChatService?: AssistantChatService;
     connectorBridgeService?: ConnectorBridgeService;
     telegramConnectorService?: TelegramConnectorService;
+    notifications?: {
+      createNotification: (input: NotificationCreateCommand) => unknown;
+    };
   },
 ) => ({
   createAgent(input: CreateAgentCommand): AgentMutationResult {
@@ -1410,6 +1417,80 @@ export const createAgentMutationService = (
       db.exec("ROLLBACK");
       throw error;
     }
+  },
+
+  // Notify workspace admins that `requesterUserId` is asking for a permission so
+  // they can grant it in Settings. Idempotent within a 24h window: if the same
+  // user already has an unread request for the same permission, no new notice is
+  // sent (prevents spamming admins on repeated blocked attempts).
+  requestPermission(input: RequestAgentPermissionCommand, requesterUserId: string | null): RequestAgentPermissionResult {
+    const workspaceId = resolveCommandWorkspaceId(input);
+    const permission = ensureValue(input.permission, "Permission");
+    const label = describePermission(permission);
+
+    if (!requesterUserId) {
+      return { notifiedAdmins: 0, alreadyRequested: false, label };
+    }
+
+    const requester = db
+      .prepare("SELECT full_name FROM users WHERE id = ? LIMIT 1")
+      .get(requesterUserId) as { full_name: string } | undefined;
+    const requesterName = requester?.full_name?.trim() || "Un miembro del equipo";
+
+    const admins = db
+      .prepare(
+        `
+          SELECT DISTINCT wm.user_id AS user_id
+          FROM workspace_memberships wm
+          JOIN roles r ON r.id = wm.role_id
+          WHERE wm.workspace_id = ?
+            AND wm.status = 'active'
+            AND r.key = 'admin'
+            AND wm.user_id <> ?
+        `,
+      )
+      .all(workspaceId, requesterUserId) as Array<{ user_id: string }>;
+
+    if (!admins.length || !options.notifications) {
+      return { notifiedAdmins: 0, alreadyRequested: false, label };
+    }
+
+    const sourceRef = { type: "permission_request", permission, requesterUserId };
+    const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const existing = db
+      .prepare(
+        `
+          SELECT 1
+          FROM notifications
+          WHERE workspace_id = ?
+            AND kind = 'permission_request'
+            AND read_at IS NULL
+            AND created_at >= ?
+            AND source_ref LIKE ?
+            AND source_ref LIKE ?
+          LIMIT 1
+        `,
+      )
+      .get(workspaceId, sinceIso, `%"permission":"${permission}"%`, `%"requesterUserId":"${requesterUserId}"%`);
+
+    if (existing) {
+      return { notifiedAdmins: 0, alreadyRequested: true, label };
+    }
+
+    for (const admin of admins) {
+      options.notifications.createNotification({
+        userId: admin.user_id,
+        workspaceId,
+        kind: "permission_request",
+        title: "Solicitud de acceso",
+        body: `${requesterName} pidió permiso para ${label} desde el asistente. Concédelo en Ajustes › Equipo y acceso.`,
+        sourceType: "agent",
+        sourceRef,
+        linkTo: "/settings/team",
+      });
+    }
+
+    return { notifiedAdmins: admins.length, alreadyRequested: false, label };
   },
 
   createDraftRunFromChat(input: CreateDraftRunFromChatCommand): DraftRunFromChatResult {

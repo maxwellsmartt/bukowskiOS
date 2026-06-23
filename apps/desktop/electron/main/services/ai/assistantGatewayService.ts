@@ -17,6 +17,7 @@ import type { AISecretStore } from "./aiSecretStore";
 import type { AnthropicProviderService } from "./anthropicProviderService";
 import type { AssistantMemoryService } from "./assistantMemoryService";
 import type { AgentToolRegistry } from "./agentToolRegistry";
+import { PermissionDeniedError, describePermission } from "./agentPermissions";
 import type { OpenAIProviderService } from "./openaiProviderService";
 import type { AssistantGatewaySessionStore } from "./assistantGatewaySessionStore";
 
@@ -1231,8 +1232,43 @@ const assertActorMayUseTool = (
   }
   const permissions = context.userPermissions ?? [];
   if (!permissions.includes("*") && !permissions.includes(requiredPermission)) {
-    throw new Error(`Blocked. ${summarizeToolName(toolName)} requires the ${requiredPermission} permission.`);
+    throw new PermissionDeniedError(requiredPermission, toolName);
   }
+};
+
+const dedupePermissionRequests = (denials: Array<{ permission: string; label: string }>) => {
+  const seen = new Set<string>();
+  const unique: Array<{ permission: string; label: string }> = [];
+  for (const denial of denials) {
+    if (seen.has(denial.permission)) {
+      continue;
+    }
+    seen.add(denial.permission);
+    unique.push(denial);
+  }
+  return unique;
+};
+
+// Builds the structured + instructional output we hand back to the model when a
+// tool is blocked by role, so its reply names the missing access in plain
+// language and points the user to the in-app "request access" path.
+const buildPermissionDeniedOutput = (error: PermissionDeniedError) => {
+  const label = describePermission(error.permission);
+  return {
+    summary: `Blocked. ${summarizeToolName(error.toolName ?? "")} requires permission to ${label}.`.replace("  ", " "),
+    payload: {
+      ok: false,
+      tool_name: error.toolName,
+      permission_denied: {
+        permission: error.permission,
+        label,
+      },
+      user_message:
+        `This action needs the "${label}" permission, which the user's role does not include. ` +
+        "Explain that clearly in the user's language, do not attempt a workaround, and tell them they can " +
+        "request access — an admin grants it in Ajustes › Equipo y acceso. The in-app chat shows a Request access button.",
+    },
+  };
 };
 
 const buildTrustedToolContext = (db: DatabaseSync, request: AssistantGatewayRequest): AIGatewayToolContext => {
@@ -1483,6 +1519,9 @@ export const createAssistantGatewayService = (
     }> = [];
     const deferredWriteToolCalls: DeferredWriteToolCall[] = [];
     const executedWriteToolNames: string[] = [];
+    // Permissions the user's role lacked this turn — surfaced on the response so
+    // the chat can render a "request access" affordance.
+    const permissionDenials: Array<{ permission: string; label: string }> = [];
     const supervisorAllowedTools = parseJsonStringArray(supervisor.allowed_tools_json);
     const supervisorToolDefinitions = options.toolRegistry.definitionsFor(
       supervisorAllowedTools,
@@ -1615,6 +1654,18 @@ export const createAssistantGatewayService = (
           });
           toolCallsUsed += 1;
         } catch (error) {
+          if (error instanceof PermissionDeniedError) {
+            const denied = buildPermissionDeniedOutput(error);
+            permissionDenials.push({ permission: error.permission, label: describePermission(error.permission) });
+            toolTraces.push({ toolName: call.name, status: "failed", summary: denied.summary });
+            outputs.push({
+              type: "function_call_output",
+              call_id: call.call_id,
+              output: serializeToolPayload(denied.payload),
+            });
+            toolCallsUsed += 1;
+            continue;
+          }
           const summary = error instanceof Error ? error.message : `Tool ${call.name} failed.`;
           toolTraces.push({
             toolName: call.name,
@@ -1931,6 +1982,18 @@ export const createAssistantGatewayService = (
               });
               specialistToolCallsUsed += 1;
             } catch (error) {
+              if (error instanceof PermissionDeniedError) {
+                const denied = buildPermissionDeniedOutput(error);
+                permissionDenials.push({ permission: error.permission, label: describePermission(error.permission) });
+                toolTraces.push({ toolName: call.name, status: "failed", summary: denied.summary });
+                outputs.push({
+                  type: "function_call_output",
+                  call_id: call.call_id,
+                  output: serializeToolPayload(denied.payload),
+                });
+                specialistToolCallsUsed += 1;
+                continue;
+              }
               const summary = error instanceof Error ? error.message : `Tool ${call.name} failed.`;
               toolTraces.push({
                 toolName: call.name,
@@ -2240,6 +2303,7 @@ export const createAssistantGatewayService = (
       actionLinks,
       notificationIntents,
       operationalReceipt,
+      permissionRequests: dedupePermissionRequests(permissionDenials),
     };
   };
 

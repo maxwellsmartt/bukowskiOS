@@ -119,6 +119,7 @@ export const ipcChannels = {
     reviewRun: "bukowskiAgents:reviewRun",
     sendAssistantMessage: "bukowskiAgents:sendAssistantMessage",
     createDraftRunFromChat: "bukowskiAgents:createDraftRunFromChat",
+    requestPermission: "bukowskiAgents:requestPermission",
   },
   overview: {
     getSnapshot: "bukowskiOverview:getSnapshot",

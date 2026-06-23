@@ -4,6 +4,7 @@ import type {
   AssistantApprovalPreference,
   AssistantChatMessageSource,
   AssistantOperationalReceipt,
+  AssistantPermissionRequest,
   AgentRunApprovalDecision,
   AgentRunApprovalScope,
   AgentRunStatus,
@@ -191,6 +192,21 @@ export type ReviewAgentRunCommand = {
   decision: ReviewAgentRunDecision;
 };
 
+export type RequestAgentPermissionCommand = {
+  commandId: string;
+  workspaceId: string;
+  permission: string;
+};
+
+export type RequestAgentPermissionResult = {
+  /** How many workspace admins were notified of the request. */
+  notifiedAdmins: number;
+  /** True when an identical pending request already existed (no new notice sent). */
+  alreadyRequested: boolean;
+  /** Human label for the requested permission. */
+  label: string;
+};
+
 export type SaveAIProviderConfigCommand = {
   commandId: string;
   workspaceId: string;
@@ -330,4 +346,5 @@ export type AssistantGatewayResponse = {
   actionLinks?: AssistantActionLink[];
   notificationIntents?: AgentNotificationIntent[];
   operationalReceipt?: AssistantOperationalReceipt | null;
+  permissionRequests?: AssistantPermissionRequest[];
 };

@@ -55,6 +55,13 @@ export type AssistantOperationalReceipt = {
   nextSteps: string[];
 };
 
+/** A permission the acting user lacked this turn, surfaced so the chat can
+ * offer a "request access" action. */
+export type AssistantPermissionRequest = {
+  permission: string;
+  label: string;
+};
+
 export type AssistantChatMessageMeta = {
   tone: "sending" | "routed" | "approval" | "error";
   label: string;
@@ -73,6 +80,7 @@ export type AssistantChatMessageMeta = {
   actionLinks?: AssistantActionLink[];
   notificationIntents?: AgentNotificationIntent[];
   operationalReceipt?: AssistantOperationalReceipt | null;
+  permissionRequests?: AssistantPermissionRequest[];
 };
 
 export type AssistantChatAttachmentRow = {

@@ -26316,3 +26316,54 @@ input[type="number"] {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ----- Assistant chat · permission-block card -----
+   Shown when an agent action is blocked by the user's role. Cooler/neutral
+   accent tone (informational, not destructive) with a "request access" action. */
+.assistant-chat-permission-card {
+  display: grid;
+  gap: 10px;
+  width: fit-content;
+  max-width: min(84%, 560px);
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.assistant-chat-permission-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.assistant-chat-permission-eyebrow {
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-primary));
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.assistant-chat-permission-copy strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.assistant-chat-permission-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.assistant-chat-permission-card .primary-control {
+  justify-self: start;
+}
+
+.assistant-chat-permission-sent {
+  color: var(--status-success-fg, #6fe0a8);
+  font-size: 12px;
+  font-weight: 600;
+}

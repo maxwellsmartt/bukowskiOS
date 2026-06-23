@@ -23,6 +23,8 @@ import type {
   DeleteAssistantThreadCommand,
   DraftRunFromChatResult,
   MissionControlSnapshot,
+  RequestAgentPermissionCommand,
+  RequestAgentPermissionResult,
   ReviewAgentRunCommand,
   SaveAIProviderConfigCommand,
   RefreshAIProviderModelsCommand,
@@ -438,6 +440,16 @@ export const reviewAgentRun = async (input: ReviewAgentRunCommand): Promise<Agen
   const result = await window.bukowskiAgents.reviewRun(input);
   notifyAgentsChanged();
   return result;
+};
+
+export const requestAgentPermission = async (
+  input: RequestAgentPermissionCommand,
+): Promise<RequestAgentPermissionResult> => {
+  if (!window.bukowskiAgents) {
+    throw new Error("Agents bridge unavailable");
+  }
+
+  return window.bukowskiAgents.requestAgentPermission(input);
 };
 
 export const createDraftRunFromChat = async (

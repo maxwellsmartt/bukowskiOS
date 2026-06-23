@@ -988,10 +988,11 @@ describe("assistant gateway service", () => {
         expect.objectContaining({
           toolName: "get_financial_health",
           status: "failed",
-          summary: "Blocked. Get Financial Health requires the finance.read permission.",
+          summary: "Blocked. Get Financial Health requires permission to ver finanzas.",
         }),
       ]),
     );
+    expect(result.permissionRequests).toEqual([{ permission: "finance.read", label: "ver finanzas" }]);
 
     cleanup();
   });

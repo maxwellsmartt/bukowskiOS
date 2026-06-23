@@ -16,6 +16,7 @@ import type {
   AssistantChatThreadState,
   AssistantGatewayAttachment,
   AssistantOperationalReceipt,
+  AssistantPermissionRequest,
   CreateAssistantThreadCommand,
   DeleteAssistantThreadCommand,
   SendAssistantChatTurnCommand,
@@ -119,6 +120,7 @@ const normalizeMeta = (response: {
   actionLinks?: AssistantActionLink[];
   notificationIntents?: AgentNotificationIntent[];
   operationalReceipt?: AssistantOperationalReceipt | null;
+  permissionRequests?: AssistantPermissionRequest[];
 }): AssistantChatMessageMeta => ({
   tone:
     response.status === "provider_error" ||
@@ -144,6 +146,7 @@ const normalizeMeta = (response: {
   actionLinks: response.actionLinks ?? [],
   notificationIntents: response.notificationIntents ?? [],
   operationalReceipt: response.operationalReceipt ?? null,
+  permissionRequests: response.permissionRequests ?? [],
 });
 
 const mapThreadStateFromResponse = (status: string): AssistantChatThreadState => {

@@ -158,7 +158,7 @@ describe("agent tool registry", () => {
         { workspaceId: "workspace-metadata" },
         { allowedToolNames: ["get_financial_health"] },
       ),
-    ).toThrow("Tool get_financial_health requires finance.read.");
+    ).toThrow("Blocked. This action requires the finance.read permission.");
 
     expect(() =>
       registry.execute(
@@ -167,7 +167,7 @@ describe("agent tool registry", () => {
         { workspaceId: "workspace-metadata", userPermissions: ["finance.read"] },
         { allowedToolNames: ["list_bank_movements"] },
       ),
-    ).toThrow("Tool list_bank_movements requires treasury.transactions.read.");
+    ).toThrow("Blocked. This action requires the treasury.transactions.read permission.");
 
     expect(
       registry.execute(

@@ -2941,6 +2941,16 @@
       "noExecutionYet": "No real execution happens here yet. This only records your decision cleanly in the flow.",
       "ifApproved": "If approved"
     },
+    "permission": {
+      "eyebrow": "Access restricted",
+      "title": "Your role does not include permission to {{permission}}.",
+      "body": "An admin can grant you access in Settings › Team & access. You can also request it here.",
+      "requestAccess": "Request access",
+      "requesting": "Sending request…",
+      "requested": "Request sent to your admins.",
+      "alreadyRequested": "You already requested this; your admins are reviewing it.",
+      "requestFailed": "Could not send the access request."
+    },
     "approvalResult": {
       "denied": "Denied. This supervised draft stops here and nothing executes.",
       "approvedForSession": "Approved for this session. Similar follow-ups in this thread can continue without asking again for this specialist.",

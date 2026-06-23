@@ -34,7 +34,7 @@ import type { AssistantApprovalPreference, AssistantChatMessageMeta, AssistantCh
 import { useAssistantChat } from "@app/providers/AssistantChatContext";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { useNotifications } from "@app/providers/NotificationsProvider";
-import { reviewAgentRun, transcribeAssistantAudio } from "@features/agents/useAgentsData";
+import { requestAgentPermission, reviewAgentRun, transcribeAssistantAudio } from "@features/agents/useAgentsData";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { readJsonPreference, uiPreferenceKeys, writeJsonPreference } from "@shared/lib/preferences";
 
@@ -636,6 +636,9 @@ export const GlobalAssistantChat = () => {
   const [optimisticTurn, setOptimisticTurn] = useState<OptimisticTurn | null>(null);
   const [optimisticAssistantMessage, setOptimisticAssistantMessage] = useState<OptimisticAssistantMessage | null>(null);
   const [reviewingRunId, setReviewingRunId] = useState<string | null>(null);
+  // Tracks the "request access" flow per permission key: "pending" while the
+  // request is in flight, "sent"/"already" once resolved.
+  const [permissionRequestState, setPermissionRequestState] = useState<Record<string, "pending" | "sent" | "already">>({});
   const [actionError, setActionError] = useState<string | null>(null);
   const [voiceState, setVoiceState] = useState<"idle" | "recording" | "transcribing">("idle");
   const [voiceLevels, setVoiceLevels] = useState<number[]>(silentVoiceLevels);
@@ -1231,6 +1234,33 @@ export const GlobalAssistantChat = () => {
     }
   };
 
+  const handleRequestPermission = async (permission: string) => {
+    if (!isWorkspaceReady || permissionRequestState[permission] === "pending") {
+      return;
+    }
+
+    setPermissionRequestState((current) => ({ ...current, [permission]: "pending" }));
+    setActionError(null);
+    try {
+      const result = await requestAgentPermission({
+        commandId: `cmd-chat-perm-${Date.now().toString(36)}`,
+        workspaceId,
+        permission,
+      });
+      setPermissionRequestState((current) => ({
+        ...current,
+        [permission]: result.alreadyRequested ? "already" : "sent",
+      }));
+    } catch (error) {
+      setPermissionRequestState((current) => {
+        const next = { ...current };
+        delete next[permission];
+        return next;
+      });
+      setActionError(getUserFacingErrorMessage(error, t("assistantChat.permission.requestFailed")));
+    }
+  };
+
   const handleApprovalPreferenceChange = async (nextValue: AssistantApprovalPreference) => {
     setSelectedApproval(nextValue);
     await updateSessionApprovalMode(resolvedActiveSession.id, nextValue);
@@ -1731,6 +1761,41 @@ export const GlobalAssistantChat = () => {
                         <p>{resolveApprovalSummary(messageState, t)}</p>
                       </div>
                     ) : null}
+
+                    {messageState?.permissionRequests?.length
+                      ? messageState.permissionRequests.map((request) => {
+                          const status = permissionRequestState[request.permission];
+                          return (
+                            <div className="assistant-chat-permission-card" key={request.permission}>
+                              <div className="assistant-chat-permission-copy">
+                                <span className="assistant-chat-permission-eyebrow">
+                                  {t("assistantChat.permission.eyebrow")}
+                                </span>
+                                <strong>{t("assistantChat.permission.title", { permission: request.label })}</strong>
+                                <p>{t("assistantChat.permission.body")}</p>
+                              </div>
+                              {status === "sent" || status === "already" ? (
+                                <span className="assistant-chat-permission-sent">
+                                  {status === "already"
+                                    ? t("assistantChat.permission.alreadyRequested")
+                                    : t("assistantChat.permission.requested")}
+                                </span>
+                              ) : (
+                                <button
+                                  className="primary-control"
+                                  disabled={status === "pending"}
+                                  onClick={() => void handleRequestPermission(request.permission)}
+                                  type="button"
+                                >
+                                  {status === "pending"
+                                    ? t("assistantChat.permission.requesting")
+                                    : t("assistantChat.permission.requestAccess")}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })
+                      : null}
 
                     {messageState && isExpanded ? (
                       <div className="assistant-chat-message-details">

@@ -2165,6 +2165,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       assistantChatService,
       connectorBridgeService,
       telegramConnectorService,
+      notifications,
     }),
   };
 };

@@ -196,6 +196,8 @@ import type {
   RmaSnapshotQuery,
   RmaSnapshot,
   ReviewAgentRunCommand,
+  RequestAgentPermissionCommand,
+  RequestAgentPermissionResult,
   AgentRunReviewResult,
   DraftRunFromChatResult,
   SendAssistantChatTurnCommand,
@@ -467,6 +469,8 @@ const bukowskiAgents = {
     ipcRenderer.invoke(ipcChannels.agents.transcribeAudio, input) as Promise<AssistantAudioTranscriptionResult>,
   reviewRun: (input: ReviewAgentRunCommand) =>
     ipcRenderer.invoke(ipcChannels.agents.reviewRun, input) as Promise<AgentRunReviewResult>,
+  requestAgentPermission: (input: RequestAgentPermissionCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.requestPermission, input) as Promise<RequestAgentPermissionResult>,
   sendAssistantMessage: (input: AssistantGatewayRequest) =>
     ipcRenderer.invoke(ipcChannels.agents.sendAssistantMessage, input) as Promise<AssistantGatewayResponse>,
   createDraftRunFromChat: (input: CreateDraftRunFromChatCommand) =>

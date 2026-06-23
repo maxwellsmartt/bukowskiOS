@@ -327,6 +327,14 @@ export const createDraftRunFromChatSchema = z
   })
   .strict();
 
+export const requestAgentPermissionSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    permission: nonEmptyString,
+  })
+  .strict();
+
 export const recordRuntimeErrorSchema = z
   .object({
     sourceKind: z.enum(["main", "renderer", "webcontents"]),
