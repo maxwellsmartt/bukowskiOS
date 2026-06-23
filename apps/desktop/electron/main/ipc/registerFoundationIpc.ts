@@ -825,11 +825,22 @@ export const registerFoundationIpc = ({
     };
   };
 
-  const assertAgentAdminAccess = (input: { workspaceId: string }, action: string) =>
-    // Existing admin-like permission used by workspace administration screens.
-    // TODO(security): introduce a dedicated `agents.manage` permission in the
-    // remote and local role seeds, then switch these checks to that key.
-    assertAgentWorkspaceAccess(input, action, "users.invite");
+  const assertAgentAdminAccess = async (input: { workspaceId: string }, action: string) => {
+    // Agent administration is gated by the dedicated `agents.manage` permission.
+    // During the rollout window we fall back to the legacy `users.invite`
+    // permission so admins are never locked out before every workspace (local
+    // seed + remote migration) has `agents.manage` granted. Once the remote
+    // grant is applied everywhere, the fallback can be removed.
+    try {
+      await assertAgentWorkspaceAccess(input, action, "agents.manage");
+    } catch (agentsManageError) {
+      try {
+        await assertAgentWorkspaceAccess(input, action, "users.invite");
+      } catch {
+        throw agentsManageError;
+      }
+    }
+  };
 
   const assertAgentReadAccess = (workspaceId: string | undefined, action: string) =>
     workspaceAccess.assertWorkspaceAccess({

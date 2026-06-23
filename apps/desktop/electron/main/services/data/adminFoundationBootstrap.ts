@@ -35,6 +35,7 @@ const operationalPermissions = [
   ["perm-treasury-transactions-classify", "treasury.transactions.classify", "Classify transactions", "Annotate transactions and allocations"],
   ["perm-treasury-reimbursements-review", "treasury.reimbursements.review", "Review reimbursements", "Adjust deductible amounts and fiscal status"],
   ["perm-treasury-export", "treasury.export", "Export treasury reports", "Export treasury data and reports"],
+  ["perm-agents-manage", "agents.manage", "Manage agents", "Configure agents, AI providers, connectors and approval modes"],
 ] as const;
 
 const operationalRoles = [
@@ -76,6 +77,7 @@ const operationalRolePermissions = [
   ["role-admin", "perm-treasury-transactions-classify"],
   ["role-admin", "perm-treasury-reimbursements-review"],
   ["role-admin", "perm-treasury-export"],
+  ["role-admin", "perm-agents-manage"],
   ["role-crew", "perm-projects-read"],
   ["role-crew", "perm-assets-read"],
   ["role-crew", "perm-incidents-read"],
