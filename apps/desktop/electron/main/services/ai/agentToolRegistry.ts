@@ -314,6 +314,45 @@ export const createAgentToolRegistry = (
       },
     },
     {
+      name: "get_action_history",
+      description:
+        "Return a compact, permission-aware operational history across agent runs, approvals, command receipts, assets, incidents, packing, finance and communications.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          domain: {
+            type: "string",
+            enum: ["agents", "approvals", "commands", "assets", "incidents", "packing", "finance", "communications"],
+          },
+          project_id: { type: "string" },
+          entity_id: { type: "string" },
+          limit: { type: "number" },
+        },
+      },
+      execute: (args, context) => {
+        const includeFinancials =
+          hasUserPermission(context, "finance.read") ||
+          hasUserPermission(context, "invoices.read") ||
+          hasUserPermission(context, "treasury.transactions.read");
+        const history = foundationReads.getActionHistory({
+          domain: asOptionalString(args.domain),
+          projectId: asOptionalString(args.project_id),
+          entityId: asOptionalString(args.entity_id),
+          limit: asInteger(args.limit, 12),
+          includeFinancials,
+          includeCommunications: true,
+        });
+
+        return {
+          summary: history.count
+            ? `Loaded ${history.count} operational history item${history.count === 1 ? "" : "s"}.`
+            : "No operational history items matched that scope.",
+          payload: history,
+        };
+      },
+    },
+    {
       name: "get_agent_health_status",
       description: "Return current provider health, active agents and approval pressure.",
       parameters: {

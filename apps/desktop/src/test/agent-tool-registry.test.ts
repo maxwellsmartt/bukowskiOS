@@ -30,6 +30,7 @@ describe("agent tool registry", () => {
         "list_agent_capabilities",
         "get_pending_approvals",
         "get_runs_by_agent",
+        "get_action_history",
         "get_agent_health_status",
         "get_tool_coverage_snapshot",
         "search_active_projects",
@@ -74,6 +75,78 @@ describe("agent tool registry", () => {
         "link_feedback_to_feature",
       ]),
     );
+
+    cleanup();
+  });
+
+  it("returns compact action history without leaking finance events to users without finance read permission", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-history");
+    const registry = createAgentToolRegistry(createFoundationReadService(database), {
+      getRunsList: () => [],
+    });
+
+    database
+      .prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          ) VALUES (?, 'workspace-metadata', NULL, 'agent', 'agent_tool', ?, 'succeeded', NULL)
+        `,
+      )
+      .run("agent-assets-create-history-test", "2030-01-01T10:00:00.000Z");
+
+    database
+      .prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          ) VALUES (?, 'workspace-metadata', NULL, 'agent', 'agent_tool', ?, 'succeeded', NULL)
+        `,
+      )
+      .run("agent-quote-history-test", "2030-01-01T10:01:00.000Z");
+
+    const assetHistory = registry.execute(
+      "get_action_history",
+      JSON.stringify({ entity_id: "agent-assets-create-history-test", limit: 5 }),
+      { workspaceId: "workspace-metadata", userPermissions: [] },
+    );
+    const assetPayload = assetHistory.result.payload as { count: number; items: Array<{ domain: string; commandId?: string | null }> };
+    expect(assetPayload.count).toBe(1);
+    expect(assetPayload.items[0]?.domain).toBe("assets");
+    expect(assetPayload.items[0]?.commandId).toBe("agent-assets-create-history-test");
+
+    const hiddenFinanceHistory = registry.execute(
+      "get_action_history",
+      JSON.stringify({ entity_id: "agent-quote-history-test", limit: 5 }),
+      { workspaceId: "workspace-metadata", userPermissions: [] },
+    );
+    const hiddenPayload = hiddenFinanceHistory.result.payload as { count: number; omittedDomains: string[]; items: Array<{ domain: string }> };
+    expect(hiddenPayload.count).toBe(0);
+    expect(hiddenPayload.omittedDomains).toContain("finance");
+
+    const financeHistory = registry.execute(
+      "get_action_history",
+      JSON.stringify({ entity_id: "agent-quote-history-test", limit: 5 }),
+      { workspaceId: "workspace-metadata", userPermissions: ["finance.read"] },
+    );
+    const financePayload = financeHistory.result.payload as { count: number; items: Array<{ domain: string; commandId?: string | null }> };
+    expect(financePayload.count).toBe(1);
+    expect(financePayload.items[0]?.domain).toBe("finance");
+    expect(financePayload.items[0]?.commandId).toBe("agent-quote-history-test");
 
     cleanup();
   });

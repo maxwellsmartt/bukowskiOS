@@ -545,6 +545,81 @@ const formatTimelineTimestamp = (value: string) => {
   return `${dateFormatter.format(eventDate)} · ${eventTimeFormatter.format(eventDate)}`;
 };
 
+type OperationalActionHistoryDomain =
+  | "agents"
+  | "approvals"
+  | "commands"
+  | "assets"
+  | "incidents"
+  | "packing"
+  | "finance"
+  | "communications";
+
+type OperationalActionHistoryItem = {
+  id: string;
+  domain: OperationalActionHistoryDomain;
+  source: string;
+  title: string;
+  summary: string;
+  status: string;
+  actor: string;
+  timestamp: string;
+  timestampLabel: string;
+  entity?: {
+    type: string;
+    id: string;
+    label?: string | null;
+  };
+  project?: {
+    id: string;
+    label: string;
+  } | null;
+  approval?: {
+    required: boolean;
+    decision: string;
+    scope: string | null;
+  };
+  commandId?: string | null;
+  trace?: {
+    runId?: string | null;
+    threadId?: string | null;
+  };
+};
+
+const clampActionHistoryLimit = (value: number | null | undefined) => Math.min(Math.max(Math.floor(value ?? 12), 1), 40);
+
+const normalizeActionHistoryFilter = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
+
+const inferCommandDomain = (commandId: string): OperationalActionHistoryDomain => {
+  const normalized = commandId.toLowerCase();
+
+  if (normalized.includes("asset")) return "assets";
+  if (normalized.includes("incident") || normalized.includes("rma")) return "incidents";
+  if (normalized.includes("packing")) return "packing";
+  if (
+    normalized.includes("quote") ||
+    normalized.includes("invoice") ||
+    normalized.includes("finance") ||
+    normalized.includes("treasury") ||
+    normalized.includes("currency") ||
+    normalized.includes("collaborator")
+  ) {
+    return "finance";
+  }
+  if (normalized.includes("project") || normalized.includes("unit")) return "commands";
+
+  return "commands";
+};
+
+const compactActionSummary = (...parts: Array<string | null | undefined>) =>
+  truncate(
+    parts
+      .map((part) => (part ?? "").trim())
+      .filter(Boolean)
+      .join(" · "),
+    180,
+  );
+
 const mapAssetStatus = (
   operationalStatus: string,
   custodyStatus: string,
@@ -2143,6 +2218,514 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
       agent: row.agent_name,
       updatedAt: formatTimelineTimestamp(row.updated_at),
     }));
+  },
+
+  getActionHistory(input?: {
+    domain?: string | null;
+    projectId?: string | null;
+    entityId?: string | null;
+    limit?: number;
+    includeFinancials?: boolean;
+    includeCommunications?: boolean;
+  }) {
+    const limit = clampActionHistoryLimit(input?.limit);
+    const sourceLimit = Math.min(limit * 3, 80);
+    const domainFilter = normalizeActionHistoryFilter(input?.domain);
+    const projectFilter = (input?.projectId ?? "").trim();
+    const entityFilter = (input?.entityId ?? "").trim();
+    const includeFinancials = input?.includeFinancials === true;
+    const includeCommunications = input?.includeCommunications !== false;
+    const items: OperationalActionHistoryItem[] = [];
+
+    const pushIfVisible = (item: OperationalActionHistoryItem) => {
+      if (domainFilter && item.domain !== domainFilter) return;
+      if (projectFilter && item.project?.id !== projectFilter) return;
+      if (
+        entityFilter &&
+        item.id !== entityFilter &&
+        item.entity?.id !== entityFilter &&
+        item.commandId !== entityFilter &&
+        item.trace?.runId !== entityFilter &&
+        item.trace?.threadId !== entityFilter
+      ) {
+        return;
+      }
+
+      items.push(item);
+    };
+
+    const agentRuns = db
+      .prepare(
+        `
+          SELECT
+            agent_runs.id,
+            agent_runs.thread_id,
+            agent_runs.title,
+            agent_runs.input_summary,
+            agent_runs.output_summary,
+            agent_runs.status,
+            agent_runs.source_channel,
+            agent_runs.approval_required,
+            COALESCE(agent_runs.approval_decision, 'pending') AS approval_decision,
+            agent_runs.approval_scope,
+            agent_runs.updated_at,
+            COALESCE(agents.display_name, 'Supervisor Agent') AS agent_name
+          FROM agent_runs
+          LEFT JOIN agents ON agents.id = agent_runs.agent_id
+          WHERE agent_runs.workspace_id = ?
+          ORDER BY agent_runs.updated_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(workspaceId, sourceLimit) as Array<{
+      id: string;
+      thread_id: string | null;
+      title: string;
+      input_summary: string;
+      output_summary: string;
+      status: string;
+      source_channel: string;
+      approval_required: number;
+      approval_decision: string;
+      approval_scope: string | null;
+      updated_at: string;
+      agent_name: string;
+    }>;
+
+    for (const row of agentRuns) {
+      const approvalRequired = row.approval_required === 1 || row.status === "needs_approval";
+      pushIfVisible({
+        id: row.id,
+        domain: approvalRequired ? "approvals" : "agents",
+        source: "agent_runs",
+        title: row.title,
+        summary: compactActionSummary(row.output_summary, row.input_summary, row.agent_name),
+        status: row.status,
+        actor: row.agent_name,
+        timestamp: row.updated_at,
+        timestampLabel: formatTimelineTimestamp(row.updated_at),
+        entity: { type: "agent_run", id: row.id, label: row.title },
+        approval: {
+          required: approvalRequired,
+          decision: row.approval_decision,
+          scope: row.approval_scope,
+        },
+        trace: {
+          runId: row.id,
+          threadId: row.thread_id,
+        },
+      });
+    }
+
+    const commandRows = db
+      .prepare(
+        `
+          SELECT
+            command_receipts.command_id,
+            command_receipts.actor_type,
+            command_receipts.source_channel,
+            command_receipts.executed_at,
+            command_receipts.outcome_status,
+            command_receipts.error_message,
+            COALESCE(users.full_name, command_receipts.actor_type) AS actor_name
+          FROM command_receipts
+          LEFT JOIN users ON users.id = command_receipts.actor_user_id
+          WHERE command_receipts.workspace_id = ?
+          ORDER BY command_receipts.executed_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(workspaceId, sourceLimit) as Array<{
+      command_id: string;
+      actor_type: string;
+      source_channel: string;
+      executed_at: string;
+      outcome_status: string;
+      error_message: string | null;
+      actor_name: string;
+    }>;
+
+    for (const row of commandRows) {
+      const domain = inferCommandDomain(row.command_id);
+      if (domain === "finance" && !includeFinancials) continue;
+      pushIfVisible({
+        id: row.command_id,
+        domain,
+        source: "command_receipts",
+        title: row.command_id,
+        summary: compactActionSummary(row.outcome_status, row.error_message, row.source_channel),
+        status: row.outcome_status,
+        actor: row.actor_name,
+        timestamp: row.executed_at,
+        timestampLabel: formatTimelineTimestamp(row.executed_at),
+        entity: { type: "command", id: row.command_id, label: row.command_id },
+        commandId: row.command_id,
+      });
+    }
+
+    const assetEvents = db
+      .prepare(
+        `
+          SELECT
+            asset_events.id,
+            asset_events.asset_id,
+            asset_events.project_id,
+            asset_events.event_type,
+            asset_events.command_id,
+            asset_events.actor_type,
+            asset_events.source_channel,
+            asset_events.notes,
+            asset_events.event_timestamp,
+            COALESCE(assets.internal_code, asset_events.asset_id) AS asset_code,
+            COALESCE(assets.name, asset_events.asset_id) AS asset_name,
+            projects.name AS project_name,
+            COALESCE(users.full_name, asset_events.actor_type) AS actor_name
+          FROM asset_events
+          LEFT JOIN assets ON assets.id = asset_events.asset_id
+          LEFT JOIN projects ON projects.id = asset_events.project_id
+          LEFT JOIN users ON users.id = asset_events.performed_by_user_id
+          WHERE asset_events.workspace_id = ?
+          ORDER BY asset_events.event_timestamp DESC
+          LIMIT ?
+        `,
+      )
+      .all(workspaceId, sourceLimit) as Array<{
+      id: string;
+      asset_id: string;
+      project_id: string | null;
+      event_type: string;
+      command_id: string;
+      actor_type: string;
+      source_channel: string;
+      notes: string | null;
+      event_timestamp: string;
+      asset_code: string;
+      asset_name: string;
+      project_name: string | null;
+      actor_name: string;
+    }>;
+
+    for (const row of assetEvents) {
+      pushIfVisible({
+        id: row.id,
+        domain: "assets",
+        source: "asset_events",
+        title: `${row.event_type}: ${row.asset_code}`,
+        summary: compactActionSummary(row.asset_name, row.notes, row.source_channel),
+        status: row.event_type,
+        actor: row.actor_name,
+        timestamp: row.event_timestamp,
+        timestampLabel: formatTimelineTimestamp(row.event_timestamp),
+        entity: { type: "asset", id: row.asset_id, label: `${row.asset_code} · ${row.asset_name}` },
+        project: row.project_id ? { id: row.project_id, label: row.project_name ?? row.project_id } : null,
+        commandId: row.command_id,
+      });
+    }
+
+    const incidents = db
+      .prepare(
+        `
+          SELECT
+            incidents.id,
+            incidents.project_id,
+            incidents.asset_id,
+            incidents.title,
+            incidents.severity,
+            incidents.status,
+            incidents.updated_at,
+            projects.name AS project_name,
+            COALESCE(users.full_name, 'Unknown reporter') AS actor_name
+          FROM incidents
+          LEFT JOIN projects ON projects.id = incidents.project_id
+          LEFT JOIN users ON users.id = incidents.reported_by_user_id
+          WHERE incidents.workspace_id = ?
+          ORDER BY incidents.updated_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(workspaceId, sourceLimit) as Array<{
+      id: string;
+      project_id: string | null;
+      asset_id: string | null;
+      title: string;
+      severity: string;
+      status: string;
+      updated_at: string;
+      project_name: string | null;
+      actor_name: string;
+    }>;
+
+    for (const row of incidents) {
+      pushIfVisible({
+        id: row.id,
+        domain: "incidents",
+        source: "incidents",
+        title: row.title,
+        summary: compactActionSummary(row.severity, row.status, row.asset_id ? `asset ${row.asset_id}` : null),
+        status: row.status,
+        actor: row.actor_name,
+        timestamp: row.updated_at,
+        timestampLabel: formatTimelineTimestamp(row.updated_at),
+        entity: { type: "incident", id: row.id, label: row.title },
+        project: row.project_id ? { id: row.project_id, label: row.project_name ?? row.project_id } : null,
+      });
+    }
+
+    const packingSlips = db
+      .prepare(
+        `
+          SELECT
+            packing_slips.id,
+            packing_slips.project_id,
+            packing_slips.status,
+            packing_slips.issue_date,
+            packing_slips.updated_at,
+            projects.name AS project_name,
+            COALESCE(users.full_name, 'Unknown preparer') AS actor_name
+          FROM packing_slips
+          LEFT JOIN projects ON projects.id = packing_slips.project_id
+          LEFT JOIN users ON users.id = packing_slips.prepared_by_user_id
+          WHERE packing_slips.workspace_id = ?
+          ORDER BY packing_slips.updated_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(workspaceId, sourceLimit) as Array<{
+      id: string;
+      project_id: string;
+      status: string;
+      issue_date: string;
+      updated_at: string;
+      project_name: string | null;
+      actor_name: string;
+    }>;
+
+    for (const row of packingSlips) {
+      pushIfVisible({
+        id: row.id,
+        domain: "packing",
+        source: "packing_slips",
+        title: `Packing slip ${row.id}`,
+        summary: compactActionSummary(row.status, row.issue_date),
+        status: row.status,
+        actor: row.actor_name,
+        timestamp: row.updated_at,
+        timestampLabel: formatTimelineTimestamp(row.updated_at),
+        entity: { type: "packing_slip", id: row.id, label: row.id },
+        project: { id: row.project_id, label: row.project_name ?? row.project_id },
+      });
+    }
+
+    if (includeFinancials) {
+      const quotes = db
+        .prepare(
+          `
+            SELECT
+              quotes.id,
+              quotes.quote_number,
+              quotes.status,
+              quotes.project_id,
+              quotes.client_name_snapshot,
+              quotes.total_amount,
+              quotes.currency,
+              quotes.updated_at,
+              projects.name AS project_name,
+              COALESCE(users.full_name, quotes.created_by_actor_type) AS actor_name
+            FROM quotes
+            LEFT JOIN projects ON projects.id = quotes.project_id
+            LEFT JOIN users ON users.id = quotes.updated_by_user_id
+            WHERE quotes.workspace_id = ?
+            ORDER BY quotes.updated_at DESC
+            LIMIT ?
+          `,
+        )
+        .all(workspaceId, sourceLimit) as Array<{
+        id: string;
+        quote_number: string;
+        status: string;
+        project_id: string | null;
+        client_name_snapshot: string;
+        total_amount: number;
+        currency: string;
+        updated_at: string;
+        project_name: string | null;
+        actor_name: string;
+      }>;
+
+      for (const row of quotes) {
+        pushIfVisible({
+          id: row.id,
+          domain: "finance",
+          source: "quotes",
+          title: `Quote ${row.quote_number}`,
+          summary: compactActionSummary(row.client_name_snapshot, row.status, `${row.currency} ${row.total_amount.toFixed(2)}`),
+          status: row.status,
+          actor: row.actor_name,
+          timestamp: row.updated_at,
+          timestampLabel: formatTimelineTimestamp(row.updated_at),
+          entity: { type: "quote", id: row.id, label: row.quote_number },
+          project: row.project_id ? { id: row.project_id, label: row.project_name ?? row.project_id } : null,
+        });
+      }
+
+      const quoteVersions = db
+        .prepare(
+          `
+            SELECT
+              quote_versions.id,
+              quote_versions.quote_id,
+              quote_versions.version_number,
+              quote_versions.change_summary,
+              quote_versions.created_at,
+              quotes.quote_number,
+              quotes.project_id,
+              projects.name AS project_name,
+              COALESCE(users.full_name, 'Unknown user') AS actor_name
+            FROM quote_versions
+            JOIN quotes ON quotes.id = quote_versions.quote_id
+            LEFT JOIN projects ON projects.id = quotes.project_id
+            LEFT JOIN users ON users.id = quote_versions.created_by_user_id
+            WHERE quote_versions.workspace_id = ?
+            ORDER BY quote_versions.created_at DESC
+            LIMIT ?
+          `,
+        )
+        .all(workspaceId, sourceLimit) as Array<{
+        id: string;
+        quote_id: string;
+        version_number: number;
+        change_summary: string | null;
+        created_at: string;
+        quote_number: string;
+        project_id: string | null;
+        project_name: string | null;
+        actor_name: string;
+      }>;
+
+      for (const row of quoteVersions) {
+        pushIfVisible({
+          id: row.id,
+          domain: "finance",
+          source: "quote_versions",
+          title: `Quote ${row.quote_number} · v${row.version_number}`,
+          summary: compactActionSummary(row.change_summary, "version snapshot"),
+          status: "versioned",
+          actor: row.actor_name,
+          timestamp: row.created_at,
+          timestampLabel: formatTimelineTimestamp(row.created_at),
+          entity: { type: "quote", id: row.quote_id, label: row.quote_number },
+          project: row.project_id ? { id: row.project_id, label: row.project_name ?? row.project_id } : null,
+        });
+      }
+
+      const invoices = db
+        .prepare(
+          `
+            SELECT
+              invoices.id,
+              invoices.invoice_number,
+              invoices.status,
+              invoices.project_id,
+              invoices.client_name_snapshot,
+              invoices.outstanding_amount,
+              invoices.currency,
+              invoices.updated_at,
+              projects.name AS project_name,
+              COALESCE(users.full_name, invoices.created_by_actor_type) AS actor_name
+            FROM invoices
+            LEFT JOIN projects ON projects.id = invoices.project_id
+            LEFT JOIN users ON users.id = invoices.updated_by_user_id
+            WHERE invoices.workspace_id = ?
+            ORDER BY invoices.updated_at DESC
+            LIMIT ?
+          `,
+        )
+        .all(workspaceId, sourceLimit) as Array<{
+        id: string;
+        invoice_number: string;
+        status: string;
+        project_id: string | null;
+        client_name_snapshot: string;
+        outstanding_amount: number;
+        currency: string;
+        updated_at: string;
+        project_name: string | null;
+        actor_name: string;
+      }>;
+
+      for (const row of invoices) {
+        pushIfVisible({
+          id: row.id,
+          domain: "finance",
+          source: "invoices",
+          title: `Invoice ${row.invoice_number}`,
+          summary: compactActionSummary(row.client_name_snapshot, row.status, `${row.currency} ${row.outstanding_amount.toFixed(2)} outstanding`),
+          status: row.status,
+          actor: row.actor_name,
+          timestamp: row.updated_at,
+          timestampLabel: formatTimelineTimestamp(row.updated_at),
+          entity: { type: "invoice", id: row.id, label: row.invoice_number },
+          project: row.project_id ? { id: row.project_id, label: row.project_name ?? row.project_id } : null,
+        });
+      }
+    }
+
+    if (includeCommunications) {
+      const messages = db
+        .prepare(
+          `
+            SELECT
+              assistant_chat_messages.id,
+              assistant_chat_messages.thread_id,
+              assistant_chat_messages.role,
+              assistant_chat_messages.body,
+              assistant_chat_messages.message_state,
+              assistant_chat_messages.created_at,
+              assistant_chat_threads.title AS thread_title
+            FROM assistant_chat_messages
+            JOIN assistant_chat_threads ON assistant_chat_threads.id = assistant_chat_messages.thread_id
+            WHERE assistant_chat_threads.workspace_id = ?
+              AND assistant_chat_messages.deleted_at IS NULL
+            ORDER BY assistant_chat_messages.created_at DESC
+            LIMIT ?
+          `,
+        )
+        .all(workspaceId, sourceLimit) as Array<{
+        id: string;
+        thread_id: string;
+        role: string;
+        body: string;
+        message_state: string;
+        created_at: string;
+        thread_title: string;
+      }>;
+
+      for (const row of messages) {
+        pushIfVisible({
+          id: row.id,
+          domain: "communications",
+          source: "assistant_chat_messages",
+          title: `${row.role}: ${row.thread_title}`,
+          summary: compactActionSummary(row.body),
+          status: row.message_state,
+          actor: row.role,
+          timestamp: row.created_at,
+          timestampLabel: formatTimelineTimestamp(row.created_at),
+          entity: { type: "assistant_message", id: row.id, label: row.thread_title },
+          trace: { threadId: row.thread_id },
+        });
+      }
+    }
+
+    const sortedItems = items
+      .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
+      .slice(0, limit);
+
+    return {
+      count: sortedItems.length,
+      omittedDomains: includeFinancials ? [] : ["finance"],
+      items: sortedItems,
+    };
   },
 
   getAgentHealthStatus() {
