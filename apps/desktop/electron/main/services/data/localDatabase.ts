@@ -1092,12 +1092,15 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       return accumulator;
     }, {});
 
-  // Personal rows (notifications/todos/reminders) belonging to non-UUID local
-  // system actors — e.g. the "user-ops" AI agent — must never be pushed to
-  // Supabase: the remote user_id column is a uuid and rejects them with a 400,
-  // which jams the sync outbox. These rows are local-only by design.
+  // Personal rows (notifications/todos/reminders) must only be pushed to
+  // Supabase when BOTH their workspace_id and user_id are real UUIDs. Local
+  // system actors ("user-ops") and the local-fallback workspace
+  // ("workspace-metadata") are not UUIDs; the remote uuid columns reject them
+  // with a 400 that jams the sync outbox. Such rows are local-only by design.
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const isSyncableActorId = (value: unknown): boolean => typeof value === "string" && uuidPattern.test(value);
+  const isSyncableId = (value: unknown): boolean => typeof value === "string" && uuidPattern.test(value);
+  const isSyncablePersonalRow = (row: Record<string, unknown>): boolean =>
+    isSyncableId(row.workspace_id) && isSyncableId(row.user_id);
 
   const resolveSupabaseDomainUpserts = (
     row: { entity_type: string; entity_id: string },
@@ -1327,13 +1330,13 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       }
       case "notification": {
         const rows = selectAll("SELECT * FROM notifications WHERE id = ?", row.entity_id)
-          .filter((r) => isSyncableActorId(r.user_id))
+          .filter(isSyncablePersonalRow)
           .map((r) => parseJsonColumn(r, ["source_ref"]));
         return rows.length ? [{ table: "notifications", onConflict: "id", rows }] : [];
       }
       case "todo": {
         const rows = selectAll("SELECT * FROM todos WHERE id = ?", row.entity_id)
-          .filter((r) => isSyncableActorId(r.user_id))
+          .filter(isSyncablePersonalRow)
           .map((r) => parseJsonColumn(r, ["agent_action_ref"]));
         return rows.length ? [{ table: "todos", onConflict: "id", rows }] : [];
       }
@@ -1341,9 +1344,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         if (row.entity_id.startsWith("treasury-card-payment-")) {
           return [];
         }
-        const rows = selectAll("SELECT * FROM reminders WHERE id = ?", row.entity_id).filter((r) =>
-          isSyncableActorId(r.user_id),
-        );
+        const rows = selectAll("SELECT * FROM reminders WHERE id = ?", row.entity_id).filter(isSyncablePersonalRow);
         return rows.length ? [{ table: "reminders", onConflict: "id", rows }] : [];
       }
       case "agent": {
