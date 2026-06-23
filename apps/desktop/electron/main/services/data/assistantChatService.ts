@@ -931,6 +931,7 @@ export const createAssistantChatService = (
     async continueReviewedRun(input: {
       runId: string;
       decision: "approve" | "deny" | "approve_for_session";
+      approverUserId?: string | null;
     }) {
       const run = db
         .prepare(
@@ -1040,6 +1041,7 @@ export const createAssistantChatService = (
           threadId: run.thread_id,
           runId: run.id,
           approvalScope: input.decision === "approve_for_session" ? "session" : "run",
+          approverUserId: input.approverUserId ?? null,
         });
         completeAssistantMessage(run.thread_id, assistantMessageId, summarySeed, response);
       } catch (error) {

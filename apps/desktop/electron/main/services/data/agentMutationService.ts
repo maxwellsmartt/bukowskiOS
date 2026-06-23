@@ -1244,7 +1244,7 @@ export const createAgentMutationService = (
     return options.assistantChatService.sendTurn(input);
   },
 
-  async reviewRun(input: ReviewAgentRunCommand): Promise<AgentRunReviewResult> {
+  async reviewRun(input: ReviewAgentRunCommand, approverUserId?: string | null): Promise<AgentRunReviewResult> {
     const now = new Date().toISOString();
     const workspaceId = resolveCommandWorkspaceId(input);
     const run = db
@@ -1386,6 +1386,7 @@ export const createAgentMutationService = (
           await options.assistantChatService.continueReviewedRun({
             runId: run.id,
             decision: input.decision,
+            approverUserId: approverUserId ?? null,
           });
         } catch (continuationError) {
           createActivityEvent(db, workspaceId, {

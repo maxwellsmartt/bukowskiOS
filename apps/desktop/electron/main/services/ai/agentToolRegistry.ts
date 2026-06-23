@@ -502,6 +502,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "search_active_projects",
+      requiredPermission: "projects.read",
       description: "Search active or prep projects with compact operational detail.",
       parameters: {
         type: "object",
@@ -534,6 +535,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "search_assets",
+      requiredPermission: "assets.read",
       description:
         "Search assets using compact registry, assignment and location data. Defaults to the full workspace inventory, which is the correct scope for availability checks and packing slip creation. Pass scope='project' or project_id only when the user explicitly asks for assets already tied to a project. If a specific query returns no available asset for a user request, call this again with a broader query or an empty query plus status='Available' to propose close alternatives.",
       parameters: {
@@ -603,6 +605,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_asset_detail",
+      requiredPermission: "assets.read",
       description: "Get a compact operational summary for a specific asset.",
       parameters: {
         type: "object",
@@ -629,6 +632,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_asset_availability",
+      requiredPermission: "assets.read",
       description: "Return asset availability and reservation pressure for a date window.",
       parameters: {
         type: "object",
@@ -661,6 +665,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_asset_location",
+      requiredPermission: "assets.read",
       description: "Return current location, custody and responsibility for one asset.",
       parameters: {
         type: "object",
@@ -681,6 +686,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_asset_movements",
+      requiredPermission: "assets.read",
       description: "Return recent asset movements and operational events.",
       parameters: {
         type: "object",
@@ -705,6 +711,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_asset_reservations",
+      requiredPermission: "assets.read",
       description: "Return reservations, assignments or checkouts linked to assets in a window.",
       parameters: {
         type: "object",
@@ -737,6 +744,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_kit_contents",
+      requiredPermission: "assets.read",
       description: "Return active kits and the assets currently linked to them.",
       parameters: {
         type: "object",
@@ -765,6 +773,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "search_projects",
+      requiredPermission: "projects.read",
       description: "Search projects using compact project summary data.",
       parameters: {
         type: "object",
@@ -804,6 +813,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_project_detail",
+      requiredPermission: "projects.read",
       description: "Return detailed project, schedule, budget, units, assets and incident context.",
       parameters: {
         type: "object",
@@ -843,6 +853,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_project_schedule",
+      requiredPermission: "projects.read",
       description: "Get compact schedule details for a project.",
       parameters: {
         type: "object",
@@ -881,6 +892,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_project_units",
+      requiredPermission: "projects.read",
       description: "Get project units with compact crew and date details.",
       parameters: {
         type: "object",
@@ -917,6 +929,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_project_conflicts",
+      requiredPermission: "projects.read",
       description: "Return overlapping project-unit windows inside a date range.",
       parameters: {
         type: "object",
@@ -945,6 +958,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_project_crew_allocations",
+      requiredPermission: "projects.read",
       description: "Return crew allocations grouped by project unit.",
       parameters: {
         type: "object",
@@ -966,6 +980,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_open_incidents",
+      requiredPermission: "incidents.read",
       description: "Return open or in-review incidents with compact fields.",
       parameters: {
         type: "object",
@@ -1004,6 +1019,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "search_incidents",
+      requiredPermission: "incidents.read",
       description: "Search incidents with compact ownership, severity and estimate fields.",
       parameters: {
         type: "object",
@@ -1044,6 +1060,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_incident_detail",
+      requiredPermission: "incidents.read",
       description: "Return detailed incident context with owner, project, asset and cost fields.",
       parameters: {
         type: "object",
@@ -1067,6 +1084,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_incident_timeline",
+      requiredPermission: "incidents.read",
       description: "Return the reported/resolved lifecycle and linked operational events for an incident.",
       parameters: {
         type: "object",
@@ -1091,6 +1109,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_incident_estimates",
+      requiredPermission: "incidents.read",
       description: "Return incident estimates and whether each incident still needs financial estimation.",
       parameters: {
         type: "object",
@@ -1119,6 +1138,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_maintenance_queue",
+      requiredPermission: "assets.read",
       description: "Return assets currently in maintenance with latest linked incident context.",
       parameters: {
         type: "object",
@@ -1141,6 +1161,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_asset_maintenance_history",
+      requiredPermission: "assets.read",
       description: "Return maintenance events and related incidents for one asset.",
       parameters: {
         type: "object",
@@ -1165,6 +1186,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_incidents_missing_cost_estimate",
+      requiredPermission: "incidents.read",
       description: "Return incidents that still do not have a cost estimate.",
       parameters: {
         type: "object",
@@ -1323,6 +1345,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_schedule_conflicts",
+      requiredPermission: "projects.read",
       description: "Return overlapping unit windows and crew scheduling conflicts in the next 30 days.",
       parameters: {
         type: "object",
@@ -1350,6 +1373,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_overdue_returns",
+      requiredPermission: "packing-slips.read",
       description: "Return packing slips that are currently overdue.",
       parameters: {
         type: "object",
@@ -2618,9 +2642,23 @@ export const createAgentToolRegistry = (
       parameters: tool.parameters,
       ...(tool.requiresApproval ? { requiresApproval: true } : {}),
     })),
-    definitionsFor(toolNames: readonly string[] | null | undefined) {
+    definitionsFor(
+      toolNames: readonly string[] | null | undefined,
+      userPermissions?: readonly string[] | null,
+    ) {
+      // When permissions are provided we hide tools the acting user could never
+      // run, so the model never proposes a blocked action (and never surfaces a
+      // permission error the user can't act on). `undefined`/`null` keeps the
+      // legacy behaviour of exposing every agent-allowed tool.
+      const canUse = (tool: ToolDefinition) => {
+        if (!tool.requiredPermission || !userPermissions) {
+          return true;
+        }
+        return userPermissions.includes("*") || userPermissions.includes(tool.requiredPermission);
+      };
+
       return definitions
-        .filter((tool) => isToolAllowed(tool.name, toolNames))
+        .filter((tool) => isToolAllowed(tool.name, toolNames) && canUse(tool))
         .map((tool) => ({
           type: "function" as const,
           name: tool.name,
@@ -2632,6 +2670,9 @@ export const createAgentToolRegistry = (
     requiresApproval(name: string): boolean {
       const tool = toolMap.get(name);
       return Boolean(tool?.requiresApproval);
+    },
+    requiredPermissionFor(name: string): string | null {
+      return toolMap.get(name)?.requiredPermission ?? null;
     },
     isAllowed(name: string, toolNames: readonly string[] | null | undefined) {
       return isToolAllowed(name, toolNames);

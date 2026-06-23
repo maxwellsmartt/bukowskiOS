@@ -405,6 +405,24 @@ describe("assistant gateway service", () => {
       baseUrl: "",
     });
 
+    const now356 = new Date().toISOString();
+    database
+      .prepare(
+        `
+          INSERT INTO users (id, full_name, email, phone, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, '', 1, ?, ?)
+        `,
+      )
+      .run("user-admin-356", "Admin Operator", "admin-356@bukowskios.local", now356, now356);
+    database
+      .prepare(
+        `
+          INSERT INTO workspace_memberships (id, workspace_id, user_id, role_id, status, joined_at, created_at)
+          VALUES (?, ?, ?, ?, 'active', ?, ?)
+        `,
+      )
+      .run("membership-admin-356", "workspace-metadata", "user-admin-356", "role-admin", now356, now356);
+
     const foundationReads = createFoundationReadService(database);
     const agentReads = createAgentReadService(database, secretStore);
     const sessionStore = createAssistantGatewaySessionStore();
@@ -476,6 +494,7 @@ describe("assistant gateway service", () => {
         workspaceId: "workspace-metadata",
         activePath: "/finance",
         currentView: "Finance",
+        sourceActorUserId: "user-admin-356",
       },
     });
 
@@ -725,6 +744,7 @@ describe("assistant gateway service", () => {
           },
         ],
         requiresApproval: () => false,
+        requiredPermissionFor: () => null,
         isAllowed: () => true,
         execute: (name: string) => ({
           trace: {
@@ -968,7 +988,7 @@ describe("assistant gateway service", () => {
         expect.objectContaining({
           toolName: "get_financial_health",
           status: "failed",
-          summary: "Tool get_financial_health requires finance.read.",
+          summary: "Blocked. Get Financial Health requires the finance.read permission.",
         }),
       ]),
     );
@@ -1258,6 +1278,7 @@ describe("assistant gateway service", () => {
       definitionsFor: (toolNames: readonly string[] | null | undefined) =>
         toolNames?.includes("create_incident") ? [createIncidentDefinition] : [],
       requiresApproval: (name: string) => name === "create_incident",
+      requiredPermissionFor: () => null,
       isAllowed: (name: string, toolNames: readonly string[] | null | undefined) =>
         toolNames === null || toolNames === undefined ? true : toolNames.includes(name),
       execute: (_name: string, rawArguments: string) => {

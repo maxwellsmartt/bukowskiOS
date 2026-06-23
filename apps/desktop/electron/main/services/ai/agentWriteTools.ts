@@ -44,6 +44,14 @@ export type WriteToolDefinition = {
   description: string;
   parameters: Record<string, unknown>;
   requiresApproval: boolean;
+  /**
+   * Workspace permission key the acting user must hold for this write to run.
+   * Enforced uniformly in the tool registry (`assertToolPermission`) on the
+   * initial call, on the post-approval re-execution, and on Telegram, so role
+   * gating can never be bypassed by the channel. Omit for personal-scope
+   * actions (todos/reminders) and internal orchestration (delegation).
+   */
+  requiredPermission?: string;
   execute: (args: Record<string, unknown>, context: AIGatewayToolContext) => WriteToolExecutionResult;
 };
 
@@ -319,6 +327,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
 
   {
     name: "create_incident",
+    requiredPermission: "incidents.create",
     description:
       "Open a new incident on an asset or project. Use when a user reports damage, loss or a problem that should be tracked. Requires human approval before persisting.",
     requiresApproval: true,
@@ -369,6 +378,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
 
   {
     name: "update_incident",
+    requiredPermission: "incidents.create",
     description:
       "Update an existing incident — change status, severity, owner or cost estimate. Use status='Resolved' to close. Requires approval.",
     requiresApproval: true,
@@ -410,6 +420,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
 
   {
     name: "create_rma",
+    requiredPermission: "rma.create",
     description:
       "Open a new RMA (repair/return) case for one or more damaged assets. Requires approval. Use when an incident escalates to a manufacturer-tracked repair. The manufacturer must already exist in the catalog.",
     requiresApproval: true,
@@ -469,6 +480,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
 
   {
     name: "create_packing_slip",
+    requiredPermission: "packing-slips.create",
     description:
       "Create a packing slip handing equipment to a project unit. Requires approval. Use when a user asks to issue gear for a shoot day.",
     requiresApproval: true,
@@ -547,6 +559,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
 
   {
     name: "return_packing_items",
+    requiredPermission: "packing-slips.create",
     description:
       "Close a packing slip — mark gear as returned. Use when the crew brings equipment back at end of day. Requires approval.",
     requiresApproval: true,
@@ -595,6 +608,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
 
   {
     name: "create_project",
+    requiredPermission: "projects.manage",
     description:
       "Create a new project with basic schedule, client and production context. Requires approval. Use after gathering at least the project name and preferably a short code.",
     requiresApproval: true,
@@ -679,6 +693,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
 
   {
     name: "update_project",
+    requiredPermission: "projects.manage",
     description:
       "Update an existing project's core details or schedule. Requires approval. Use get_project_detail first so unchanged required fields like code and name are preserved.",
     requiresApproval: true,
@@ -737,6 +752,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
 
   {
     name: "create_project_unit",
+    requiredPermission: "projects.manage",
     description:
       "Create a project unit or shoot unit inside an existing project. Requires approval. Use for second unit, main unit refinements, shoot blocks or production phases.",
     requiresApproval: true,
@@ -781,6 +797,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
 
   {
     name: "create_quote",
+    requiredPermission: "finance.manage",
     description:
       "Create a saved draft quote with client, project, package and line items so it appears in Quotes. Requires approval. Use this whenever the user asks to create, prepare, save, or draft a quote unless they explicitly ask for a non-saved outline.",
     requiresApproval: true,
@@ -907,6 +924,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
 
   {
     name: "set_quote_status",
+    requiredPermission: "finance.manage",
     description:
       "Move a quote to sent, approved, rejected or cancelled. Requires approval. Cancelling an approved quote needs a reason.",
     requiresApproval: true,
@@ -978,6 +996,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
   },
   {
     name: "classify_movement",
+    requiredPermission: "treasury.transactions.classify",
     description:
       "Classify a bank movement: set its kind (income, expense, transfer, fx_exchange, salary, reimbursement, tax, tss, bank_fee, interest, owner_draw, other), concept, counterparty, RNC and expense category. Applies immediately and is reversible with Undo (Cmd+Z). Use list_bank_movements first to get the movement id.",
     requiresApproval: false,
@@ -1022,6 +1041,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
   },
   {
     name: "categorize_movements_by_rule",
+    requiredPermission: "treasury.transactions.classify",
     description:
       "Classify ALL unclassified movements that share the selected movement's description, and remember the rule for future imports. Requires approval because it affects many rows at once and persists a recurring rule. Reversible with Undo. Use for recurring movements like TSS, DGII taxes or bank fees.",
     requiresApproval: true,
@@ -1063,6 +1083,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
   },
   {
     name: "set_project_allocations",
+    requiredPermission: "treasury.transactions.classify",
     description:
       "Split a movement's amount across one or more projects for per-project P&L. Replaces existing allocations. Applies immediately and is reversible with Undo. The allocation total cannot exceed the movement amount.",
     requiresApproval: false,
@@ -1117,6 +1138,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
   },
   {
     name: "create_bank_account",
+    requiredPermission: "treasury.accounts.manage",
     description:
       "Create a treasury bank account so statements can be imported into it. Requires approval. Use list_bank_accounts first to avoid duplicates.",
     requiresApproval: true,
@@ -1155,6 +1177,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
   },
   {
     name: "review_deductible",
+    requiredPermission: "treasury.reimbursements.review",
     description:
       "Accountant review: set the DGII-deductible amount and fiscal data (NCF, withholding) for an expense. Requires approval. deductible_amount cannot exceed the claimed amount.",
     requiresApproval: true,
@@ -1201,6 +1224,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
   },
   {
     name: "correct_movement",
+    requiredPermission: "treasury.transactions.classify",
     description:
       "Correct an imported bank movement's raw fields (date, description, amount, direction, reference). Requires approval. Reversible with Undo.",
     requiresApproval: true,
@@ -1241,6 +1265,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
   },
   {
     name: "import_bank_statement",
+    requiredPermission: "treasury.import",
     description:
       "Import bank statement movements into a treasury account. First read the attached statement with read_attached_document, map each line to a normalized row, then call this tool. Requires approval. Duplicates are detected automatically (re-importing the same movements is safe). The import is reversible via Undo / delete import.",
     requiresApproval: true,

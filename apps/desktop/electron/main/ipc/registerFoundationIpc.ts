@@ -651,7 +651,7 @@ type RegisterFoundationIpcOptions = {
     updateAssistantThreadPreferences: (input: UpdateAssistantThreadPreferencesCommand) => AssistantChatSnapshot;
     renameAssistantThread: (input: RenameAssistantThreadCommand) => AssistantChatSnapshot;
     sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) => Promise<AssistantChatSnapshot>;
-    reviewRun: (input: ReviewAgentRunCommand) => unknown;
+    reviewRun: (input: ReviewAgentRunCommand, approverUserId?: string | null) => unknown;
     sendAssistantMessage: (input: AssistantGatewayRequest) => Promise<AssistantGatewayResponse>;
     createDraftRunFromChat: (input: CreateDraftRunFromChatCommand) => unknown;
   };
@@ -1071,7 +1071,10 @@ export const registerFoundationIpc = ({
   );
   safeHandle(ipcChannels.agents.reviewRun, reviewAgentRunSchema, async (_event, input) => {
     await assertAgentWorkspaceAccess(input, "review agent runs");
-    return agentMutations.reviewRun(input);
+    // Resolve the approver server-side so the per-action permission gate in the
+    // gateway checks who is actually signed in, never a client-supplied id.
+    const approverUserId = await workspaceAccess.getCurrentUserId("review agent runs");
+    return agentMutations.reviewRun(input, approverUserId);
   });
   safeHandle(
     ipcChannels.agents.sendAssistantMessage,

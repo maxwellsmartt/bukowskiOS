@@ -227,6 +227,7 @@ describe("agent tool registry", () => {
         workspaceId: "workspace-metadata",
         activePath: "/projects",
         currentView: "Projects",
+        userPermissions: ["*"],
       },
     );
 
@@ -435,6 +436,7 @@ describe("agent tool registry", () => {
         workspaceId: "workspace-metadata",
         activePath: "/projects",
         currentView: "Projects",
+        userPermissions: ["*"],
       },
     );
     const reservations = registry.execute(
@@ -444,6 +446,7 @@ describe("agent tool registry", () => {
         workspaceId: "workspace-metadata",
         activePath: "/assets",
         currentView: "Assets",
+        userPermissions: ["*"],
       },
     );
     const incidentDetail = registry.execute(
@@ -453,6 +456,7 @@ describe("agent tool registry", () => {
         workspaceId: "workspace-metadata",
         activePath: "/incidents",
         currentView: "Incidents",
+        userPermissions: ["*"],
       },
     );
     const finance = registry.execute(
@@ -720,6 +724,7 @@ describe("agent tool registry", () => {
         activePath: "/projects/project-aurora/info",
         currentView: "Project",
         activeProjectId: "project-aurora",
+        userPermissions: ["*"],
       },
     );
     const projectSearch = registry.execute(
@@ -730,6 +735,7 @@ describe("agent tool registry", () => {
         activePath: "/projects/project-aurora/info",
         currentView: "Project",
         activeProjectId: "project-aurora",
+        userPermissions: ["*"],
       },
     );
 
@@ -761,6 +767,7 @@ describe("agent tool registry", () => {
         workspaceId: "workspace-metadata",
         activePath: "/assets",
         currentView: "Assets",
+        userPermissions: ["*"],
       },
     );
 
@@ -812,11 +819,13 @@ describe("agent tool registry", () => {
       workspaceId: "workspace-metadata",
       activePath: "/projects",
       currentView: "Projects",
+      userPermissions: ["*"],
     });
     const activeWorkspaceSearch = registry.execute("search_projects", JSON.stringify({ query: "AGT", limit: 5 }), {
       workspaceId: "workspace-cine2-test",
       activePath: "/projects",
       currentView: "Projects",
+      userPermissions: ["*"],
     });
 
     expect(defaultWorkspaceSearch.result.payload.count).toBe(0);

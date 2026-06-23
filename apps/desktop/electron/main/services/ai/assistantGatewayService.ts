@@ -1215,6 +1215,26 @@ const loadActorPermissions = (db: DatabaseSync, workspaceId: string, userId: str
     .filter(Boolean);
 };
 
+// Hard request-time gate for write tools that require approval. Those are
+// deferred (not executed) before approval, so `assertToolPermission` inside
+// execute() never runs for them at request time — without this check a model
+// that emitted a call to a tool the user lacks could still stage a draft. We
+// stop it the moment the call is seen, regardless of approval routing.
+const assertActorMayUseTool = (
+  toolRegistry: Pick<AgentToolRegistry, "requiredPermissionFor">,
+  toolName: string,
+  context: AIGatewayToolContext,
+) => {
+  const requiredPermission = toolRegistry.requiredPermissionFor(toolName);
+  if (!requiredPermission) {
+    return;
+  }
+  const permissions = context.userPermissions ?? [];
+  if (!permissions.includes("*") && !permissions.includes(requiredPermission)) {
+    throw new Error(`Blocked. ${summarizeToolName(toolName)} requires the ${requiredPermission} permission.`);
+  }
+};
+
 const buildTrustedToolContext = (db: DatabaseSync, request: AssistantGatewayRequest): AIGatewayToolContext => {
   const workspaceId = request.workspaceId || request.context.workspaceId || defaultWorkspaceId;
   const actorUserId = request.context.sourceActorUserId ?? request.source?.actorUserId ?? null;
@@ -1464,7 +1484,10 @@ export const createAssistantGatewayService = (
     const deferredWriteToolCalls: DeferredWriteToolCall[] = [];
     const executedWriteToolNames: string[] = [];
     const supervisorAllowedTools = parseJsonStringArray(supervisor.allowed_tools_json);
-    const supervisorToolDefinitions = options.toolRegistry.definitionsFor(supervisorAllowedTools);
+    const supervisorToolDefinitions = options.toolRegistry.definitionsFor(
+      supervisorAllowedTools,
+      trustedContext.userPermissions,
+    );
 
     let previousResponseId = sessionSnapshot.isExpired ? null : sessionSnapshot.previousResponseId;
     let supervisorRuntimeModelKey = supervisorModelKey;
@@ -1537,6 +1560,8 @@ export const createAssistantGatewayService = (
           if (!options.toolRegistry.isAllowed(call.name, supervisorAllowedTools)) {
             throw new Error(`Tool ${call.name} is not allowed for Supervisor Agent.`);
           }
+
+          assertActorMayUseTool(options.toolRegistry, call.name, trustedContext);
 
           const toolRequiresApproval = options.toolRegistry.requiresApproval(call.name);
           const writeToolCanRunNow = !toolRequiresApproval;
@@ -1758,7 +1783,10 @@ export const createAssistantGatewayService = (
           : "anonymous workspace member";
         const approvalBypassed = sessionApprovalApplies || approvalBypassApplies;
         const targetAllowedTools = parseJsonStringArray(targetRuntime.allowed_tools_json);
-        const targetToolDefinitions = options.toolRegistry.definitionsFor(targetAllowedTools);
+        const targetToolDefinitions = options.toolRegistry.definitionsFor(
+          targetAllowedTools,
+          trustedContext.userPermissions,
+        );
 
         const specialistInstructions = [
           targetRuntime.base_prompt || `You are the ${targetRuntime.display_name} inside BukowskiOS.`,
@@ -1848,6 +1876,8 @@ export const createAssistantGatewayService = (
               if (!options.toolRegistry.isAllowed(call.name, targetAllowedTools)) {
                 throw new Error(`Tool ${call.name} is not allowed for ${targetRuntime.display_name}.`);
               }
+
+              assertActorMayUseTool(options.toolRegistry, call.name, trustedContext);
 
               const toolRequiresApproval = options.toolRegistry.requiresApproval(call.name);
               const writeToolCanRunNow = !toolRequiresApproval;
@@ -2223,6 +2253,7 @@ export const createAssistantGatewayService = (
       threadId: string;
       runId: string;
       approvalScope: "run" | "session";
+      approverUserId?: string | null;
     }): Promise<AssistantGatewayResponse> {
       const run = db
         .prepare(
@@ -2294,9 +2325,23 @@ export const createAssistantGatewayService = (
           attachedDocuments: [],
         };
 
+        // The approver must personally hold the permission the action requires
+        // (admins hold "*"). Approving is not a way to escalate past your own
+        // role — without this, anyone who can open the runs queue could greenlight
+        // a finance or treasury write they could never trigger themselves.
+        const approverPermissions = loadActorPermissions(db, args.workspaceId, args.approverUserId ?? null);
+        const hasApproverPermission = (permission: string) =>
+          approverPermissions.includes("*") || approverPermissions.includes(permission);
+
         for (const payload of approvedPayloads) {
           if (!options.toolRegistry.requiresApproval(payload.toolName)) {
             throw new Error(`Approved payload contains non-gated tool ${payload.toolName}.`);
+          }
+          const requiredPermission = options.toolRegistry.requiredPermissionFor(payload.toolName);
+          if (requiredPermission && !hasApproverPermission(requiredPermission)) {
+            throw new Error(
+              `Blocked. Approving ${summarizeToolName(payload.toolName)} requires the ${requiredPermission} permission.`,
+            );
           }
           const expectedHash = hashApprovedToolPayload(payload.toolName, payload.arguments);
           if (payload.approvalHash !== expectedHash) {
