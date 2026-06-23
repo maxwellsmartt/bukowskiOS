@@ -1,3 +1,10 @@
+// Supabase keys workspaces by uuid. A non-UUID workspace id (e.g. the local
+// offline fallback "workspace-metadata") cannot exist remotely, so any outbox
+// row for it is local-only and must not be pushed — otherwise every push,
+// including the sync_outbox mirror, fails with a uuid 400 and jams the queue.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isSyncableWorkspaceId = (value: string): boolean => UUID_RE.test(value);
+
 export type SupabaseOutboxTransportRow = {
   id: string;
   workspace_id: string;
@@ -338,6 +345,12 @@ export const createSupabaseOutboxTransport = ({
   };
 
   return async (row: SupabaseOutboxTransportRow) => {
+    // Local-only workspace (non-UUID id): nothing to sync remotely. Resolve so
+    // the worker marks the row sent and it leaves the queue cleanly.
+    if (!isSyncableWorkspaceId(row.workspace_id)) {
+      return;
+    }
+
     const accessToken = await getAccessToken();
 
     if (!normalizedUrl || !anonKey.trim()) {
