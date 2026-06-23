@@ -1,5 +1,5 @@
 {
-  "version": "v3",
+  "version": "v4",
   "system_managed_fields": [
     "agent_key",
     "agent_type",
@@ -74,7 +74,8 @@
         "create_todo",
         "create_reminder",
         "read_attached_document",
-        "assess_repair_or_replace"
+        "assess_repair_or_replace",
+        "find_substitute_assets"
       ],
       "allowed_domains_json": [
         "assets",
@@ -141,7 +142,8 @@
         "get_maintenance_queue",
         "get_asset_maintenance_history",
         "get_asset_exposure",
-        "get_project_detail"
+        "get_project_detail",
+        "find_substitute_assets"
       ],
       "allowed_domains_json": [
         "assets",

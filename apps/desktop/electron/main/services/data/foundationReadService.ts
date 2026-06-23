@@ -3836,6 +3836,53 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
     };
   },
 
+  // Suggests available, compatible substitutes for an asset that is damaged,
+  // reserved or otherwise unavailable. Compatibility is keyed on the same
+  // category (the operational equivalence signal) and refined by name overlap
+  // so same brand/model lines rank as direct equivalents.
+  findSubstituteAssets(input: { assetId?: string | null; limit?: number }) {
+    const assetId = (input?.assetId ?? "").trim();
+    if (!assetId) {
+      return null;
+    }
+
+    const inventory = this.getAssets();
+    const target = inventory.find((row) => row.id === assetId);
+    if (!target) {
+      return null;
+    }
+
+    const targetTokens = new Set(tokenizeSearch(target.name));
+    const limit = Math.max(1, input?.limit ?? 6);
+
+    const substitutes = inventory
+      .filter((row) => row.id !== assetId)
+      .filter((row) => row.category === target.category)
+      .filter((row) => row.quantity > 0)
+      .map((row) => {
+        const overlap = tokenizeSearch(row.name).filter((token) => targetTokens.has(token)).length;
+        return {
+          id: row.id,
+          name: row.name,
+          code: row.code,
+          category: row.category,
+          availableQuantity: row.quantity,
+          location: row.location,
+          status: row.status,
+          compatibility: overlap >= 2 ? "direct_equivalent" : "same_category",
+          matchScore: overlap,
+        };
+      })
+      .sort((left, right) => right.matchScore - left.matchScore || right.availableQuantity - left.availableQuantity)
+      .slice(0, limit);
+
+    return {
+      target: { id: target.id, name: target.name, code: target.code, category: target.category, status: target.status },
+      substitutes,
+      totalCompatibleAvailable: substitutes.length,
+    };
+  },
+
   getOpenInvoices(limit = 8) {
     const rows = db
       .prepare(

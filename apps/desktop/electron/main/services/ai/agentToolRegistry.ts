@@ -1257,6 +1257,38 @@ export const createAgentToolRegistry = (
       },
     },
     {
+      name: "find_substitute_assets",
+      requiredPermission: "assets.read",
+      description:
+        "Find available, compatible substitute assets for one that is damaged, reserved or unavailable. Returns same-category alternatives that are in stock, ranked so same brand/model lines come first. Pass asset_id.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          asset_id: { type: "string" },
+          limit: { type: "number" },
+        },
+        required: ["asset_id"],
+      },
+      execute: (args) => {
+        const result = foundationReads.findSubstituteAssets({
+          assetId: asOptionalString(args.asset_id),
+          limit: asInteger(args.limit, 6),
+        });
+
+        if (!result) {
+          return { summary: "Asset not found for substitution.", payload: { found: false } };
+        }
+
+        return {
+          summary: result.substitutes.length
+            ? `Found ${result.substitutes.length} available compatible substitute(s) for ${result.target.name}.`
+            : `No available compatible substitutes for ${result.target.name} right now.`,
+          payload: { found: true, ...result },
+        };
+      },
+    },
+    {
       name: "get_financial_exposure_summary",
       requiredPermission: "finance.read",
       description: "Return a compact finance exposure summary by project.",
