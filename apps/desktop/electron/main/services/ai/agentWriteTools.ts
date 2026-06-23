@@ -1116,6 +1116,97 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
   },
 
   {
+    name: "update_project_unit",
+    requiredPermission: "projects.manage",
+    description:
+      "Update an existing project unit's label, dates, order, notes or status action. Requires approval. Use get_project_units first and pass unchanged required fields.",
+    requiresApproval: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["project_id", "unit_id", "code", "name", "sort_order"],
+      properties: {
+        project_id: { type: "string" },
+        unit_id: { type: "string" },
+        code: { type: "string" },
+        name: { type: "string" },
+        sort_order: { type: "number" },
+        color_key: { type: "string" },
+        start_date: { type: "string", description: "YYYY-MM-DD." },
+        end_date: { type: "string", description: "YYYY-MM-DD." },
+        notes: { type: "string" },
+        status_action: { type: "string", enum: ["none", "mark_wrapped", "cancel", "reactivate"] },
+        cascade_crew_dates: { type: "boolean" },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const projectId = resolveRequiredProjectId(services, workspaceId, args.project_id);
+      const unitId = asString(args.unit_id);
+      const code = asString(args.code).toUpperCase();
+      const name = asString(args.name);
+      const sortOrder = asNumber(args.sort_order);
+      const statusAction = asString(args.status_action);
+      if (!unitId) throw new Error("unit_id is required.");
+      if (!code) throw new Error("Unit code is required.");
+      if (!name) throw new Error("Unit name is required.");
+      if (sortOrder === undefined) throw new Error("sort_order is required.");
+
+      services.projects.updateProjectUnit({
+        projectId,
+        unitId,
+        code,
+        name,
+        sortOrder,
+        colorKey: asOptionalString(args.color_key),
+        startDate: asOptionalString(args.start_date),
+        endDate: asOptionalString(args.end_date),
+        notes: asOptionalString(args.notes),
+        statusAction:
+          statusAction === "mark_wrapped" || statusAction === "cancel" || statusAction === "reactivate"
+            ? statusAction
+            : "none",
+        cascadeCrewDates: asBoolean(args.cascade_crew_dates),
+      });
+
+      return {
+        summary: `Unit ${code} · ${name} updated.`,
+        payload: { projectId, unitId, code, name },
+      };
+    },
+  },
+
+  {
+    name: "delete_project_unit",
+    requiredPermission: "projects.manage",
+    description:
+      "Delete an unused project unit. Requires approval. The main/base unit and units with linked operational records cannot be deleted.",
+    requiresApproval: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["project_id", "unit_id"],
+      properties: {
+        project_id: { type: "string" },
+        unit_id: { type: "string" },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const projectId = resolveRequiredProjectId(services, workspaceId, args.project_id);
+      const unitId = asString(args.unit_id);
+      if (!unitId) throw new Error("unit_id is required.");
+
+      services.projects.deleteProjectUnit({ projectId, unitId });
+
+      return {
+        summary: `Unit ${unitId} deleted.`,
+        payload: { projectId, unitId },
+      };
+    },
+  },
+
+  {
     name: "create_quote",
     requiredPermission: "finance.manage",
     description:

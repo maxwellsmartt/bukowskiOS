@@ -6,6 +6,7 @@ import { createCurrencyReadService } from "../../electron/main/services/data/cur
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createAgentReadService } from "../../electron/main/services/data/agentReadService";
 import { createAssetMutationService } from "../../electron/main/services/data/assetMutationService";
+import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("agent tool registry", () => {
@@ -111,6 +112,8 @@ describe("agent tool registry", () => {
         "update_asset",
         "archive_asset",
         "assign_move_assets",
+        "update_project_unit",
+        "delete_project_unit",
       ]),
     );
 
@@ -122,6 +125,8 @@ describe("agent tool registry", () => {
     expect(registry.requiresApproval("update_asset")).toBe(true);
     expect(registry.requiresApproval("archive_asset")).toBe(true);
     expect(registry.requiresApproval("assign_move_assets")).toBe(true);
+    expect(registry.requiresApproval("update_project_unit")).toBe(true);
+    expect(registry.requiresApproval("delete_project_unit")).toBe(true);
     expect(registry.requiresApproval("get_asset_availability")).toBe(false);
 
     const approvalRequiredToolNames = [
@@ -133,12 +138,109 @@ describe("agent tool registry", () => {
       "update_asset",
       "archive_asset",
       "assign_move_assets",
+      "update_project_unit",
+      "delete_project_unit",
     ];
     const writeDefs = registry.definitions.filter((tool) => approvalRequiredToolNames.includes(tool.name));
     expect(writeDefs).toHaveLength(approvalRequiredToolNames.length);
     for (const tool of writeDefs) {
       expect((tool as { requiresApproval?: boolean }).requiresApproval).toBe(true);
     }
+
+    cleanup();
+  });
+
+  it("executes project unit lifecycle tools through project mutations", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-unit-writes");
+    const secretStore = { hasProviderSecret: () => false };
+    const noopMutation = (label: string) =>
+      new Proxy({}, {
+        get: () => () => {
+          throw new Error(`mutation '${label}' should not be invoked in this test`);
+        },
+      });
+    const registry = createAgentToolRegistry(createFoundationReadService(database), {
+      getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      writeServices: {
+        projects: createProjectMutationService(database),
+        assets: noopMutation("assets"),
+        packing: noopMutation("packing"),
+        incidents: noopMutation("incidents"),
+        rma: noopMutation("rma"),
+        finance: noopMutation("finance"),
+        quotes: noopMutation("quotes"),
+        treasury: noopMutation("treasury"),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    });
+
+    expect(() =>
+      registry.execute(
+        "update_project_unit",
+        JSON.stringify({
+          project_id: "project-aurora",
+          unit_id: "unit-missing",
+          code: "AGTU",
+          name: "Agent Unit",
+          sort_order: 9,
+        }),
+        { workspaceId: "workspace-metadata", userPermissions: ["projects.read"] },
+        { allowedToolNames: ["update_project_unit"] },
+      ),
+    ).toThrow("Blocked. This action requires the projects.manage permission.");
+
+    registry.execute(
+      "create_project_unit",
+      JSON.stringify({
+        project_id: "project-aurora",
+        code: "AGTU",
+        name: "Agent Unit",
+        sort_order: 9,
+      }),
+      { workspaceId: "workspace-metadata", userPermissions: ["projects.manage"] },
+      { allowedToolNames: ["create_project_unit"] },
+    );
+
+    const createdUnit = database
+      .prepare("SELECT id FROM project_units WHERE project_id = ? AND code = ? LIMIT 1")
+      .get("project-aurora", "AGTU") as { id: string } | undefined;
+    expect(createdUnit?.id).toBeTruthy();
+
+    const updateResult = registry.execute(
+      "update_project_unit",
+      JSON.stringify({
+        project_id: "project-aurora",
+        unit_id: createdUnit!.id,
+        code: "AGTU",
+        name: "Agent Unit Updated",
+        sort_order: 10,
+        notes: "Updated through agent tool coverage.",
+      }),
+      { workspaceId: "workspace-metadata", userPermissions: ["projects.manage"] },
+      { allowedToolNames: ["update_project_unit"] },
+    );
+
+    expect(updateResult.result.payload.unitId).toBe(createdUnit!.id);
+    const updatedUnit = database
+      .prepare("SELECT name, sort_order FROM project_units WHERE id = ? LIMIT 1")
+      .get(createdUnit!.id) as { name: string; sort_order: number } | undefined;
+    expect(updatedUnit).toEqual({ name: "Agent Unit Updated", sort_order: 10 });
+
+    const deleteResult = registry.execute(
+      "delete_project_unit",
+      JSON.stringify({ project_id: "project-aurora", unit_id: createdUnit!.id }),
+      { workspaceId: "workspace-metadata", userPermissions: ["projects.manage"] },
+      { allowedToolNames: ["delete_project_unit"] },
+    );
+
+    expect(deleteResult.result.payload.unitId).toBe(createdUnit!.id);
+    expect(database.prepare("SELECT id FROM project_units WHERE id = ? LIMIT 1").get(createdUnit!.id)).toBeUndefined();
+
+    const outbox = database
+      .prepare("SELECT payload_json FROM sync_outbox WHERE entity_type = 'project' AND entity_id = ? ORDER BY created_at DESC LIMIT 1")
+      .get("project-aurora") as { payload_json: string } | undefined;
+    expect(outbox?.payload_json).toContain("delete_unit");
 
     cleanup();
   });

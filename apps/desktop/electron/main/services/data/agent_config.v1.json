@@ -1,5 +1,5 @@
 {
-  "version": "v6",
+  "version": "v7",
   "system_managed_fields": [
     "agent_key",
     "agent_type",
@@ -80,6 +80,8 @@
         "update_asset",
         "archive_asset",
         "assign_move_assets",
+        "update_project_unit",
+        "delete_project_unit",
         "get_financial_priorities"
       ],
       "allowed_domains_json": [
@@ -454,6 +456,8 @@
         "create_project",
         "update_project",
         "create_project_unit",
+        "update_project_unit",
+        "delete_project_unit",
         "search_assets",
         "create_packing_slip",
         "create_quote",
