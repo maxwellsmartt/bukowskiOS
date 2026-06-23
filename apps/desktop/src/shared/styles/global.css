@@ -11861,36 +11861,51 @@ button.timeline-signal-chip:focus-visible {
   transform: translateX(-0.5px);
 }
 
+/* Division hierarchy: month boundaries read strongest, then weeks, then days,
+   so the eye can parse time spans at a glance. */
 .timeline-grid-line-day {
-  background: rgba(255, 255, 255, 0.014);
+  background: rgba(255, 255, 255, 0.032);
 }
 
 .timeline-grid-line-week {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.09);
 }
 
 .timeline-grid-line-month {
-  background: rgba(255, 255, 255, 0.072);
+  background: rgba(255, 255, 255, 0.2);
+  width: 1.5px;
 }
 
+/* Scale-aware: each view emphasises its primary cadence and quiets finer ones
+   so days / weeks / months each read precisely. */
+.timeline-grid-shell-day .timeline-grid-line-day {
+  background: rgba(255, 255, 255, 0.05);
+}
+.timeline-grid-shell-week .timeline-grid-line-day {
+  background: rgba(255, 255, 255, 0.022);
+}
+.timeline-grid-shell-month .timeline-grid-line-day {
+  display: none;
+}
+.timeline-grid-shell-month .timeline-grid-line-week {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Density scales the fine cadence up/down while keeping the hierarchy intact. */
 .timeline-grid-shell-density-compact .timeline-grid-line-day {
-  background: rgba(255, 255, 255, 0.008);
+  background: rgba(255, 255, 255, 0.02);
 }
-
 .timeline-grid-shell-density-compact .timeline-grid-line-week {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.07);
 }
-
 .timeline-grid-shell-density-expanded .timeline-grid-line-day {
-  background: rgba(255, 255, 255, 0.024);
+  background: rgba(255, 255, 255, 0.06);
 }
-
 .timeline-grid-shell-density-expanded .timeline-grid-line-week {
-  background: rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.12);
 }
-
 .timeline-grid-shell-density-expanded .timeline-grid-line-month {
-  background: rgba(255, 255, 255, 0.082);
+  background: rgba(255, 255, 255, 0.24);
 }
 
 .timeline-bar {

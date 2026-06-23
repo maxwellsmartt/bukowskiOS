@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useUserSetting } from "@shared/hooks/useUserSetting";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { resolveProjectColor } from "@shared/lib/projectColors";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 import { PROJECT_SIDEBAR_SORT_VALUES, userSettingKeys, type ProjectSidebarSortPreference } from "@shared/lib/userSettings";
 import type { ProjectCardRow, ProjectDeletePreview } from "@contracts";
@@ -302,7 +303,12 @@ export const ShellProjectsPanel = () => {
             >
               <div className="shell-project-copy">
                 <div className="shell-project-title-row">
-                  <span className="shell-project-code-badge">{project.code}</span>
+                  <span
+                    className="shell-project-code-badge"
+                    style={isTimelineHidden ? undefined : { color: resolveProjectColor(project.colorKey) }}
+                  >
+                    {project.code}
+                  </span>
                   <span className="shell-project-name">{project.name}</span>
                   {project.isArchived ? <span className="shell-project-archived-badge">{t("shell.projectsPanel.archived")}</span> : null}
                 </div>
