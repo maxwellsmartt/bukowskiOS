@@ -109,7 +109,11 @@ export const createOperationalAlertsService = (
     return rows.map((row) => row.user_id);
   };
 
-  const hasRecentUnread = (workspaceId: string, userId: string, alertKey: string, sinceIso: string): boolean => {
+  // Dedup on EXISTENCE within the cooldown window — read or unread. Keying on
+  // unread re-fired the same alert every sweep as soon as the user marked it
+  // read; existence-based dedup means an alert is created once per window and
+  // only re-surfaces after the cooldown if the situation is still unresolved.
+  const hasRecentAlert = (workspaceId: string, userId: string, alertKey: string, sinceIso: string): boolean => {
     const row = db
       .prepare(
         `
@@ -118,7 +122,6 @@ export const createOperationalAlertsService = (
           WHERE workspace_id = ?
             AND user_id = ?
             AND kind = 'operational_alert'
-            AND read_at IS NULL
             AND created_at >= ?
             AND source_ref LIKE ?
           LIMIT 1
@@ -143,7 +146,7 @@ export const createOperationalAlertsService = (
     let notified = 0;
     for (const alert of alerts) {
       for (const userId of coordinators) {
-        if (hasRecentUnread(workspaceId, userId, alert.alertKey, sinceIso)) {
+        if (hasRecentAlert(workspaceId, userId, alert.alertKey, sinceIso)) {
           continue;
         }
         notifications.createNotification({

@@ -75,6 +75,17 @@ describe("operational alerts service", () => {
     expect(second.notified).toBe(0);
     expect(countAlerts(database, "user-alert-admin")).toBe(3);
 
+    // Marking alerts as read must NOT cause them to re-fire on the next sweep
+    // (dedup is by existence within the window, not by unread state).
+    database
+      .prepare(
+        "UPDATE notifications SET read_at = ? WHERE workspace_id = ? AND user_id = ? AND kind = 'operational_alert'",
+      )
+      .run(now, WORKSPACE, "user-alert-admin");
+    const third = service.runSweep(WORKSPACE);
+    expect(countAlerts(database, "user-alert-admin")).toBe(3);
+    expect(third.notified).toBe(0);
+
     cleanup();
   });
 });
