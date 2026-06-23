@@ -28,6 +28,7 @@ import { createAssistantAudioTranscriptionService } from "../ai/assistantAudioTr
 import { createAssistantGatewaySessionStore } from "../ai/assistantGatewaySessionStore";
 import { createAgentToolRegistry } from "../ai/agentToolRegistry";
 import { createCommunicationsSendService, type CommunicationsSendService } from "./communicationsSendService";
+import { createOperationalAlertsService } from "./operationalAlertsService";
 import { createAISecretStore } from "../ai/aiSecretStore";
 import { createAnthropicProviderService } from "../ai/anthropicProviderService";
 import { createOpenAIProviderService } from "../ai/openaiProviderService";
@@ -1896,6 +1897,10 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     notifications,
     telegram: { sendTelegramMessage: telegramConnectorService.sendTelegramMessage },
   });
+  const operationalAlerts = createOperationalAlertsService(database, {
+    foundationReads,
+    notifications,
+  });
   const documentStorage = createSupabaseDocumentStorage({
     supabaseUrl: isSupabaseSyncEnabled() ? process.env.VITE_SUPABASE_URL : undefined,
     bucket: "workspace-documents",
@@ -2007,6 +2012,31 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   });
   assistantChatService.reconcileInterruptedThreads();
   void telegramConnectorService.start();
+
+  // Proactive operational alerts: sweep on startup and hourly, pushing in-app
+  // notifications to each workspace's coordinators. Best-effort — a failure
+  // never blocks startup.
+  const runOperationalAlertSweep = () => {
+    try {
+      const workspaces = database.prepare("SELECT id FROM workspaces WHERE is_active = 1").all() as Array<{ id: string }>;
+      for (const workspace of workspaces) {
+        try {
+          operationalAlerts.runSweep(workspace.id);
+        } catch (sweepError) {
+          logger.warn("Operational alert sweep failed for a workspace.", {
+            workspaceId: workspace.id,
+            message: sweepError instanceof Error ? sweepError.message : String(sweepError),
+          });
+        }
+      }
+    } catch (error) {
+      logger.warn("Operational alert sweep could not run.", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+  runOperationalAlertSweep();
+  setInterval(runOperationalAlertSweep, 60 * 60 * 1000).unref?.();
   try {
     const retentionSummary = dataRetention.run();
     lastRetentionRunAt = new Date().toISOString();
