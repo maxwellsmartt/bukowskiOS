@@ -24,6 +24,7 @@ import { resolveAssetAvailability, summarizeUnavailableAssets, translateAssetAva
 import { formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
 import { presentAssetCondition, presentAssetStatus } from "@shared/lib/assetStatusPresentation";
 import { cleanDisplay } from "@shared/lib/displayValue";
+import { copyToClipboard } from "@shared/lib/clipboard";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
@@ -1523,7 +1524,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       return;
     }
 
-    await navigator.clipboard.writeText(buildAssetCsvIssueReport(csvImportPreview));
+    await copyToClipboard(buildAssetCsvIssueReport(csvImportPreview));
     setCsvReportCopied(true);
     window.setTimeout(() => setCsvReportCopied(false), 1800);
   };

@@ -11,6 +11,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { titleCaseEnum } from "@shared/labels/statusLabels";
 import { getConnectorBrand } from "@shared/lib/connectorBranding";
+import { copyToClipboard } from "@shared/lib/clipboard";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { useCatalogData } from "@features/projects/useProjectsData";
@@ -505,7 +506,7 @@ export const AgentConnectorsPage = () => {
     }
 
     try {
-      await navigator.clipboard.writeText(`/link ${generatedLinkToken}`);
+      await copyToClipboard(`/link ${generatedLinkToken}`);
       setCopiedLinkCommand(true);
       if (copiedLinkCommandTimeoutRef.current !== null) {
         window.clearTimeout(copiedLinkCommandTimeoutRef.current);

@@ -12,6 +12,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useLocale } from "@shared/hooks/useLocale";
+import { copyToClipboard } from "@shared/lib/clipboard";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { hasFinanceAccess } from "@shared/lib/financeAccess";
 
@@ -668,7 +669,7 @@ export const WorkspaceSettingsPage = ({ variant = "workspace" }: WorkspaceSettin
 
   const handleCopyWorkspaceId = async () => {
     try {
-      await navigator.clipboard.writeText(activeWorkspaceId);
+      await copyToClipboard(activeWorkspaceId);
       setCopiedWorkspaceId(true);
       if (copyFeedbackTimeoutRef.current) {
         window.clearTimeout(copyFeedbackTimeoutRef.current);
