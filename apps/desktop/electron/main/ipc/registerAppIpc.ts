@@ -16,6 +16,7 @@ import {
 } from "@contracts";
 import { ipcChannels } from "@contracts/ipc/channels";
 import { assertAllowedExternalUrl } from "../security/securityConfig";
+import { getDesktopLogsDirectory, listRecentLogFiles } from "../services/logger";
 import type { WorkspaceAccessGuard } from "../services/auth/workspaceAccessGuard";
 import {
   getFreshStoredUserClaims,
@@ -564,7 +565,7 @@ export const registerAppIpc = ({
     platform: process.platform,
     isPackaged: app.isPackaged,
     version: app.getVersion(),
-    shellVersion: "Beta 2",
+    shellVersion: "Beta 1",
   }));
   safeHandleReadWithSchema(ipcChannels.app.getDiagnostics, emptyReadArgsSchema, () => getDiagnosticsSnapshot());
   safeHandleReadWithSchema(ipcChannels.app.getSupportSnapshot, emptyReadArgsSchema, () => getSupportSnapshot());
@@ -1087,6 +1088,28 @@ export const registerAppIpc = ({
       return shell.openExternal(url);
     },
     "The app could not open that external link.",
+  );
+
+  // Reveal a recent log file in the OS file manager (Finder/Explorer). The name
+  // is validated against the known log directory listing so the renderer can
+  // never coax us into revealing an arbitrary path.
+  safeHandleRead(
+    ipcChannels.app.revealLogFile,
+    (_event, name: unknown) => {
+      const logsDirectory = getDesktopLogsDirectory();
+      if (!logsDirectory) {
+        return;
+      }
+
+      const requestedName = typeof name === "string" ? path.basename(name) : "";
+      const knownFile = listRecentLogFiles().find((file) => file.name === requestedName);
+      if (!knownFile) {
+        return;
+      }
+
+      shell.showItemInFolder(path.join(logsDirectory, knownFile.name));
+    },
+    "The app could not open that log file.",
   );
 
   // Reliable clipboard write via Electron (navigator.clipboard can be denied

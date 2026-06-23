@@ -1,7 +1,7 @@
 {
   "name": "@bukowski/desktop",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "BukowskiOS desktop operations workspace",
   "author": "BukowskiOS",
   "type": "module",

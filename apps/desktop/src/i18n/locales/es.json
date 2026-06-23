@@ -5400,7 +5400,11 @@
     },
     "advanced": {
       "support": {
-        "cardTitle": "Soporte",
+        "cardTitle": "Diagnóstico y soporte",
+        "cardSubtitle": "Estado de la app y herramientas para compartir diagnósticos con soporte.",
+        "actionsHint": "Los archivos salen redactados. Compártelos solo con personas de confianza.",
+        "systemStatus": "Estado del sistema",
+        "allHealthy": "Sin incidencias registradas",
         "lastCrash": "Último crash",
         "lastError": "Último error",
         "lastLoadIssue": "Último problema de carga",
@@ -5443,7 +5447,14 @@
         "mode": "Modo",
         "packaged": "Empaquetado",
         "development": "Desarrollo",
-        "unknown": "Desconocido"
+        "unknown": "Desconocido",
+        "cardSubtitle": "Identidad de esta instalación."
+      },
+      "logs": {
+        "cardTitle": "Archivos de log",
+        "cardSubtitle": "Registros locales recientes en este equipo.",
+        "revealInFinder": "Mostrar en Finder",
+        "couldNotReveal": "No se pudo abrir el archivo de log."
       }
     },
     "account": {

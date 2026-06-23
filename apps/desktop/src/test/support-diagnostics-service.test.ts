@@ -93,8 +93,8 @@ test("support diagnostics snapshot and exports include recent runtime failures a
         appName: "bukowskiOS",
         platform: "darwin",
         isPackaged: false,
-        version: "0.2.1",
-        shellVersion: "Beta 2",
+        version: "0.2.2",
+        shellVersion: "Beta 1",
       }),
       runtimeDiagnostics,
     });

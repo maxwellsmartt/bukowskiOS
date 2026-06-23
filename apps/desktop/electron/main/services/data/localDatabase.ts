@@ -535,7 +535,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     platform: process.platform,
     isPackaged: app.isPackaged,
     version: app.getVersion(),
-    shellVersion: "Beta 2",
+    shellVersion: "Beta 1",
   });
 
   const getDiagnosticsSnapshot = (): AppDiagnosticsSnapshot => {

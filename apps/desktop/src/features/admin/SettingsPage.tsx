@@ -8,7 +8,7 @@ import type {
   AppSupportSnapshot,
   AppSyncOutboxRow,
 } from "@contracts";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, FolderOpen } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -22,6 +22,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { useLocale } from "@shared/hooks/useLocale";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { copyToClipboard } from "@shared/lib/clipboard";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { notifyExportResult } from "@shared/lib/exportNotifications";
 
@@ -666,22 +667,89 @@ export const SettingsPage = () => {
     return platform;
   };
 
-  // The three captured-event slots often hold the same underlying incident
-  // (e.g. one restart logs crash + error + load failure with equal text).
-  // Collapse equal values into a single row so the support card reads cleanly.
-  const supportEventRows = useMemo(() => {
-    const rows = [
-      { label: t("settings.advanced.support.lastCrash"), value: formatSupportEvent(supportSnapshot.lastCrash, t("settings.advanced.support.noneCaptured")) },
-      { label: t("settings.advanced.support.lastError"), value: formatSupportEvent(supportSnapshot.lastError, t("settings.advanced.support.noneCaptured")) },
-      { label: t("settings.advanced.support.lastLoadIssue"), value: formatSupportEvent(supportSnapshot.lastLoadFailure, t("settings.advanced.support.noLoadIssues")) },
+  // Surface the captured incidents as colored status tiles. When nothing has
+  // gone wrong we collapse everything into a single reassuring "all clear"
+  // tile; when a single restart logged crash + error + load failure with equal
+  // text we collapse those into one critical tile so the card reads cleanly.
+  const supportEventRows = useMemo<SettingsStat[]>(() => {
+    const criticalCount = supportSnapshot.recentCriticalEvents.length;
+    const criticalTile: SettingsStat = {
+      label: t("settings.advanced.support.criticalEventsTracked"),
+      value: String(criticalCount),
+      tone: criticalCount > 0 ? "critical" : "positive",
+    };
+
+    const hasIncident = Boolean(supportSnapshot.lastCrash || supportSnapshot.lastError || supportSnapshot.lastLoadFailure);
+    if (!hasIncident) {
+      return [
+        {
+          label: t("settings.advanced.support.systemStatus"),
+          value: t("settings.advanced.support.allHealthy"),
+          tone: "positive",
+        },
+        criticalTile,
+      ];
+    }
+
+    const rows: SettingsStat[] = [
+      {
+        label: t("settings.advanced.support.lastCrash"),
+        value: formatSupportEvent(supportSnapshot.lastCrash, t("settings.advanced.support.noneCaptured")),
+        tone: supportSnapshot.lastCrash ? "critical" : "positive",
+      },
+      {
+        label: t("settings.advanced.support.lastError"),
+        value: formatSupportEvent(supportSnapshot.lastError, t("settings.advanced.support.noneCaptured")),
+        tone: supportSnapshot.lastError ? "warning" : "positive",
+      },
+      {
+        label: t("settings.advanced.support.lastLoadIssue"),
+        value: formatSupportEvent(supportSnapshot.lastLoadFailure, t("settings.advanced.support.noLoadIssues")),
+        tone: supportSnapshot.lastLoadFailure ? "warning" : "positive",
+      },
     ];
+
     const uniqueValues = new Set(rows.map((row) => row.value));
     if (uniqueValues.size === 1 && supportSnapshot.lastCrash) {
-      return [{ label: t("settings.advanced.support.lastIssue"), value: rows[0].value }];
+      return [
+        { label: t("settings.advanced.support.lastIssue"), value: rows[0].value, tone: "critical" },
+        criticalTile,
+      ];
     }
-    return rows;
+    return [...rows, criticalTile];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supportSnapshot, t]);
+
+  // App identity rows. The build mode renders as a status pill — a "Desarrollo"
+  // badge is a useful flag that this isn't a production build.
+  const appInfoRows = useMemo<SettingsStat[]>(
+    () => [
+      { label: t("settings.advanced.appInfo.app"), value: appInfo?.appName ?? "bukowskiOS" },
+      { label: t("settings.advanced.appInfo.version"), value: appInfo?.version ?? t("settings.advanced.appInfo.unknown") },
+      { label: t("settings.advanced.appInfo.build"), value: appInfo?.shellVersion ?? t("settings.advanced.appInfo.unknown") },
+      {
+        label: t("settings.advanced.appInfo.platform"),
+        value: appInfo?.platform ? platformLabel(appInfo.platform) : t("settings.advanced.appInfo.unknown"),
+      },
+      {
+        label: t("settings.advanced.appInfo.mode"),
+        value: appInfo?.isPackaged ? t("settings.advanced.appInfo.packaged") : t("settings.advanced.appInfo.development"),
+        tone: appInfo?.isPackaged ? "positive" : "warning",
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [appInfo, t],
+  );
+
+  // Recent log files, newest first, for the dedicated log card.
+  const sortedLogFiles = useMemo(
+    () => [...supportSnapshot.recentLogFiles].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    [supportSnapshot.recentLogFiles],
+  );
+  const totalLogBytes = useMemo(
+    () => supportSnapshot.recentLogFiles.reduce((total, file) => total + file.sizeBytes, 0),
+    [supportSnapshot.recentLogFiles],
+  );
 
   const supportSummaryText = useMemo(
     () =>
@@ -1250,107 +1318,127 @@ export const SettingsPage = () => {
 
       {activeSection === "advanced" ? (
         <div className="settings-advanced-layout">
-          <SurfaceCard className="settings-advanced-card settings-advanced-card-wide" title={t("settings.advanced.support.cardTitle")}>
+          <SurfaceCard
+            className="settings-advanced-card settings-advanced-card-wide settings-advanced-card-glass"
+            title={t("settings.advanced.appInfo.cardTitle")}
+            subtitle={t("settings.advanced.appInfo.cardSubtitle")}
+          >
+            <div className="summary-grid settings-stat-grid">
+              {appInfoRows.map((row) => (
+                <SettingsStatRow key={row.label} stat={row} />
+              ))}
+            </div>
+          </SurfaceCard>
+
+          <SurfaceCard
+            className="settings-advanced-card"
+            title={t("settings.advanced.support.cardTitle")}
+            subtitle={t("settings.advanced.support.cardSubtitle")}
+          >
             <div className="summary-grid settings-stat-grid">
               {supportEventRows.map((row) => (
-                <div className="summary-row" key={row.label}>
-                  <span className="summary-label">{row.label}</span>
-                  <span className="summary-value">{row.value}</span>
-                </div>
+                <SettingsStatRow key={row.label} stat={row} />
               ))}
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.support.logLocation")}</span>
-                <span className="summary-value">
+            </div>
+
+            <div className="settings-advanced-actions">
+              <p className="settings-advanced-actions-hint">{t("settings.advanced.support.actionsHint")}</p>
+              <div className="action-panel-actions action-panel-actions-start">
+                <button
+                  className="action-primary-button"
+                  disabled={isExportingSupportBundle}
+                  onClick={async () => {
+                    const confirmed = await confirmSensitiveExport("supportBundle");
+                    if (!confirmed) return;
+                    await runAction(() => window.bukowskiApp!.exportSupportBundle(), setIsExportingSupportBundle);
+                  }}
+                  type="button"
+                >
+                  {isExportingSupportBundle ? t("settings.advanced.support.exporting") : t("settings.advanced.support.exportBundle")}
+                </button>
+                <button
+                  className="ghost-control"
+                  disabled={isExportingLogs}
+                  onClick={async () => {
+                    const confirmed = await confirmSensitiveExport("logs");
+                    if (!confirmed) return;
+                    await runAction(() => window.bukowskiApp!.exportRecentLogs(), setIsExportingLogs);
+                  }}
+                  type="button"
+                >
+                  {isExportingLogs ? t("settings.advanced.support.exportingLogs") : t("settings.advanced.support.exportLogs")}
+                </button>
+                <button
+                  className="ghost-control"
+                  onClick={async () => {
+                    try {
+                      await copyToClipboard(supportSummaryText);
+                      toast.success(t("settings.actions.copiedTitle"), t("settings.actions.diagnosticsCopiedBody"));
+                      setError(null);
+                    } catch (copyError) {
+                      setError(getUserFacingErrorMessage(copyError, t("settings.actions.couldNotCopyDiagnostics")));
+                    }
+                  }}
+                  type="button"
+                >
+                  {t("settings.advanced.support.copyDiagnostics")}
+                </button>
+              </div>
+            </div>
+          </SurfaceCard>
+
+          <SurfaceCard
+            className="settings-advanced-card"
+            title={t("settings.advanced.logs.cardTitle")}
+            subtitle={t("settings.advanced.logs.cardSubtitle")}
+          >
+            {sortedLogFiles.length ? (
+              <>
+                <ul className="settings-log-list">
+                  {sortedLogFiles.map((file) => (
+                    <li className="settings-log-row" key={file.name}>
+                      <span className="settings-log-name">{file.name}</span>
+                      <span className="settings-log-trailing">
+                        <span className="settings-log-meta">
+                          {formatBytes(file.sizeBytes)} · {formatDateLabel(file.updatedAt)}
+                        </span>
+                        <button
+                          aria-label={t("settings.advanced.logs.revealInFinder")}
+                          className="settings-log-reveal"
+                          onClick={async () => {
+                            try {
+                              await window.bukowskiApp?.revealLogFile(file.name);
+                              setError(null);
+                            } catch (revealError) {
+                              setError(getUserFacingErrorMessage(revealError, t("settings.advanced.logs.couldNotReveal")));
+                            }
+                          }}
+                          title={t("settings.advanced.logs.revealInFinder")}
+                          type="button"
+                        >
+                          <FolderOpen aria-hidden size={14} />
+                        </button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="settings-log-footnote">
+                  {t("settings.advanced.support.logFilesSummary", {
+                    count: sortedLogFiles.length,
+                    size: formatBytes(totalLogBytes),
+                  })}
+                  {" · "}
                   {supportSnapshot.logStorageLabel === emptySupportSnapshot.logStorageLabel
                     ? t("settings.advanced.support.logLocationValue")
                     : supportSnapshot.logStorageLabel}
-                </span>
+                </p>
+              </>
+            ) : (
+              <div className="settings-log-empty">
+                <p className="surface-card-subtitle">{t("settings.advanced.support.noLogFiles")}</p>
               </div>
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.support.recentLogFiles")}</span>
-                <span className="summary-value">
-                  {supportSnapshot.recentLogFiles.length
-                    ? t("settings.advanced.support.logFilesSummary", {
-                        count: supportSnapshot.recentLogFiles.length,
-                        size: formatBytes(supportSnapshot.recentLogFiles.reduce((total, file) => total + file.sizeBytes, 0)),
-                      })
-                    : t("settings.advanced.support.noLogFiles")}
-                </span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.support.criticalEventsTracked")}</span>
-                <span className="summary-value">{supportSnapshot.recentCriticalEvents.length}</span>
-              </div>
-            </div>
-
-            <div className="action-panel-actions action-panel-actions-start">
-              <button
-                className="action-primary-button"
-                disabled={isExportingSupportBundle}
-                onClick={async () => {
-                  const confirmed = await confirmSensitiveExport("supportBundle");
-                  if (!confirmed) return;
-                  await runAction(() => window.bukowskiApp!.exportSupportBundle(), setIsExportingSupportBundle);
-                }}
-                type="button"
-              >
-                {isExportingSupportBundle ? t("settings.advanced.support.exporting") : t("settings.advanced.support.exportBundle")}
-              </button>
-              <button
-                className="ghost-control"
-                disabled={isExportingLogs}
-                onClick={async () => {
-                  const confirmed = await confirmSensitiveExport("logs");
-                  if (!confirmed) return;
-                  await runAction(() => window.bukowskiApp!.exportRecentLogs(), setIsExportingLogs);
-                }}
-                type="button"
-              >
-                {isExportingLogs ? t("settings.advanced.support.exportingLogs") : t("settings.advanced.support.exportLogs")}
-              </button>
-              <button
-                className="ghost-control"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(supportSummaryText);
-                    toast.success(t("settings.actions.copiedTitle"), t("settings.actions.diagnosticsCopiedBody"));
-                    setError(null);
-                  } catch (copyError) {
-                    setError(getUserFacingErrorMessage(copyError, t("settings.actions.couldNotCopyDiagnostics")));
-                  }
-                }}
-                type="button"
-              >
-                {t("settings.advanced.support.copyDiagnostics")}
-              </button>
-            </div>
+            )}
           </SurfaceCard>
-
-          <SurfaceCard className="settings-advanced-card" title={t("settings.advanced.appInfo.cardTitle")}>
-            <div className="summary-grid settings-stat-grid">
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.appInfo.app")}</span>
-                <span className="summary-value">{appInfo?.appName ?? "bukowskiOS"}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.appInfo.version")}</span>
-                <span className="summary-value">{appInfo?.version ?? t("settings.advanced.appInfo.unknown")}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.appInfo.build")}</span>
-                <span className="summary-value">{appInfo?.shellVersion ?? t("settings.advanced.appInfo.unknown")}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.appInfo.platform")}</span>
-                <span className="summary-value">{appInfo?.platform ? platformLabel(appInfo.platform) : t("settings.advanced.appInfo.unknown")}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.appInfo.mode")}</span>
-                <span className="summary-value">{appInfo?.isPackaged ? t("settings.advanced.appInfo.packaged") : t("settings.advanced.appInfo.development")}</span>
-              </div>
-            </div>
-          </SurfaceCard>
-
         </div>
       ) : null}
       </SettingsLayout>

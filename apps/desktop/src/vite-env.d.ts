@@ -222,6 +222,7 @@ declare global {
       exportSupportBundle: () => Promise<AppExportResult>;
       exportRecentLogs: () => Promise<AppExportResult>;
       openExternal: (url: string) => Promise<void>;
+      revealLogFile: (name: string) => Promise<void>;
       writeClipboard: (text: string) => Promise<void>;
       getDocumentsRoot: () => Promise<{ root: string; isCustom: boolean; defaultRoot: string }>;
       chooseDocumentsRoot: () => Promise<{ root: string; isCustom: boolean; defaultRoot: string }>;
