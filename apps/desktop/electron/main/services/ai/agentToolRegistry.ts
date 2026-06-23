@@ -50,6 +50,90 @@ const assertToolPermission = (tool: ToolDefinition, context: AIGatewayToolContex
 };
 
 const asString = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+const isMissingToolValue = (value: unknown) => {
+  if (value === undefined || value === null) return true;
+  if (typeof value === "string") return !value.trim();
+  if (Array.isArray(value)) return value.length === 0;
+  return false;
+};
+const getRequiredToolFields = (tool: ToolDefinition) => {
+  const required = tool.parameters.required;
+  return Array.isArray(required) ? required.map((field) => (typeof field === "string" ? field : "")).filter(Boolean) : [];
+};
+const validateRequiredToolFields = (tool: ToolDefinition, args: Record<string, unknown>) => {
+  const missingFields = getRequiredToolFields(tool).filter((field) => isMissingToolValue(args[field]));
+  if (!missingFields.length) {
+    return;
+  }
+
+  throw new Error(
+    [
+      `Missing required field${missingFields.length === 1 ? "" : "s"} for ${tool.name}: ${missingFields.join(", ")}.`,
+      "Suggested action: use the relevant read/search tool to resolve those values, or ask the user for the exact missing field.",
+      "Safe to retry: yes; no data was changed.",
+    ].join(" "),
+  );
+};
+const appendRecoveryGuidance = (message: string, guidance: string) => {
+  if (message.includes("Suggested action:") || message.includes("Safe to retry:")) {
+    return message;
+  }
+  return `${message} ${guidance}`;
+};
+const enhanceToolExecutionError = (toolName: string, error: unknown) => {
+  if (!(error instanceof Error)) {
+    return new Error(
+      `Tool ${toolName} failed. Suggested action: retry after checking the tool inputs and current workspace context. Safe to retry: yes if no prior successful receipt exists.`,
+    );
+  }
+
+  const message = error.message;
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("not found") || normalized.includes("no longer available") || normalized.includes("already removed")) {
+    return new Error(
+      appendRecoveryGuidance(
+        message,
+        "Suggested action: treat the ID as stale; run the matching search/detail tool again, pick a fresh match, then retry only with the confirmed ID. Safe to retry: yes after resolving the current ID.",
+      ),
+    );
+  }
+
+  if (
+    normalized.includes("cannot transition") ||
+    normalized.includes("only draft") ||
+    normalized.includes("only approved") ||
+    normalized.includes("requires a reason") ||
+    normalized.includes("current status")
+  ) {
+    return new Error(
+      appendRecoveryGuidance(
+        message,
+        "Suggested action: load the current record detail/history, explain the valid next states, and ask for a corrected transition if needed. Safe to retry: yes after choosing a valid state.",
+      ),
+    );
+  }
+
+  if (normalized.includes("already in use") || normalized.includes("unique constraint")) {
+    return new Error(
+      appendRecoveryGuidance(
+        message,
+        "Suggested action: search for the existing record and reuse it when appropriate, or ask the user for a different unique code/number. Safe to retry: yes with a different unique value.",
+      ),
+    );
+  }
+
+  if (normalized.includes("cannot be archived") || normalized.includes("cannot be deleted") || normalized.includes("linked operational records")) {
+    return new Error(
+      appendRecoveryGuidance(
+        message,
+        "Suggested action: load the record detail/history, name the blocking linked records, and resolve those blockers before retrying. Safe to retry: no until the blocker is cleared.",
+      ),
+    );
+  }
+
+  return error;
+};
 const asNumber = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : null);
 const asOptionalString = (value: unknown) => {
   const nextValue = asString(value);
@@ -2821,10 +2905,26 @@ export const createAgentToolRegistry = (
       let parsedArgs: Record<string, unknown> = {};
 
       if (rawArguments.trim()) {
-        parsedArgs = JSON.parse(rawArguments) as Record<string, unknown>;
+        try {
+          parsedArgs = JSON.parse(rawArguments) as Record<string, unknown>;
+        } catch {
+          throw new Error(
+            [
+              `Invalid JSON arguments for ${name}.`,
+              "Suggested action: retry with a valid JSON object that matches the tool schema.",
+              "Safe to retry: yes; no data was changed.",
+            ].join(" "),
+          );
+        }
       }
 
-      const result = tool.execute(parsedArgs, context);
+      validateRequiredToolFields(tool, parsedArgs);
+      let result: ToolExecutionResult;
+      try {
+        result = tool.execute(parsedArgs, context);
+      } catch (error) {
+        throw enhanceToolExecutionError(name, error);
+      }
       return {
         result,
         trace: {

@@ -241,6 +241,62 @@ describe("agent tool registry", () => {
     cleanup();
   });
 
+  it("returns actionable recovery errors for invalid arguments, stale ids and invalid transitions", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-recovery-errors");
+    const noopMutation = (label: string) =>
+      new Proxy({}, {
+        get: () => () => {
+          throw new Error(`mutation '${label}' should not be invoked in this test`);
+        },
+      });
+
+    const registry = createAgentToolRegistry(createFoundationReadService(database), {
+      getRunsList: () => [],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      writeServices: {
+        packing: noopMutation("packing"),
+        projects: noopMutation("projects"),
+        incidents: noopMutation("incidents"),
+        rma: noopMutation("rma"),
+        assets: createAssetMutationService(database),
+        finance: noopMutation("finance"),
+        quotes: noopMutation("quotes"),
+        invoices: noopMutation("invoices"),
+        quoteReads: {
+          getQuoteDetail: () => ({ id: "quote-draft-recovery", status: "draft" }),
+        },
+        treasury: noopMutation("treasury"),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    });
+
+    expect(() =>
+      registry.execute("search_assets", "{bad json", { workspaceId: "workspace-metadata", userPermissions: ["assets.read"] }),
+    ).toThrow(/Invalid JSON arguments.*Suggested action: retry.*Safe to retry: yes/s);
+
+    expect(() =>
+      registry.execute("search_assets", "{}", { workspaceId: "workspace-metadata", userPermissions: ["assets.read"] }),
+    ).toThrow(/Missing required field.*query.*Suggested action: use the relevant read\/search tool.*Safe to retry: yes/s);
+
+    expect(() =>
+      registry.execute(
+        "archive_asset",
+        JSON.stringify({ asset_id: "asset-missing-recovery" }),
+        { workspaceId: "workspace-metadata", userPermissions: ["assets.manage"] },
+      ),
+    ).toThrow(/Asset not found.*treat the ID as stale.*Safe to retry: yes after resolving the current ID/s);
+
+    expect(() =>
+      registry.execute(
+        "create_invoice_from_quote",
+        JSON.stringify({ quote_id: "quote-draft-recovery" }),
+        { workspaceId: "workspace-metadata", userPermissions: ["invoices.create"] },
+      ),
+    ).toThrow(/Only approved quotes.*load the current record detail\/history.*valid state/s);
+
+    cleanup();
+  });
+
   it("updates quote drafts and creates invoices from approved quotes with separate permissions", () => {
     const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-finance-writes");
     const secretStore = { hasProviderSecret: () => false };
