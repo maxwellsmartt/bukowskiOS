@@ -1410,6 +1410,29 @@ export const createAgentToolRegistry = (
       },
     },
     {
+      name: "get_financial_priorities",
+      requiredPermission: "finance.read",
+      description:
+        "Return financial issues ranked by priority (which to attack first). Combines per-project exposure (incident cost at risk) and immobilized capital into a single score, highest first.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          limit: { type: "number" },
+        },
+      },
+      execute: (args) => {
+        const result = foundationReads.getFinancialPriorities({ limit: asInteger(args.limit, 6) });
+
+        return {
+          summary: result.topPriority
+            ? `Top financial priority: ${result.topPriority.project} (${result.topPriority.reason}).`
+            : "No material financial priorities right now.",
+          payload: result,
+        };
+      },
+    },
+    {
       name: "get_schedule_conflicts",
       requiredPermission: "projects.read",
       description: "Return overlapping unit windows and crew scheduling conflicts in the next 30 days.",

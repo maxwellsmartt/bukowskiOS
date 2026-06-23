@@ -75,7 +75,7 @@ describe("agent provider config", () => {
       .get() as { seed_version: string; allowed_tools_json: string };
     const tools = JSON.parse(row.allowed_tools_json) as string[];
 
-    expect(row.seed_version).toBe("v4");
+    expect(row.seed_version).toBe("v5");
     // Admin's custom tool preserved.
     expect(tools).toContain("custom_admin_tool");
     // New default capabilities merged in.

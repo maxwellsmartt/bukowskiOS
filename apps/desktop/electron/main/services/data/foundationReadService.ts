@@ -3883,6 +3883,45 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
     };
   },
 
+  // Ranks where financial attention should go first. Combines per-project
+  // operational exposure (incident cost at risk) with immobilized capital
+  // (assets out) into a single priority score, so finance/coordinators get a
+  // clear "attack this first" order instead of a flat exposure list.
+  getFinancialPriorities(input?: { limit?: number }) {
+    const overview = this.getFinanceOverview();
+    const limit = Math.max(1, input?.limit ?? 6);
+
+    const items = overview.exposureByProject
+      .map((row) => {
+        // Exposure (cost-at-risk) is the primary driver; immobilized capital
+        // adds weight at a discount since it is recoverable, not lost.
+        const priorityScore = Math.round(row.exposureValue + row.assetsOutValue * 0.25);
+        const drivers: string[] = [];
+        if (row.exposureValue > 0) drivers.push(`exposición ${row.exposure}`);
+        if (row.incidentCount > 0) drivers.push(`${row.incidentCount} incidente(s)`);
+        if (row.assetsOutValue > 0) drivers.push(`${row.assetsOut} en equipo fuera`);
+        return {
+          project: row.project,
+          exposure: row.exposure,
+          exposureValue: row.exposureValue,
+          incidentCount: row.incidentCount,
+          assetsOut: row.assetsOut,
+          assetsOutValue: row.assetsOutValue,
+          priorityScore,
+          reason: drivers.length ? drivers.join(" · ") : "Sin exposición material.",
+        };
+      })
+      .filter((row) => row.priorityScore > 0 || row.incidentCount > 0)
+      .sort((left, right) => right.priorityScore - left.priorityScore || right.incidentCount - left.incidentCount)
+      .slice(0, limit)
+      .map((row, index) => ({ ...row, priorityRank: index + 1 }));
+
+    return {
+      items,
+      topPriority: items[0] ?? null,
+    };
+  },
+
   getOpenInvoices(limit = 8) {
     const rows = db
       .prepare(

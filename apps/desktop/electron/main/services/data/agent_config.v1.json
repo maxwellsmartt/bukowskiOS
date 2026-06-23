@@ -1,5 +1,5 @@
 {
-  "version": "v4",
+  "version": "v5",
   "system_managed_fields": [
     "agent_key",
     "agent_type",
@@ -75,7 +75,8 @@
         "create_reminder",
         "read_attached_document",
         "assess_repair_or_replace",
-        "find_substitute_assets"
+        "find_substitute_assets",
+        "get_financial_priorities"
       ],
       "allowed_domains_json": [
         "assets",
@@ -272,7 +273,8 @@
         "search_quotes",
         "explain_quote_total",
         "prepare_quote_draft",
-        "get_project_detail"
+        "get_project_detail",
+        "get_financial_priorities"
       ],
       "allowed_domains_json": [
         "finance",
