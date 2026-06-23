@@ -145,11 +145,30 @@ Hallazgos nuevos:
 
 | ID | Severidad | Estado | Significado práctico | Consecuencia si no se corrige |
 |----|-----------|--------|----------------------|-------------------------------|
-| F-R1 | `crítico` | `open` | Los tools del chat/agentes tienen allowlist por agente, pero no verifican permisos del usuario antes de leer Finance/Treasury. | Un usuario sin Finance podría pedir al chat movimientos bancarios, P&L, DGII ledger o health financiero y recibir datos aunque la UI esconda Finance. |
+| F-R1 | `crítico` | `fixed` | Los tools del chat/agentes ahora declaran `requiredPermission`, el gateway carga permisos confiables en main y `execute()` niega Finance/Treasury sin permiso efectivo. | Cerrado por tests focalizados: usuarios sin `finance.read` / `treasury.transactions.read` no reciben payload financiero aunque el agente tenga la tool en allowlist. |
 | F-R2 | `alto` | `open` | Varias mutaciones de Projects devuelven listas/detalles con defaults financieros después de crear/editar/archivar. | Un usuario con `projects.manage` pero sin Finance puede recibir `exposure`, budget u otros campos económicos en el payload IPC post-mutación. |
 | F-R3 | `medio` | `open` | `getProjectDetail(..., { includeFinancials: false })` aún devuelve `replacementValue` y `costEstimate`. | Si la regla es "sin Finance no ve datos económicos", Projects/Assets/Incidents siguen filtrando valores monetarios. |
 
 Evidencia técnica:
+
+Actualización 2026-06-23: F-R1 quedó cerrado. La evidencia vigente está en:
+
+- `apps/desktop/electron/main/services/ai/agentToolRegistry.ts`: los tools de
+  Finance/Treasury declaran `requiredPermission` y `execute()` llama
+  `assertToolPermission(tool, context)`.
+- `apps/desktop/electron/main/services/ai/assistantGatewayService.ts`: el
+  gateway construye un contexto confiable con `loadActorPermissions(...)`,
+  filtra definiciones por permisos del usuario y vuelve a validar permisos al
+  aprobar payloads guardados.
+- `apps/desktop/src/test/agent-tool-registry.test.ts`: prueba que Finance y
+  Treasury fallan sin permisos aunque la allowlist del agente incluya la tool.
+- `apps/desktop/src/test/assistant-gateway-service.test.ts`: prueba que el chat
+  bloquea un usuario sin Finance y devuelve una solicitud explícita de permiso.
+- `apps/desktop/src/test/security-regression.test.ts`: prueba estática que todos
+  los tools Finance/Treasury sensibles conservan `requiredPermission`.
+
+El resto de la evidencia abajo queda como contexto histórico de la auditoría de
+2026-06-05 y sigue aplicando para F-R2/F-R3.
 
 - `apps/desktop/electron/main/services/ai/agentToolRegistry.ts`: tools como
   `get_financial_exposure_summary`, `get_budget_vs_actual`,
@@ -172,24 +191,19 @@ Evidencia técnica:
 
 Orden de fixes recomendado:
 
-1. **F-R1 primero**: convertir el tool registry en una frontera de seguridad.
-   Cada tool financiero debe declarar `requiredPermission`; `execute()` debe
-   negar ejecución si el usuario actual no tiene ese permiso. Para esto el
-   contexto del gateway debe incluir identidad/permisos confiables resueltos en
-   main, no datos enviados desde renderer.
-2. **F-R2 segundo**: crear helpers internos para devolver Project list/detail
+1. **F-R2 primero**: crear helpers internos para devolver Project list/detail
    sanitizados después de cualquier mutación. No debe quedar ningún call-site de
    `getProjects/getProjectDetail` expuesto a renderer sin decisión explícita de
    `includeFinancials`.
-3. **F-R3 tercero**: decidir con producto si `replacementValue` y
+2. **F-R3 segundo**: decidir con producto si `replacementValue` y
    `costEstimate` son datos financieros restringidos. Si sí, enmascararlos en
    read service y ocultar columnas en UI para usuarios sin Finance.
 
 Tests sugeridos para cerrar:
 
-- Test unitario de `agentToolRegistry.execute()` que rechace tools
+- Done — Test unitario de `agentToolRegistry.execute()` que rechaza tools
   Finance/Treasury sin `finance.read` / `treasury.transactions.read`.
-- Test de gateway que demuestre que un usuario no-finance no puede recibir
+- Done — Test de gateway que demuestra que un usuario no-finance no puede recibir
   payload financiero aunque el Finance Agent tenga el tool en `allowed_tools_json`.
 - Test estático o unitario que cubra todos los returns post-mutación de Projects
   y falle si aparece `foundationReads.getProjects(...)` o
