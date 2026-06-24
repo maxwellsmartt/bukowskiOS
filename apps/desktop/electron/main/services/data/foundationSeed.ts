@@ -1234,6 +1234,42 @@ export const cleanupFoundationDemoData = (db: DatabaseSync) => {
   deleteByColumn(db, "workspace_memberships", "user_id", DEMO_USER_IDS);
   deleteByColumn(db, "users", "id", DEMO_USER_IDS);
 
+  // Deleting demo roots above can leave orphaned child rows in tables we did
+  // not enumerate (agent_runs, scheduling, crew_assignments referencing demo
+  // project_units, etc.). The post-migration integrity check runs a global
+  // foreign_key_check and aborts startup if any dangling reference remains, so
+  // cascade-delete every orphan the sweep produced until the graph is clean.
+  // The DB was FK-consistent before this sweep, so the only violations now are
+  // demo-derived; deleting them up the chain is safe. Bounded loop.
+  try {
+    for (let pass = 0; pass < 25; pass += 1) {
+      const violations = db.prepare("PRAGMA foreign_key_check").all() as Array<{ table?: string; rowid?: number | bigint | null }>;
+      if (!violations.length) {
+        break;
+      }
+      let deletedAny = false;
+      for (const violation of violations) {
+        const table = violation.table;
+        const rowid = violation.rowid;
+        if (!table || rowid === null || rowid === undefined) {
+          continue;
+        }
+        try {
+          db.prepare(`DELETE FROM "${table}" WHERE rowid = ?`).run(rowid);
+          deletedAny = true;
+        } catch {
+          // Skip rows we cannot address (e.g. WITHOUT ROWID tables).
+        }
+      }
+      if (!deletedAny) {
+        break;
+      }
+    }
+  } catch {
+    // foreign_key_check unsupported or failed — leave as-is; the call site and
+    // per-delete guards keep startup alive.
+  }
+
   if (foreignKeysDisabled) {
     try {
       db.exec("PRAGMA foreign_keys = ON");

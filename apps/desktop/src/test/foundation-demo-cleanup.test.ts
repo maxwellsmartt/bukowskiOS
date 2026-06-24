@@ -32,6 +32,12 @@ describe("cleanupFoundationDemoData", () => {
     const fkRow = database.prepare("PRAGMA foreign_keys").get() as { foreign_keys: number } | undefined;
     expect(fkRow?.foreign_keys).toBe(1);
 
+    // The sweep must leave the database FK-consistent — the real startup runs a
+    // global foreign_key_check right after and aborts (hanging the loading
+    // screen) if any dangling reference remains.
+    const violations = database.prepare("PRAGMA foreign_key_check").all();
+    expect(violations).toEqual([]);
+
     cleanup();
   });
 
