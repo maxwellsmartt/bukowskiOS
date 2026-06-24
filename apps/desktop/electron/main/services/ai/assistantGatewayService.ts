@@ -874,164 +874,6 @@ const buildHumanErrorResponse = (
   orchestration: null,
 });
 
-const normalizeFastPathMessage = (message: string) =>
-  message
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-
-const hasActionIntent = (normalizedMessage: string) =>
-  /\b(crea|crear|creame|genera|generar|prepara|preparar|haz|hacer|asigna|asignar|mueve|mover|borra|borrar|elimina|eliminar|actualiza|actualizar|edita|editar|packing|quote|cotizacion|rma|incidente|reminder|todo)\b/i.test(
-    normalizedMessage,
-  );
-
-const formatRateValue = (value: unknown) =>
-  typeof value === "number"
-    ? new Intl.NumberFormat("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 4,
-      }).format(value)
-    : "—";
-
-const formatFastPathTimestamp = (value: unknown) => {
-  if (typeof value !== "string" || !value) {
-    return "sin hora guardada";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleString("es-DO", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-};
-
-const buildFastPathResponse = (input: {
-  assistantMessage: string;
-  intentLabel: string;
-  commandStateLabel?: string;
-  toolTraces: AIGatewayToolCallTrace[];
-}): AssistantGatewayResponse => ({
-  status: "answered",
-  stateLabel: "Answered",
-  stateBody: "Answered from workspace data.",
-  assistantMessage: input.assistantMessage,
-  routedAgentId: null,
-  routedAgentName: "Fast path",
-  routedAgentRole: "Workspace tools",
-  intentLabel: input.intentLabel,
-  commandStateLabel: input.commandStateLabel ?? "No changes applied",
-  draftRunId: null,
-  approvalDecision: null,
-  approvalScope: null,
-  approvalReason: null,
-  providerKey: "workspace-tools",
-  modelKey: "fast-path",
-  toolTraces: input.toolTraces,
-  orchestration: {
-    intent: input.intentLabel,
-    targetAgentId: null,
-    targetAgentName: "Fast path",
-    confidence: 1,
-    requiresApproval: false,
-    toolCallRequested: true,
-    toolCalls: input.toolTraces,
-    userFacingSummary: input.assistantMessage,
-    answerKind: "informational",
-    draftRunTitle: null,
-    draftRunDescription: null,
-  },
-});
-
-const getCurrencyRequests = (normalizedMessage: string) => {
-  const mentionsUsd = /\b(usd|dolar|dolares|dollar|dollars)\b/.test(normalizedMessage);
-  const mentionsEur = /\b(eur|euro|euros)\b/.test(normalizedMessage);
-  if (mentionsUsd && mentionsEur) {
-    return ["USD", "EUR"];
-  }
-  if (mentionsEur) {
-    return ["EUR"];
-  }
-  return ["USD"];
-};
-
-const buildExchangeFastPathMessage = (payloads: Array<Record<string, unknown>>) => {
-  const sections = payloads.map((payload) => {
-    const pair = typeof payload.pair === "string" ? payload.pair : "USD/DOP";
-    const items = Array.isArray(payload.items) ? (payload.items as Array<Record<string, unknown>>) : [];
-    const bestBuySource = typeof payload.bestBuySource === "string" ? payload.bestBuySource : null;
-    const bestSellSource = typeof payload.bestSellSource === "string" ? payload.bestSellSource : null;
-
-    if (!items.length) {
-      return `No tengo tasas activas guardadas para ${pair}. Prueba Refresh rates en Finance para traer el último snapshot.`;
-    }
-
-    const lines = items.slice(0, 6).map((item) => {
-      const buy = item.buy && typeof item.buy === "object" ? (item.buy as Record<string, unknown>) : null;
-      const sell = item.sell && typeof item.sell === "object" ? (item.sell as Record<string, unknown>) : null;
-      const sourceLabel = typeof item.sourceLabel === "string" ? item.sourceLabel : "Banco";
-      const fetchedAt = formatFastPathTimestamp(buy?.fetchedAt ?? sell?.fetchedAt);
-      const sourceProof = typeof buy?.sourceProof === "string" ? buy.sourceProof : typeof sell?.sourceProof === "string" ? sell.sourceProof : null;
-      const bestMarkers = [
-        bestBuySource === sourceLabel ? "mejor compra" : null,
-        bestSellSource === sourceLabel ? "mejor venta" : null,
-      ]
-        .filter(Boolean)
-        .join(", ");
-      return `- ${sourceLabel}: compra ${formatRateValue(buy?.rate)} | venta ${formatRateValue(sell?.rate)}${
-        bestMarkers ? ` (${bestMarkers})` : ""
-      }. Actualizado: ${fetchedAt}${sourceProof ? ` · fuente: ${sourceProof}` : ""}`;
-    });
-
-    return [`${pair}`, ...lines].join("\n");
-  });
-
-  return sections.join("\n\n");
-};
-
-const extractLookupQuery = (normalizedMessage: string, originalMessage: string) => {
-  if (/\bmonitor(es)?\b/.test(normalizedMessage)) {
-    return "monitor";
-  }
-  if (/\bteradek\b/.test(normalizedMessage)) {
-    return "teradek";
-  }
-  if (/\bflanders\b/.test(normalizedMessage)) {
-    return "flanders";
-  }
-  if (/\blicen(c|s)ia(s)?\b/.test(normalizedMessage)) {
-    return "license";
-  }
-  return originalMessage
-    .replace(/[¿?]/g, " ")
-    .replace(/\b(busca|buscar|buscame|hay|tienes|disponible|disponibles|availability|search|asset|assets|equipo|equipos|en|el|la|los|las|un|una|de|del|para|por|favor)\b/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 80);
-};
-
-const buildAssetFastPathMessage = (payload: Record<string, unknown>, query: string) => {
-  const items = Array.isArray(payload.items) ? (payload.items as Array<Record<string, unknown>>) : [];
-  if (!items.length) {
-    return `No encontré assets disponibles para “${query}”. Puedo hacer una búsqueda más amplia o revisar por categoría si quieres.`;
-  }
-  const exactMatch = payload.exactMatch !== false;
-  const intro = exactMatch
-    ? `Encontré ${items.length} asset${items.length === 1 ? "" : "s"} para “${query}”:`
-    : `No encontré match exacto para “${query}”, pero estas alternativas están disponibles:`;
-  const lines = items.map((item) => {
-    const name = typeof item.name === "string" ? item.name : "Asset";
-    const code = typeof item.code === "string" ? item.code : "sin código";
-    const quantity = typeof item.availableQuantity === "number" ? item.availableQuantity : null;
-    const location = typeof item.location === "string" ? item.location : "sin ubicación";
-    return `- ${name} (${code})${quantity !== null ? ` · disponible: ${quantity}` : ""} · ${location}`;
-  });
-  return [intro, ...lines].join("\n");
-};
-
 const isImageMime = (mimeType: string) => (mimeType || "").toLowerCase().startsWith("image/");
 
 // Pre-extracts attached documents (CSV/XLSX/PDF) into plain text/rows so the
@@ -1063,60 +905,6 @@ const extractAttachedDocuments = async (
     }
   }
   return documents;
-};
-
-const maybeRunFastPath = (
-  request: AssistantGatewayRequest,
-  toolRegistry: AgentToolRegistry,
-  db: DatabaseSync,
-): AssistantGatewayResponse | null => {
-  if (request.attachments?.length) {
-    return null;
-  }
-  const normalizedMessage = normalizeFastPathMessage(request.message);
-  if (hasActionIntent(normalizedMessage)) {
-    return null;
-  }
-
-  const context = buildTrustedToolContext(db, request);
-
-  if (/\b(tasa|tasas|exchange|cambio|dolar|dolares|usd|euro|eur|banco|popular|central|santa cruz)\b/.test(normalizedMessage)) {
-    const toolTraces: AIGatewayToolCallTrace[] = [];
-    const payloads: Array<Record<string, unknown>> = [];
-    for (const currency of getCurrencyRequests(normalizedMessage)) {
-      const execution = toolRegistry.execute(
-        "compare_exchange_rates",
-        JSON.stringify({ base_currency: currency, quote_currency: "DOP" }),
-        context,
-      );
-      toolTraces.push(execution.trace);
-      payloads.push(execution.result.payload as Record<string, unknown>);
-    }
-    return buildFastPathResponse({
-      assistantMessage: buildExchangeFastPathMessage(payloads),
-      intentLabel: "Exchange-rate lookup",
-      toolTraces,
-    });
-  }
-
-  if (/\b(busca|buscar|buscame|search|disponible|disponibles|availability|hay|tienes|asset|assets|equipo|equipos|monitor|teradek|flanders)\b/.test(normalizedMessage)) {
-    const query = extractLookupQuery(normalizedMessage, request.message);
-    if (!query) {
-      return null;
-    }
-    const execution = toolRegistry.execute(
-      "search_assets",
-      JSON.stringify({ query, status: "Available", scope: "workspace", limit: 5 }),
-      context,
-    );
-    return buildFastPathResponse({
-      assistantMessage: buildAssetFastPathMessage(execution.result.payload as Record<string, unknown>, query),
-      intentLabel: "Asset availability lookup",
-      toolTraces: [execution.trace],
-    });
-  }
-
-  return null;
 };
 
 const formatProviderFailureForUser = (summary: string, fallback: string) => {
@@ -1369,18 +1157,10 @@ export const createAssistantGatewayService = (
     };
     const trustedContext = buildTrustedToolContext(db, request);
     request.context = trustedContext;
-    const fastPathResponse = maybeRunFastPath(request, options.toolRegistry, db);
-    if (fastPathResponse) {
-      options.sessionStore.writeResult(request.workspaceId, request.threadId, {
-        previousResponseId: null,
-        intent: fastPathResponse.intentLabel,
-        targetAgent: fastPathResponse.routedAgentName,
-        toolResultSummary: fastPathResponse.toolTraces[fastPathResponse.toolTraces.length - 1]?.summary ?? null,
-        status: fastPathResponse.status,
-        error: null,
-      });
-      return fastPathResponse;
-    }
+    // Note: the keyword "fast path" that answered asset/exchange lookups locally
+    // was removed — it matched generic words ("tienes", "hay") and hijacked
+    // normal conversation. All turns now go through the model, which has the
+    // read tools to answer these properly.
 
     const supervisor = loadSupervisorConfig(db, workspaceId);
     const supervisorProviderKey = supervisor?.provider_key ?? "openai";
