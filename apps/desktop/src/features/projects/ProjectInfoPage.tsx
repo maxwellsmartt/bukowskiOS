@@ -226,9 +226,6 @@ export const ProjectInfoPage = () => {
                   <div className="project-info-summary-window">
                     <span>{t("projects.info.schedule.window")}</span>
                     <strong>{scheduleWindow}</strong>
-                    <small>
-                      {scheduleStart} - {scheduleEnd}
-                    </small>
                   </div>
 
                   {currentProject.hasPreproduction ? (
@@ -237,9 +234,6 @@ export const ProjectInfoPage = () => {
                       <strong>
                         {currentProject.preproductionStartDate ?? t("projects.info.schedule.noStartDate")} → {currentProject.preproductionEndDate ?? t("projects.info.schedule.openEnded")}
                       </strong>
-                      <small>
-                        {currentProject.preproductionStartDate ?? t("projects.info.schedule.noStartDate")} - {currentProject.preproductionEndDate ?? t("projects.info.schedule.openEnded")}
-                      </small>
                     </div>
                   ) : null}
                 </div>
@@ -337,7 +331,7 @@ export const ProjectInfoPage = () => {
                   <label className="action-field">
                     <span className="action-field-label">{t("projects.info.fields.endDate")}</span>
                     <input
-                      className="action-field-control"
+                      className="action-field-control project-info-end-date"
                       min={startDate || undefined}
                       onChange={(event) => setEndDate(event.target.value)}
                       type="date"

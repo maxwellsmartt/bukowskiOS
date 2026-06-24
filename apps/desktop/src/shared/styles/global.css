@@ -8922,11 +8922,23 @@ body.is-resizing-side-rail {
 }
 
 /* Hairline divider that sets the pre-production section apart from the
-   core project fields above it. */
+   core project fields above it. Spans the full card width (both grid columns)
+   with a small horizontal inset. */
 .project-info-section-divider {
+  grid-column: 1 / -1;
   height: 1px;
-  margin: 4px 0 2px;
+  margin: 6px 6px 4px;
   background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+}
+
+/* The project end date carries a persistent amber tint as a visual guide. */
+.project-info-end-date {
+  border-color: var(--status-warning-border, rgba(245, 184, 101, 0.4));
+  color: var(--status-warning-fg, #f5b865);
+}
+
+.project-info-end-date:focus {
+  border-color: var(--status-warning-fg, #f5b865);
 }
 
 .project-info-card .action-form-grid {

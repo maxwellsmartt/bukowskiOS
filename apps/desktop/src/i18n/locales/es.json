@@ -4523,7 +4523,7 @@
       },
       "schedule": {
         "title": "Agenda",
-        "window": "Ventana",
+        "window": "Ventana de Producción",
         "activeUnits": "Unidades activas",
         "plannedUnits": "Unidades planificadas",
         "wrappedUnits": "Unidades cerradas",

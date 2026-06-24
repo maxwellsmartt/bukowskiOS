@@ -4519,7 +4519,7 @@
       },
       "schedule": {
         "title": "Schedule",
-        "window": "Window",
+        "window": "Production Window",
         "activeUnits": "Active units",
         "plannedUnits": "Planned units",
         "wrappedUnits": "Wrapped units",

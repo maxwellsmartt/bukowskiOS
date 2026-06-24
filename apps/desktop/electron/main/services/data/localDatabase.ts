@@ -2086,31 +2086,42 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
 
   // One-time hydration nudge: project-snapshot imports can leave placeholder
   // crew ("Remote crew abc123") whose real names only arrive from the
-  // cursor-incremental crew catalog pull. If such placeholders exist, reset the
-  // crew pull cursor (unless one is already pending) so the next catalog pull
-  // re-fetches and fills in the real names.
+  // cursor-incremental crew catalog pull. Two things blocked hydration:
+  //   1. The placeholder carried a recent updated_at, so the last-write-wins
+  //      catalog pull treated the (older) real crew row as stale and skipped
+  //      it — the placeholder never got overwritten.
+  //   2. The pull is cursor-incremental, so it would not re-fetch the crew.
+  // Fix both: backdate any existing placeholder to the epoch (so the real row
+  // always wins LWW) and reset the crew pull cursor (so the pull re-fetches).
   try {
-    const stalePlaceholderWorkspaces = database
+    const PLACEHOLDER_FILTER = `(crew_members.notes LIKE 'Created from a project snapshot%' OR crew_members.full_name LIKE 'Remote crew %')`;
+    const backdated = database
       .prepare(
-        `
-          SELECT DISTINCT crew_members.workspace_id AS workspace_id
-          FROM crew_members
-          LEFT JOIN sync_pull_cursors
-            ON sync_pull_cursors.workspace_id = crew_members.workspace_id
-            AND sync_pull_cursors.entity_type = 'crew_members'
-          WHERE crew_members.notes LIKE 'Created from a project snapshot%'
-            AND sync_pull_cursors.last_synced_at IS NOT NULL
-        `,
+        `UPDATE crew_members
+            SET created_at = '1970-01-01T00:00:00.000Z',
+                updated_at = '1970-01-01T00:00:00.000Z'
+          WHERE ${PLACEHOLDER_FILTER}
+            AND updated_at > '1970-01-01T00:00:00.000Z'`,
       )
-      .all() as Array<{ workspace_id: string }>;
-    for (const workspace of stalePlaceholderWorkspaces) {
-      database
+      .run();
+    if (backdated.changes > 0) {
+      const placeholderWorkspaces = database
         .prepare(
-          `UPDATE sync_pull_cursors SET last_synced_at = NULL, updated_at = ?
-             WHERE workspace_id = ? AND entity_type = 'crew_members'`,
+          `SELECT DISTINCT workspace_id FROM crew_members WHERE ${PLACEHOLDER_FILTER}`,
         )
-        .run(new Date().toISOString(), workspace.workspace_id);
-      logger.info("Reset crew catalog cursor to hydrate placeholder crew names.", { workspaceId: workspace.workspace_id });
+        .all() as Array<{ workspace_id: string }>;
+      for (const workspace of placeholderWorkspaces) {
+        database
+          .prepare(
+            `UPDATE sync_pull_cursors SET last_synced_at = NULL, updated_at = ?
+               WHERE workspace_id = ? AND entity_type = 'crew_members'`,
+          )
+          .run(new Date().toISOString(), workspace.workspace_id);
+      }
+      logger.info("Backdated placeholder crew and reset crew cursor so the catalog pull hydrates real names.", {
+        placeholders: backdated.changes,
+        workspaces: placeholderWorkspaces.length,
+      });
     }
   } catch (error) {
     logger.warn("Could not schedule crew placeholder hydration.", {

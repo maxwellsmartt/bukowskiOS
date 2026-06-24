@@ -911,7 +911,11 @@ const applyProjectSnapshot = (
       if (!rowExists(db, "crew_members", row.crew_member_id)) {
         const crewId = String(row.crew_member_id ?? "");
         if (!crewId) throw new Error("Crew assignment has no crew member id.");
-        const updatedAt = String(row.updated_at ?? safeProject.updated_at ?? new Date().toISOString());
+        // Epoch updated_at: the crew catalog pull is last-write-wins, so a
+        // placeholder dated "now" would block the real crew row (which has an
+        // older timestamp) from ever overwriting it. Dating the stub at the
+        // epoch guarantees the real record always wins and hydrates the name.
+        const placeholderTimestamp = "1970-01-01T00:00:00.000Z";
         db.prepare(
           `INSERT OR IGNORE INTO crew_members (
              id, workspace_id, full_name, role_label, email, phone, notes, is_active, created_at, updated_at
@@ -921,8 +925,8 @@ const applyProjectSnapshot = (
           context.workspaceId,
           `Remote crew ${crewId.slice(-6) || crewId}`,
           "Created from a project snapshot; the crew catalog will hydrate the full record.",
-          updatedAt,
-          updatedAt,
+          placeholderTimestamp,
+          placeholderTimestamp,
         );
         createdPlaceholderCrew = true;
       }

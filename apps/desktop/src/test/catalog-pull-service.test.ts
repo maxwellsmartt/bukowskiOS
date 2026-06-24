@@ -35,6 +35,41 @@ describe("catalogPullService", () => {
     cleanup();
   });
 
+  it("hydrates an epoch-dated placeholder crew with the real catalog row", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-catalog-pull-crew-hydrate");
+    const workspaceId = "workspace-metadata";
+    const service = createCatalogPullService(database);
+
+    // Placeholder created by a project-snapshot import, backdated to the epoch
+    // so the real (older-than-now) catalog row always wins last-write-wins.
+    database
+      .prepare(
+        `INSERT INTO crew_members (id, workspace_id, full_name, role_label, email, phone, notes, is_active, created_at, updated_at)
+           VALUES (?, ?, 'Remote crew abcdef', NULL, NULL, NULL, 'Created from a project snapshot; the crew catalog will hydrate the full record.', 1, '1970-01-01T00:00:00.000Z', '1970-01-01T00:00:00.000Z')`,
+      )
+      .run("crew-001", workspaceId);
+
+    const result = service.applyRemoteRows(workspaceId, "crew_members", [
+      {
+        id: "crew-001",
+        workspace_id: workspaceId,
+        full_name: "Ada Lovelace",
+        role_label: "DIT",
+        updated_at: "2026-04-01T10:00:00.000Z",
+      },
+    ]);
+
+    expect(result.appliedCount).toBe(1);
+    expect(result.skippedDueToOlderCount).toBe(0);
+
+    const local = database
+      .prepare(`SELECT full_name FROM crew_members WHERE id = ?`)
+      .get("crew-001") as { full_name: string };
+    expect(local.full_name).toBe("Ada Lovelace");
+
+    cleanup();
+  });
+
   it("skips a remote row that is older than the local copy (LWW)", () => {
     const { cleanup, database } = createTestDatabase("bukowski-catalog-pull-lww");
     const workspaceId = "workspace-metadata";
