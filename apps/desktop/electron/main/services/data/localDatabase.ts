@@ -498,9 +498,17 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   } else {
     // Demo data is off: sweep out any demo dataset seeded by an earlier run so
     // it stops adding noise. Both cleanups target only known demo ids under
-    // workspace-metadata and never touch the user's real workspace.
-    runStartupStep("cleanup foundation demo data", () => cleanupFoundationDemoData(database));
-    runStartupStep("cleanup legacy Rentman demo", () => cleanupLegacyRentmanDemo(database));
+    // workspace-metadata and never touch the user's real workspace. The sweep is
+    // best-effort — never let it abort startup (that would hang the loading
+    // screen), so swallow any error here as a final safety net.
+    try {
+      runStartupStep("cleanup foundation demo data", () => cleanupFoundationDemoData(database));
+      runStartupStep("cleanup legacy Rentman demo", () => cleanupLegacyRentmanDemo(database));
+    } catch (error) {
+      logger.warn("Demo data cleanup skipped after error.", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
   runStartupStep("apply asset quantity foundation migration", () =>
     applyTrackedStep(database, "runtime_asset_quantity_foundation_v1", () => applyAssetQuantityFoundationMigration(database)),

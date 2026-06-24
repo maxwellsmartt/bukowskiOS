@@ -147,12 +147,28 @@ const clearPreviousLegacyImport = (db: DatabaseSync) => {
 
 /**
  * Remove all legacy Rentman demo rows (assets, imports, and the loc-legacy /
- * cat-legacy scaffolding). Idempotent; safe to run when demo data is disabled.
+ * cat-legacy scaffolding). Idempotent. Best-effort and non-fatal: this runs as
+ * a startup step, so a missing table or any error must never abort DB init.
  */
 export const cleanupLegacyRentmanDemo = (db: DatabaseSync) => {
-  clearPreviousLegacyImport(db);
-  db.prepare("DELETE FROM locations WHERE id LIKE 'loc-legacy-%'").run();
-  db.prepare("DELETE FROM asset_categories WHERE id LIKE 'cat-legacy-%'").run();
+  const safeRun = (sql: string, ...params: string[]) => {
+    try {
+      db.prepare(sql).run(...params);
+    } catch {
+      // Table may not exist on this schema, or the row may be missing — skip.
+    }
+  };
+
+  safeRun("DELETE FROM legacy_rentman_asset_links");
+  safeRun("DELETE FROM legacy_rentman_items");
+  safeRun("DELETE FROM legacy_rentman_imports WHERE id = ?", LEGACY_RENTMAN_IMPORT_ID);
+  safeRun("DELETE FROM asset_current_state WHERE asset_id LIKE 'asset-legacy-rentman-%'");
+  safeRun("DELETE FROM asset_events WHERE asset_id LIKE 'asset-legacy-rentman-%'");
+  safeRun("DELETE FROM asset_assignments WHERE asset_id LIKE 'asset-legacy-rentman-%'");
+  safeRun("DELETE FROM asset_files WHERE asset_id LIKE 'asset-legacy-rentman-%'");
+  safeRun("DELETE FROM assets WHERE id LIKE 'asset-legacy-rentman-%'");
+  safeRun("DELETE FROM locations WHERE id LIKE 'loc-legacy-%'");
+  safeRun("DELETE FROM asset_categories WHERE id LIKE 'cat-legacy-%'");
 };
 
 const getLocationId = (warehouseSlot: string) =>

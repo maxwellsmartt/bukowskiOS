@@ -1194,39 +1194,51 @@ const deleteByColumn = (db: DatabaseSync, table: string, column: string, ids: re
 
 /**
  * Remove the demo dataset seeded by seedFoundationData. Targets ONLY the known
- * demo ids under workspace-metadata, never the user's real workspace. Foreign
- * keys are disabled for the sweep so child/parent order is irrelevant; this is
- * a self-contained demo subgraph. Idempotent.
+ * demo ids under workspace-metadata, never the user's real workspace.
+ *
+ * Best-effort and non-fatal by design: this runs as a startup step, so it must
+ * never throw — a thrown error aborts DB init and hangs the loading screen. No
+ * explicit transaction is opened (the caller may already be mid-transaction,
+ * and PRAGMA foreign_keys cannot change inside one); each delete is individually
+ * guarded and runs child-before-parent so it succeeds whether or not FK
+ * enforcement is actually off.
  */
 export const cleanupFoundationDemoData = (db: DatabaseSync) => {
-  db.exec("PRAGMA foreign_keys = OFF");
+  let foreignKeysDisabled = false;
   try {
-    db.exec("BEGIN");
-    // Child rows first by their foreign keys, then the parents.
-    deleteByColumn(db, "asset_events", "asset_id", DEMO_ASSET_IDS);
-    deleteByColumn(db, "asset_assignments", "asset_id", DEMO_ASSET_IDS);
-    deleteByColumn(db, "asset_files", "asset_id", DEMO_ASSET_IDS);
-    deleteByColumn(db, "asset_current_state", "asset_id", DEMO_ASSET_IDS);
-    deleteByColumn(db, "asset_valuations", "asset_id", DEMO_ASSET_IDS);
-    deleteByColumn(db, "packing_items", "packing_slip_id", DEMO_PACKING_IDS);
-    deleteByColumn(db, "rma_assets", "rma_id", DEMO_RMA_IDS);
-    deleteByColumn(db, "rma_cases", "id", DEMO_RMA_IDS);
-    deleteByColumn(db, "incidents", "id", DEMO_INCIDENT_IDS);
-    deleteByColumn(db, "packing_slips", "id", DEMO_PACKING_IDS);
-    deleteByColumn(db, "crew_assignments", "crew_member_id", DEMO_CREW_IDS);
-    deleteByColumn(db, "project_units", "project_id", DEMO_PROJECT_IDS);
-    deleteByColumn(db, "projects", "id", DEMO_PROJECT_IDS);
-    deleteByColumn(db, "assets", "id", DEMO_ASSET_IDS);
-    deleteByColumn(db, "crew_members", "id", DEMO_CREW_IDS);
-    deleteByColumn(db, "departments", "id", DEMO_DEPARTMENT_IDS);
-    deleteByColumn(db, "locations", "id", DEMO_LOCATION_IDS);
-    deleteByColumn(db, "workspace_memberships", "user_id", DEMO_USER_IDS);
-    deleteByColumn(db, "users", "id", DEMO_USER_IDS);
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  } finally {
-    db.exec("PRAGMA foreign_keys = ON");
+    db.exec("PRAGMA foreign_keys = OFF");
+    foreignKeysDisabled = true;
+  } catch {
+    // No-op inside an open transaction; the child-first order below still keeps
+    // FK enforcement satisfied in the common cases.
+  }
+
+  // Child rows first by their foreign keys, then the parents.
+  deleteByColumn(db, "asset_events", "asset_id", DEMO_ASSET_IDS);
+  deleteByColumn(db, "asset_assignments", "asset_id", DEMO_ASSET_IDS);
+  deleteByColumn(db, "asset_files", "asset_id", DEMO_ASSET_IDS);
+  deleteByColumn(db, "asset_current_state", "asset_id", DEMO_ASSET_IDS);
+  deleteByColumn(db, "asset_valuations", "asset_id", DEMO_ASSET_IDS);
+  deleteByColumn(db, "packing_items", "packing_slip_id", DEMO_PACKING_IDS);
+  deleteByColumn(db, "rma_assets", "rma_id", DEMO_RMA_IDS);
+  deleteByColumn(db, "rma_cases", "id", DEMO_RMA_IDS);
+  deleteByColumn(db, "incidents", "id", DEMO_INCIDENT_IDS);
+  deleteByColumn(db, "packing_slips", "id", DEMO_PACKING_IDS);
+  deleteByColumn(db, "crew_assignments", "crew_member_id", DEMO_CREW_IDS);
+  deleteByColumn(db, "project_units", "project_id", DEMO_PROJECT_IDS);
+  deleteByColumn(db, "projects", "id", DEMO_PROJECT_IDS);
+  deleteByColumn(db, "assets", "id", DEMO_ASSET_IDS);
+  deleteByColumn(db, "crew_members", "id", DEMO_CREW_IDS);
+  deleteByColumn(db, "departments", "id", DEMO_DEPARTMENT_IDS);
+  deleteByColumn(db, "locations", "id", DEMO_LOCATION_IDS);
+  deleteByColumn(db, "workspace_memberships", "user_id", DEMO_USER_IDS);
+  deleteByColumn(db, "users", "id", DEMO_USER_IDS);
+
+  if (foreignKeysDisabled) {
+    try {
+      db.exec("PRAGMA foreign_keys = ON");
+    } catch {
+      // ignore
+    }
   }
 };
