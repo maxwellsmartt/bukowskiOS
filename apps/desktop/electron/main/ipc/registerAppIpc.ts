@@ -559,6 +559,14 @@ export const registerAppIpc = ({
       accessLevel: "write",
       requiredPermission: "users.invite",
     });
+  // Sensitive app-level access (sync internals, backups, exports) requires the
+  // user to be an admin. Granting requires passing the admin check for at least
+  // ONE local workspace — not every one. The old "must pass for every
+  // workspace" loop hard-failed whenever a single workspace could not be
+  // verified (a stale/demo seed workspace the user does not administer, or a
+  // remote workspace whose membership check needs the network while offline),
+  // which broke the sync popover and Settings sync panel entirely. We still
+  // deny when the user is not an admin of any workspace.
   const assertSensitiveAppAccess = async (action: string) => {
     const workspaceIds = Array.from(
       new Set(
@@ -568,9 +576,21 @@ export const registerAppIpc = ({
       ),
     );
 
-    for (const workspaceId of workspaceIds) {
-      await assertWorkspaceAdminAccess(workspaceId, action);
+    if (workspaceIds.length === 0) {
+      return;
     }
+
+    let lastError: unknown = null;
+    for (const workspaceId of workspaceIds) {
+      try {
+        await assertWorkspaceAdminAccess(workspaceId, action);
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError ?? new Error(`You do not have access to ${action}.`);
   };
 
   safeHandleReadWithSchema(ipcChannels.app.getInfo, emptyReadArgsSchema, () => ({
