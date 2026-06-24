@@ -806,6 +806,7 @@ export const registerFoundationIpc = ({
 
   const withTrustedAssistantActor = async <T extends AssistantGatewayRequest>(input: T): Promise<T> => {
     const actorUserId = await workspaceAccess.getCurrentUserId("send assistant messages");
+    const actorName = await workspaceAccess.getCurrentActorName();
     return {
       ...input,
       context: {
@@ -820,7 +821,7 @@ export const registerFoundationIpc = ({
           }
         : {
             connectorKey: "desktop",
-            actorName: "Desktop user",
+            actorName,
             permissionSummary: "Authenticated workspace member",
             isLinkedIdentity: true,
             actorUserId,

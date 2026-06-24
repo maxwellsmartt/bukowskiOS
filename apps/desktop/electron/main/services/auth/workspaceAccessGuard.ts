@@ -27,6 +27,7 @@ type AssertWorkspaceAccessInput = {
 type JwtPayload = {
   sub?: string;
   exp?: number;
+  email?: string;
 };
 
 type WorkspaceRow = {
@@ -375,6 +376,44 @@ export const createWorkspaceAccessGuard = ({
       }
 
       return userId;
+    },
+
+    // Human-facing name for the signed-in desktop user, used to label their
+    // turns in the assistant chat. Resolves the local users row first, then the
+    // JWT email, before falling back to the generic label.
+    async getCurrentActorName() {
+      let jwtEmail: string | undefined;
+      let userId: string | null = null;
+
+      if (isConfigured(supabaseUrl, anonKey)) {
+        const { accessToken } = await getTokens();
+        if (accessToken) {
+          const payload = decodeJwtPayload(accessToken);
+          userId = payload?.sub ?? null;
+          jwtEmail = payload?.email;
+        }
+      }
+
+      if (userId) {
+        const row = database
+          .prepare("SELECT full_name, email FROM users WHERE id = ? LIMIT 1")
+          .get(userId) as { full_name?: string | null; email?: string | null } | undefined;
+        const fullName = row?.full_name?.trim();
+        if (fullName) {
+          return fullName;
+        }
+        const localEmail = row?.email?.trim();
+        if (localEmail) {
+          return localEmail;
+        }
+      }
+
+      const trimmedJwtEmail = jwtEmail?.trim();
+      if (trimmedJwtEmail) {
+        return trimmedJwtEmail;
+      }
+
+      return "Desktop user";
     },
 
     async assertAssetAccess(
