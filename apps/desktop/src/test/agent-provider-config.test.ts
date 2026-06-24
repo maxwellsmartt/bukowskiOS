@@ -85,6 +85,32 @@ describe("agent provider config", () => {
     cleanup();
   });
 
+  it("preserves a user-customized role_label across a config version bump", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-rolelabel-preserve");
+
+    // An admin renamed the role, on an older seed version.
+    database
+      .prepare(
+        `UPDATE agents
+           SET seed_version = 'v1',
+               role_label = 'Jefe de Equipo'
+         WHERE workspace_id = 'workspace-metadata' AND agent_key = 'assets-agent'`,
+      )
+      .run();
+
+    bootstrapAIGatewayFoundation(database);
+
+    const row = database
+      .prepare("SELECT seed_version, role_label FROM agents WHERE workspace_id = 'workspace-metadata' AND agent_key = 'assets-agent'")
+      .get() as { seed_version: string; role_label: string };
+
+    // Version advanced (system re-seed ran) but the custom role_label survived.
+    expect(row.seed_version).toBe("v11");
+    expect(row.role_label).toBe("Jefe de Equipo");
+
+    cleanup();
+  });
+
   it("saves and tests Anthropic as a live provider", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-provider-anthropic-config");
     const secrets = new Map<string, string>();

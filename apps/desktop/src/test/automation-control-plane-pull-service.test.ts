@@ -153,4 +153,52 @@ describe("automationControlPlanePullService", () => {
 
     cleanup();
   });
+
+  it("syncs user-overridable agent fields but never overwrites system-managed ones", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-automation-pull-system-fields");
+    const service = createAutomationControlPlanePullService(database);
+
+    // Local code-seeded system field (the prompt) plus an old timestamp so the
+    // remote row is treated as newer.
+    database
+      .prepare("UPDATE agents SET base_prompt = ?, updated_at = ? WHERE workspace_id = ? AND id = ?")
+      .run("LOCAL CODE PROMPT — must survive sync", "2026-06-01T00:00:00.000Z", "workspace-metadata", "agent-assets");
+
+    const result = service.applyRemoteRows("workspace-metadata", "agents", [
+      {
+        id: "agent-assets",
+        workspace_id: "workspace-metadata",
+        agent_key: "assets-agent",
+        display_name: "Penélope",
+        role_summary: "Assets Agent",
+        base_prompt: "STALE REMOTE PROMPT — should be ignored",
+        domain_key: "assets",
+        provider_key: "openai",
+        model_key: "openai:gpt-5.4",
+        model_label: "GPT-5.4",
+        status: "active",
+        approval_mode: "supervised",
+        allowed_tools_json: "[]",
+        allowed_domains_json: "[]",
+        notes: null,
+        is_supervisor: 0,
+        sort_order: 2,
+        created_at: "2026-06-01T00:00:00.000Z",
+        updated_at: "2026-06-20T16:05:00.000Z",
+      },
+    ]);
+
+    expect(result.appliedCount).toBe(1);
+
+    const localRow = database
+      .prepare("SELECT display_name, base_prompt FROM agents WHERE id = ?")
+      .get("agent-assets") as { display_name: string; base_prompt: string };
+
+    // User-overridable rename synced through…
+    expect(localRow.display_name).toBe("Penélope");
+    // …but the system-managed prompt stayed local (code-owned).
+    expect(localRow.base_prompt).toBe("LOCAL CODE PROMPT — must survive sync");
+
+    cleanup();
+  });
 });

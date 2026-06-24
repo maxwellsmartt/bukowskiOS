@@ -59,6 +59,10 @@ const providerDefaults = [
 
 type AgentConfigRecord = (typeof agentConfig.agents)[number];
 
+// Baseline timestamp stamped on a system agent's first local seed, so a real
+// remote customization always wins the last-write-wins automation pull.
+const SYSTEM_AGENT_SEED_TIMESTAMP = "1970-01-01T00:00:00.000Z";
+
 const hasColumn = (db: DatabaseSync, tableName: string, columnName: string) => {
   const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
   return rows.some((row) => row.name === columnName);
@@ -438,7 +442,6 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
     UPDATE agents
     SET
       agent_key = ?,
-      role_label = ?,
       emoji = ?,
       domain_key = ?,
       agent_type = ?,
@@ -542,7 +545,12 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
         agent.seedVersion,
         agent.sortOrder,
         now,
-        now,
+        // updated_at = epoch on first seed so any real remote customization
+        // (display_name/model/tools, always dated later) wins the automation
+        // pull's last-write-wins and hydrates onto a freshly synced machine
+        // instead of being skipped as older. Only the seed sets epoch; a real
+        // local edit stamps `now` via the mutation service.
+        SYSTEM_AGENT_SEED_TIMESTAMP,
       );
 
       // Re-seed the system-managed fields ONLY when the config version actually
@@ -574,9 +582,10 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
           }
         }
 
+        // role_label is intentionally NOT re-seeded: it is a user-overridable
+        // field (an admin can rename a role) and must survive config bumps.
         updateSystemAgent.run(
           agent.agentKey,
-          agent.roleLabel,
           agent.emoji,
           agent.domainKey,
           agent.agentType,

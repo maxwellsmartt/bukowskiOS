@@ -102,7 +102,34 @@ const upsertRow = (
 
   const columns = entries.map(([key]) => key);
   const values = entries.map(([, value]) => toSqlInputValue(value));
-  const updateColumns = columns.filter((column) => column !== "id" && column !== "created_at");
+  // System-managed agent fields come from the local code config (the same JSON
+  // re-seeds them on every machine), so they must NOT be overwritten by a
+  // remote row — otherwise a teammate on an older app version could push a stale
+  // prompt that regresses everyone. Only user-overridable fields (display_name,
+  // model, tools, approval, status, notes…) sync across machines.
+  const systemManagedAgentColumns =
+    entityType === "agents"
+      ? new Set([
+          "agent_key",
+          "agent_type",
+          "is_supervisor",
+          "icon_key",
+          "emoji",
+          "base_prompt",
+          "soul",
+          "skills_json",
+          "specialization_json",
+          "can_execute_write_actions",
+          "can_create_draft_runs",
+          "is_system_agent",
+          "visibility",
+          "seed_version",
+          "sort_order",
+        ])
+      : new Set<string>();
+  const updateColumns = columns.filter(
+    (column) => column !== "id" && column !== "created_at" && !systemManagedAgentColumns.has(column),
+  );
 
   db.prepare(
     `
