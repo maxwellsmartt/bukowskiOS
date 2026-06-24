@@ -28,6 +28,11 @@ type JwtPayload = {
   sub?: string;
   exp?: number;
   email?: string;
+  name?: string;
+  user_metadata?: {
+    full_name?: string;
+    name?: string;
+  } & Record<string, unknown>;
 };
 
 type WorkspaceRow = {
@@ -379,10 +384,13 @@ export const createWorkspaceAccessGuard = ({
     },
 
     // Human-facing name for the signed-in desktop user, used to label their
-    // turns in the assistant chat. Resolves the local users row first, then the
-    // JWT email, before falling back to the generic label.
+    // turns in the assistant chat. Prefers a real full name (local users row,
+    // then the JWT auth metadata that the account profile writes via
+    // updateUserMetadata) and only falls back to the email, then the generic
+    // label.
     async getCurrentActorName() {
       let jwtEmail: string | undefined;
+      let jwtName: string | undefined;
       let userId: string | null = null;
 
       if (isConfigured(supabaseUrl, anonKey)) {
@@ -391,9 +399,11 @@ export const createWorkspaceAccessGuard = ({
           const payload = decodeJwtPayload(accessToken);
           userId = payload?.sub ?? null;
           jwtEmail = payload?.email;
+          jwtName = payload?.user_metadata?.full_name ?? payload?.user_metadata?.name ?? payload?.name;
         }
       }
 
+      let localEmail: string | undefined;
       if (userId) {
         const row = database
           .prepare("SELECT full_name, email FROM users WHERE id = ? LIMIT 1")
@@ -402,18 +412,15 @@ export const createWorkspaceAccessGuard = ({
         if (fullName) {
           return fullName;
         }
-        const localEmail = row?.email?.trim();
-        if (localEmail) {
-          return localEmail;
-        }
+        localEmail = row?.email?.trim() || undefined;
       }
 
-      const trimmedJwtEmail = jwtEmail?.trim();
-      if (trimmedJwtEmail) {
-        return trimmedJwtEmail;
+      const trimmedJwtName = jwtName?.trim();
+      if (trimmedJwtName) {
+        return trimmedJwtName;
       }
 
-      return "Desktop user";
+      return localEmail || jwtEmail?.trim() || "Desktop user";
     },
 
     async assertAssetAccess(

@@ -391,6 +391,47 @@ describe("workspace access guard", () => {
     cleanup();
   });
 
+  it("uses the JWT profile full name when no local users row carries one", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-workspace-access-actor-metadata");
+    const guard = createWorkspaceAccessGuard({
+      database,
+      supabaseUrl: "https://example.supabase.co",
+      anonKey: "anon-key",
+      getTokens: async () => ({
+        accessToken: createJwt({
+          sub: "user-no-local-row",
+          email: "ernesto@example.test",
+          user_metadata: { full_name: "Ernesto Maxwell" },
+          exp: 9_999_999_999,
+        }),
+      }),
+      fetchImpl: vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })),
+      now: () => 1_000,
+    });
+
+    await expect(guard.getCurrentActorName()).resolves.toBe("Ernesto Maxwell");
+
+    cleanup();
+  });
+
+  it("falls back to the email when neither a full name source is set", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-workspace-access-actor-email");
+    const guard = createWorkspaceAccessGuard({
+      database,
+      supabaseUrl: "https://example.supabase.co",
+      anonKey: "anon-key",
+      getTokens: async () => ({
+        accessToken: createJwt({ sub: "user-email-only", email: "ernesto@example.test", exp: 9_999_999_999 }),
+      }),
+      fetchImpl: vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })),
+      now: () => 1_000,
+    });
+
+    await expect(guard.getCurrentActorName()).resolves.toBe("ernesto@example.test");
+
+    cleanup();
+  });
+
   it("falls back to the generic label when no session is present", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-workspace-access-actor-fallback");
     const guard = createWorkspaceAccessGuard({
