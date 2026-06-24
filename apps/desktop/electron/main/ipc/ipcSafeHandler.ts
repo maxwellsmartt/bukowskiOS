@@ -24,6 +24,15 @@ const formatValidationError = (error: z.ZodError) => {
   if (issue?.code === "invalid_type" && rawIssue.input === undefined) {
     return field ? `${field} is required.` : "A required field is missing.";
   }
+  // Unrecognized keys have no field path; name them so a client/schema drift
+  // (e.g. a field the handler accepts but the schema forgot) is debuggable
+  // instead of surfacing the opaque generic fallback.
+  if (issue?.code === "unrecognized_keys") {
+    const keys = (issue as z.ZodIssue & { keys?: string[] }).keys ?? [];
+    if (keys.length) {
+      return `Unexpected field(s): ${keys.join(", ")}.`;
+    }
+  }
   if (field && issue?.message) {
     return `${field}: ${issue.message}`;
   }

@@ -608,6 +608,10 @@ export const createProjectSchema = z
 
 export const updateProjectSchema = createProjectSchema.omit({ workspaceId: true }).extend({
   projectId: nonEmptyString,
+  // When true, shifting the project window cascades the delta to its units.
+  // The mutation service reads this flag; without it the strict schema rejected
+  // the save with an unactionable "review the highlighted fields" message.
+  cascadeDates: z.boolean().optional(),
 });
 
 export const projectBlueprintGeneralInfoSchema = z
