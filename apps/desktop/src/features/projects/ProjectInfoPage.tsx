@@ -222,25 +222,27 @@ export const ProjectInfoPage = () => {
               aside={<StatusBadge>{t(`projects.statuses.${currentProject.status}`, { defaultValue: currentProject.status })}</StatusBadge>}
             >
               <div className="project-info-summary" aria-label={t("projects.info.schedule.title")}>
-                <div className="project-info-summary-window">
-                  <span>{t("projects.info.schedule.window")}</span>
-                  <strong>{scheduleWindow}</strong>
-                  <small>
-                    {scheduleStart} - {scheduleEnd}
-                  </small>
-                </div>
-
-                {currentProject.hasPreproduction ? (
-                  <div className="project-info-summary-window project-info-summary-preproduction">
-                    <span>{t("projects.info.schedule.preproduction")}</span>
-                    <strong>
-                      {currentProject.preproductionStartDate ?? t("projects.info.schedule.noStartDate")} → {currentProject.preproductionEndDate ?? t("projects.info.schedule.openEnded")}
-                    </strong>
+                <div className="project-info-summary-windows">
+                  <div className="project-info-summary-window">
+                    <span>{t("projects.info.schedule.window")}</span>
+                    <strong>{scheduleWindow}</strong>
                     <small>
-                      {currentProject.preproductionStartDate ?? t("projects.info.schedule.noStartDate")} - {currentProject.preproductionEndDate ?? t("projects.info.schedule.openEnded")}
+                      {scheduleStart} - {scheduleEnd}
                     </small>
                   </div>
-                ) : null}
+
+                  {currentProject.hasPreproduction ? (
+                    <div className="project-info-summary-window project-info-summary-preproduction">
+                      <span>{t("projects.info.schedule.preproduction")}</span>
+                      <strong>
+                        {currentProject.preproductionStartDate ?? t("projects.info.schedule.noStartDate")} → {currentProject.preproductionEndDate ?? t("projects.info.schedule.openEnded")}
+                      </strong>
+                      <small>
+                        {currentProject.preproductionStartDate ?? t("projects.info.schedule.noStartDate")} - {currentProject.preproductionEndDate ?? t("projects.info.schedule.openEnded")}
+                      </small>
+                    </div>
+                  ) : null}
+                </div>
 
                 <div className="project-info-summary-progress">
                   <div className="project-info-summary-progress-copy">

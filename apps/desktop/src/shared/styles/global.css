@@ -8965,6 +8965,15 @@ body.is-resizing-side-rail {
     rgba(7, 10, 12, 0.2);
 }
 
+/* Window + pre-production sit side by side to save vertical space (and fall
+   back to a single full-width column when pre-production is absent or the
+   card is too narrow). */
+.project-info-summary-windows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
 .project-info-summary-window,
 .project-info-summary-progress,
 .project-info-summary-stats > div {
