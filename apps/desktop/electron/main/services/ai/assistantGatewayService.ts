@@ -424,6 +424,7 @@ const buildGatewayInput = (
   request: AssistantGatewayRequest,
   recentUserMessages: string[],
   recentAssistantMessages: string[],
+  conversationHistory: Array<{ role: "user" | "assistant"; body: string }>,
 ): string | Array<Record<string, unknown>> => {
   const attachments = request.attachments ?? [];
   // Only images go into the multimodal vision blocks; CSV/XLSX/PDF are
@@ -436,6 +437,7 @@ const buildGatewayInput = (
     userMessage:
       trimmedMessage || (attachments.length ? "Please review the attached context for BukowskiOS." : ""),
     appContext: parseAppContextSummary(request),
+    conversationHistory,
     recentUserMessages,
     recentAssistantMessages,
     attachments: attachments.length ? summarizeAttachments(attachments) : [],
@@ -670,6 +672,53 @@ const loadRecentAssistantMessages = (db: DatabaseSync, threadId: string, limit =
   )
     .map((row) => row.body.trim().replace(/\s+/g, " ").slice(0, 1200))
     .reverse();
+
+// Chronological user+assistant transcript for the thread. This is the real
+// conversation context: the supervisor previously leaned on previousResponseId
+// (which expires) and the specialist had no history at all, so short
+// follow-ups ("usa el primero", "y el otro?") broke. Both stages now receive
+// this. The current user turn is excluded so it is not duplicated with the
+// separately-passed userRequest.
+const loadRecentTranscript = (
+  db: DatabaseSync,
+  threadId: string,
+  currentUserMessage: string,
+  limit = 12,
+): Array<{ role: "user" | "assistant"; body: string }> => {
+  const rows = db
+    .prepare(
+      `
+        SELECT role, body
+        FROM assistant_chat_messages
+        WHERE thread_id = ?
+          AND role IN ('user', 'assistant')
+          AND message_state = 'completed'
+          AND deleted_at IS NULL
+          AND trim(body) <> ''
+        ORDER BY created_at DESC
+        LIMIT ?
+      `,
+    )
+    .all(threadId, limit) as Array<{ role: "user" | "assistant"; body: string }>;
+
+  const transcript = rows
+    .map((row) => ({ role: row.role, body: row.body.trim().replace(/\s+/g, " ").slice(0, 1200) }))
+    .reverse();
+
+  const trimmedCurrent = currentUserMessage.trim().replace(/\s+/g, " ").slice(0, 1200);
+  // Drop a trailing user turn that is the message we are answering right now.
+  for (let index = transcript.length - 1; index >= 0; index -= 1) {
+    if (transcript[index]!.role === "assistant") {
+      break;
+    }
+    if (transcript[index]!.role === "user" && transcript[index]!.body === trimmedCurrent) {
+      transcript.splice(index, 1);
+      break;
+    }
+  }
+
+  return transcript;
+};
 
 const loadThreadSessionApproval = (db: DatabaseSync, threadId: string) =>
   db
@@ -1263,8 +1312,9 @@ export const createAssistantGatewayService = (
       "Specialists may request write tools when the user asks for an action, but approval-required tools are gated by the runtime and must not be described as executed until a tool result confirms execution.",
       "Specialists must use search_assets / search_projects / etc. to resolve names → IDs BEFORE asking the user anything. They can use ask_user_choice to surface a small set of options when search returns ambiguous results.",
       "When the user asks to create, prepare, save, or draft a quote, treat it as a saved draft in Quotes and route toward create_quote. prepare_quote_draft is only for an explicitly non-saved outline.",
-      "If the user is continuing a partially completed task, use the previous session summary and last tool results to continue the pending steps. Do not make them repeat the full original prompt.",
-      "If the user replies with a short continuation like 'usa el primero', 'dale', 'hazlo', or 'continúa', use recentAssistantMessages plus the previous tool summary as the pending action context.",
+      "conversationHistory holds the recent chronological user+assistant turns of this thread; use it to classify follow-ups correctly and keep routing coherent across the conversation.",
+      "If the user is continuing a partially completed task, use conversationHistory plus the previous session summary and last tool results to continue the pending steps. Do not make them repeat the full original prompt.",
+      "If the user replies with a short continuation like 'usa el primero', 'dale', 'hazlo', or 'continúa', use conversationHistory / recentAssistantMessages plus the previous tool summary as the pending action context.",
       "If recentAssistantMessages contain candidate assets/projects/options and the user chooses one, reuse the exact IDs already shown there. Do not restart the task or ask for the same project again.",
       "Never ask the user for internal IDs for projects, quotes, assets, units, users or departments before trying the available search/detail tools. Users know names, codes and context; tools resolve IDs.",
       "For exchange-rate questions, route to the Finance Agent and use exchange-rate tools before answering. Include buy/sell meaning, source and fetchedAt when available.",
@@ -1291,7 +1341,13 @@ export const createAssistantGatewayService = (
     ].join("\n");
 
     const recentAssistantMessages = loadRecentAssistantMessages(db, request.threadId);
-    const initialPrompt = buildGatewayInput(request, sessionSnapshot.recentUserMessages, recentAssistantMessages);
+    const conversationHistory = loadRecentTranscript(db, request.threadId, request.message);
+    const initialPrompt = buildGatewayInput(
+      request,
+      sessionSnapshot.recentUserMessages,
+      recentAssistantMessages,
+      conversationHistory,
+    );
     const toolTraces: AIGatewayToolCallTrace[] = [];
     const executedToolPayloads: Array<{
       toolName: string;
@@ -1635,9 +1691,10 @@ export const createAssistantGatewayService = (
           "Quote rule: if the user asks to create, prepare, save, or draft a quote, call create_quote so the draft is persisted and visible in Quotes. Only call prepare_quote_draft when the user explicitly asks for a non-saved outline.",
           "Packing slip inventory rule: search the full workspace inventory for available assets before creating a packing slip. Only pass scope='project' or project_id when the user explicitly asks what is already inside that project.",
           "Asset miss rule: if search_assets returns zero matches for a requested asset, immediately run one broader workspace-level search_assets query (shorter term or empty query with status='Available') and offer the closest available options. Do not simply stop at 'no assets found'.",
-          "Continuation rule: when the user replies briefly after a partial task, use the prior session/tool summary to continue unresolved steps. Do not require the original prompt again.",
-          "Pending action rule: recentAssistantMessages may contain the option list or blocker you just gave the user. Treat short replies like 'use the first one' as instructions to continue from that list.",
-          "Choice reuse rule: when recentAssistantMessages contain candidate options with IDs, reuse those exact IDs for the next tool call. Do not run the full task from scratch unless the selected ID no longer works.",
+          "Conversation history rule: conversationHistory holds the recent chronological user+assistant turns of THIS thread. Read it to stay coherent — never re-introduce yourself, re-ask something already answered, or restart a task the history shows is mid-flight.",
+          "Continuation rule: when the user replies briefly after a partial task, use conversationHistory plus the prior session/tool summary to continue unresolved steps. Do not require the original prompt again.",
+          "Pending action rule: conversationHistory / recentAssistantMessages may contain the option list or blocker you just gave the user. Treat short replies like 'usa el primero' / 'use the first one' as instructions to continue from that list.",
+          "Choice reuse rule: when conversationHistory or recentAssistantMessages contain candidate options with IDs, reuse those exact IDs for the next tool call. Do not run the full task from scratch unless the selected ID no longer works.",
           "ID resolution rule: never ask the user for internal IDs before trying search/detail tools. Resolve by name, code, number, recent tool result, or current route context first.",
           "Exchange-rate rule: when asked about USD/EUR/DOP rates, comparisons, best bank, or 24h history, call the exchange-rate tools and include source/fetchedAt if available.",
           "Do NOT mention 'supervised' or 'pending approval' to the user unless the action is genuinely gated. The default is to execute and report results.",
@@ -1666,6 +1723,10 @@ export const createAssistantGatewayService = (
                 }
               : null,
           supervisorSummary: orchestration.user_facing_summary,
+          // Conversation context so the specialist can honour its continuation /
+          // choice-reuse rules instead of restarting on every short follow-up.
+          conversationHistory,
+          recentAssistantMessages,
           toolResults: executedToolPayloads,
         });
         const specialistMustUseTool =
