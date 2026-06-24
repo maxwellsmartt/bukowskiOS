@@ -559,6 +559,19 @@ export const registerAppIpc = ({
       accessLevel: "write",
       requiredPermission: "users.invite",
     });
+  const assertSensitiveAppAccess = async (action: string) => {
+    const workspaceIds = Array.from(
+      new Set(
+        getLocalWorkspaces()
+          .map((workspace) => workspace.id?.trim())
+          .filter((workspaceId): workspaceId is string => Boolean(workspaceId)),
+      ),
+    );
+
+    for (const workspaceId of workspaceIds) {
+      await assertWorkspaceAdminAccess(workspaceId, action);
+    }
+  };
 
   safeHandleReadWithSchema(ipcChannels.app.getInfo, emptyReadArgsSchema, () => ({
     appName: "bukowskiOS",
@@ -941,100 +954,139 @@ export const registerAppIpc = ({
   );
   safeHandleRead(
     ipcChannels.app.createBackup,
-    () => ({
+    async () => {
+      await assertSensitiveAppAccess("create backups");
+      return {
       summary: "Backup created successfully.",
       diagnostics: createBackupNow(),
-    }),
+      };
+    },
     "The app could not create a backup.",
   );
   safeHandleRead(
     ipcChannels.app.restoreBackup,
-    () => ({
+    async () => {
+      await assertSensitiveAppAccess("restore backups");
+      return {
       summary: "Backup restored. The app will restart now.",
       diagnostics: restoreFromBackupNow(),
-    }),
+      };
+    },
     "The app could not restore the backup.",
   );
   safeHandleRead(
     ipcChannels.app.runIntegrityCheck,
-    () => ({
+    async () => {
+      await assertSensitiveAppAccess("run integrity checks");
+      return {
       summary: "Integrity check completed successfully.",
       diagnostics: runIntegrityCheckNow(),
-    }),
+      };
+    },
     "The app could not complete the integrity check.",
   );
   safeHandleRead(
     ipcChannels.app.runLocalSync,
-    async () => ({
+    async () => {
+      await assertSensitiveAppAccess("run local sync");
+      return {
       summary: "Local sync pass completed.",
       diagnostics: await runLocalSyncNow(),
-    }),
+      };
+    },
     "The app could not complete the local sync pass.",
   );
   safeHandleReadWithSchema(
     ipcChannels.app.getSyncOutboxRows,
     emptyReadArgsSchema,
-    () => getSyncOutboxRows(),
+    async () => {
+      await assertSensitiveAppAccess("review local sync queue");
+      return getSyncOutboxRows();
+    },
     "The app could not load the local sync queue.",
   );
   safeHandleReadWithSchema(
     ipcChannels.app.getSyncPullCursors,
     emptyReadArgsSchema,
-    () => getSyncPullCursors(),
+    async () => {
+      await assertSensitiveAppAccess("review inbound sync status");
+      return getSyncPullCursors();
+    },
     "The app could not load inbound sync status.",
   );
   safeHandleReadWithSchema(
     ipcChannels.app.getSyncStatusSnapshot,
     emptyReadArgsSchema,
-    () => ({
-      diagnostics: getDiagnosticsSnapshot(),
-      pullCursors: getSyncPullCursors(),
-    }),
+    async () => {
+      await assertSensitiveAppAccess("review sync status");
+      return {
+        diagnostics: getDiagnosticsSnapshot(),
+        pullCursors: getSyncPullCursors(),
+      };
+    },
     "The app could not load sync status.",
   );
   safeHandleRead(
     ipcChannels.app.retrySyncOutboxRow,
-    async (_event, id: string) => ({
-      summary: "Sync row retried locally.",
-      diagnostics: await retrySyncOutboxRow(id),
-    }),
+    async (_event, id: string) => {
+      await assertSensitiveAppAccess("retry local sync rows");
+      return {
+        summary: "Sync row retried locally.",
+        diagnostics: await retrySyncOutboxRow(id),
+      };
+    },
     "The app could not retry that local sync row.",
   );
   safeHandleRead(
     ipcChannels.app.retryAllFailedSyncOutboxRows,
-    async () => ({
-      summary: "All failed sync rows were queued again locally.",
-      diagnostics: await retryAllFailedSyncOutboxRows(),
-    }),
+    async () => {
+      await assertSensitiveAppAccess("retry failed local sync rows");
+      return {
+        summary: "All failed sync rows were queued again locally.",
+        diagnostics: await retryAllFailedSyncOutboxRows(),
+      };
+    },
     "The app could not retry the failed local sync rows.",
   );
   safeHandleReadWithSchema(
     ipcChannels.app.getSyncConflicts,
     getSyncConflictsReadArgsSchema,
-    (_event, workspaceId: string) => getSyncConflicts(workspaceId),
+    async (_event, workspaceId: string) => {
+      await assertWorkspaceAdminAccess(workspaceId, "review sync conflicts");
+      return getSyncConflicts(workspaceId);
+    },
     "The app could not load sync conflicts.",
   );
   safeHandle(
     ipcChannels.app.resolveSyncConflict,
     resolveSyncConflictSchema,
-    (_event, input) => resolveSyncConflict(input as import("@contracts").AppSyncConflictResolveCommand),
+    async (_event, input) => {
+      await assertSensitiveAppAccess("resolve sync conflicts");
+      return resolveSyncConflict(input as import("@contracts").AppSyncConflictResolveCommand);
+    },
     "The app could not resolve that sync conflict.",
   );
   safeHandle(
     ipcChannels.app.backfillOperationalSnapshots,
     backfillOperationalSnapshotsSchema,
-    (_event, input) =>
-      backfillOperationalSnapshots(input as import("@contracts").AppOperationalBackfillCommand),
+    async (_event, input) => {
+      await assertWorkspaceAdminAccess(input.workspaceId, "backfill operational snapshots");
+      return backfillOperationalSnapshots(input as import("@contracts").AppOperationalBackfillCommand);
+    },
     "The app could not backfill operational sync snapshots.",
   );
   safeHandleRead(
     ipcChannels.app.exportWorkspaceData,
-    async () => exportDatabaseJson(database),
+    async () => {
+      await assertSensitiveAppAccess("export local workspace data");
+      return exportDatabaseJson(database);
+    },
     "The app could not export local data.",
   );
   safeHandleRead(
     ipcChannels.app.exportRecentLogs,
     async () => {
+      await assertSensitiveAppAccess("export recent logs");
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: "Export recent BukowskiOS logs",
         defaultPath: path.join(app.getPath("documents"), `bukowski-logs-${new Date().toISOString().slice(0, 10)}.txt`),
@@ -1057,6 +1109,7 @@ export const registerAppIpc = ({
   safeHandleRead(
     ipcChannels.app.exportSupportBundle,
     async () => {
+      await assertSensitiveAppAccess("export support bundles");
       const { canceled, filePaths } = await dialog.showOpenDialog({
         title: "Choose where to save the BukowskiOS support bundle",
         buttonLabel: "Save support bundle here",
@@ -1137,6 +1190,7 @@ export const registerAppIpc = ({
   safeHandleRead(
     ipcChannels.app.chooseDocumentsRoot,
     async () => {
+      await assertSensitiveAppAccess("change the documents folder");
       const { canceled, filePaths } = await dialog.showOpenDialog({
         title: "Carpeta de documentos",
         properties: ["openDirectory", "createDirectory"],
@@ -1150,7 +1204,8 @@ export const registerAppIpc = ({
   );
   safeHandleRead(
     ipcChannels.app.resetDocumentsRoot,
-    () => {
+    async () => {
+      await assertSensitiveAppAccess("reset the documents folder");
       appSettings.setDocumentsRoot(null);
       return documentsRootInfo();
     },

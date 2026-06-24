@@ -329,6 +329,52 @@ describe("security regression checks", () => {
     expect(supportDiagnosticsSource).toContain("sanitizeStructuredValue");
   });
 
+  it("gates app-level diagnostics, export, sync, and documents-root IPC behind a sensitive access guard", () => {
+    const appIpcSource = readText("apps/desktop/electron/main/ipc/registerAppIpc.ts");
+    const expectedGuardedChannels = [
+      "ipcChannels.app.createBackup",
+      "ipcChannels.app.restoreBackup",
+      "ipcChannels.app.runIntegrityCheck",
+      "ipcChannels.app.runLocalSync",
+      "ipcChannels.app.getSyncOutboxRows",
+      "ipcChannels.app.getSyncPullCursors",
+      "ipcChannels.app.getSyncStatusSnapshot",
+      "ipcChannels.app.retrySyncOutboxRow",
+      "ipcChannels.app.retryAllFailedSyncOutboxRows",
+      "ipcChannels.app.resolveSyncConflict",
+      "ipcChannels.app.exportWorkspaceData",
+      "ipcChannels.app.exportRecentLogs",
+      "ipcChannels.app.exportSupportBundle",
+      "ipcChannels.app.chooseDocumentsRoot",
+      "ipcChannels.app.resetDocumentsRoot",
+    ];
+
+    expect(appIpcSource).toContain("const assertSensitiveAppAccess = async");
+    expect(appIpcSource).toContain('requiredPermission: "users.invite"');
+
+    const missingSensitiveGuard = expectedGuardedChannels.filter((channel) => {
+      const channelIndex = appIpcSource.indexOf(channel);
+      if (channelIndex < 0) return true;
+      const handlerBlock = appIpcSource.slice(channelIndex, channelIndex + 700);
+      return !handlerBlock.includes("assertSensitiveAppAccess(");
+    });
+
+    expect(missingSensitiveGuard).toEqual([]);
+
+    const workspaceScopedChannels = [
+      "ipcChannels.app.getSyncConflicts",
+      "ipcChannels.app.backfillOperationalSnapshots",
+    ];
+    const missingWorkspaceGuard = workspaceScopedChannels.filter((channel) => {
+      const channelIndex = appIpcSource.indexOf(channel);
+      if (channelIndex < 0) return true;
+      const handlerBlock = appIpcSource.slice(channelIndex, channelIndex + 500);
+      return !handlerBlock.includes("assertWorkspaceAdminAccess(");
+    });
+
+    expect(missingWorkspaceGuard).toEqual([]);
+  });
+
   it("keeps local at-rest hardening centralized in the storage privacy helper", () => {
     const backupSource = readText("apps/desktop/electron/main/services/data/localDatabaseSupport.ts");
     const secretStoreSource = readText("apps/desktop/electron/main/services/ai/aiSecretStore.ts");
