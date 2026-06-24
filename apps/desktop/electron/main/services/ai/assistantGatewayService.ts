@@ -56,7 +56,7 @@ const orchestrationSchema = {
       confidence: { type: "number" },
       requires_approval: { type: "boolean" },
       tool_call_requested: { type: "boolean" },
-      user_facing_summary: { type: "string" },
+      assistant_reply: { type: "string" },
       answer_kind: {
         type: "string",
         enum: ["informational", "draft_run", "needs_approval", "error"],
@@ -74,13 +74,25 @@ const orchestrationSchema = {
       "confidence",
       "requires_approval",
       "tool_call_requested",
-      "user_facing_summary",
+      "assistant_reply",
       "answer_kind",
       "draft_run_title",
       "draft_run_description",
     ],
   },
 } satisfies Record<string, unknown>;
+
+// Shared voice/persona, applied to both the supervisor and the specialists so
+// the assistant reads as one coherent, natural operator — not a form filler.
+const ASSISTANT_VOICE_DIRECTIVES = [
+  "=== VOICE ===",
+  "Reply in the user's language. The user works in Spanish, so default to natural Dominican-neutral Spanish unless they write in another language.",
+  "Be warm but professional — a sharp, trusted operations colleague. Write complete, conversational sentences, never clipped telegram-style fragments or robotic 'done: X' lists.",
+  "Be direct and useful: lead with the answer, keep it tight, and when it helps, close with the single most useful next step or a short question to move the task forward. Do not pad.",
+  "Never expose internal machinery to the user: no 'supervised', 'pending approval', 'routing', 'specialist', 'orchestration', or tool names unless an action is genuinely gated and the user needs to act.",
+  "When you did something, say what changed in plain terms and where to see it. When you could not, say why and what you need to proceed.",
+  "=== END VOICE ===",
+].join("\n");
 
 const safeJsonParse = <T>(value: string): T | null => {
   try {
@@ -1304,6 +1316,7 @@ export const createAssistantGatewayService = (
 
     const supervisorInstructions = [
       supervisor.base_prompt || "You are the BukowskiOS Supervisor Agent.",
+      ASSISTANT_VOICE_DIRECTIVES,
       "=== SYSTEM CONTEXT ===",
       `Today: ${supervisorTodayIso} (${supervisorTodayHuman})`,
       `Workspace: ${workspaceId}`,
@@ -1323,7 +1336,8 @@ export const createAssistantGatewayService = (
       "Choose one target_agent from the allowed list below.",
       "Only set requires_approval=true when the action is truly irreversible (delete), externally visible (send message to a client), or above the workspace's risk threshold. Routine creation is NOT a reason for approval.",
       "When the user asks for an action and the specialist has enough data, route it and let the specialist request the right tool. The runtime enforces approval for sensitive writes.",
-      "Keep user_facing_summary practical and concise — describe what got done, not what could be done.",
+      "assistant_reply is the message the user actually reads. Write it as a natural, complete, conversational answer in the user's language — never a clipped 'summary'. It carries the real routing/classification in the other fields, so the reply itself should sound human, not like a status code.",
+      "When you route to a specialist, assistant_reply can be a short, natural lead-in (the specialist writes the full answer). When you answer directly (target_agent = supervisor-agent), assistant_reply IS the full answer — make it genuinely helpful and complete.",
       "Allowed agents:",
       loadAgentsPrompt(db, workspaceId),
       "When tool data is needed, call only the smallest relevant tool.",
@@ -1563,7 +1577,7 @@ export const createAssistantGatewayService = (
       confidence: number;
       requires_approval: boolean;
       tool_call_requested: boolean;
-      user_facing_summary: string;
+      assistant_reply: string;
       answer_kind: "informational" | "draft_run" | "needs_approval" | "error";
       draft_run_title: string | null;
       draft_run_description: string | null;
@@ -1644,7 +1658,7 @@ export const createAssistantGatewayService = (
           })
         : { agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] };
 
-    const fallbackAssistantMessage = orchestration.user_facing_summary;
+    const fallbackAssistantMessage = orchestration.assistant_reply;
     let specialistMessage = fallbackAssistantMessage;
     let responseProviderKey = supervisorProviderKey;
     let responseModelKey = supervisorModelKey;
@@ -1677,6 +1691,7 @@ export const createAssistantGatewayService = (
 
         const specialistInstructions = [
           targetRuntime.base_prompt || `You are the ${targetRuntime.display_name} inside BukowskiOS.`,
+          ASSISTANT_VOICE_DIRECTIVES,
           "=== SYSTEM CONTEXT ===",
           `Today: ${todayIso} (${todayHumanEs})`,
           `Workspace: ${workspaceId}`,
@@ -1722,7 +1737,7 @@ export const createAssistantGatewayService = (
                   description: orchestration.draft_run_description,
                 }
               : null,
-          supervisorSummary: orchestration.user_facing_summary,
+          supervisorReply: orchestration.assistant_reply,
           // Conversation context so the specialist can honour its continuation /
           // choice-reuse rules instead of restarting on every short follow-up.
           conversationHistory,
