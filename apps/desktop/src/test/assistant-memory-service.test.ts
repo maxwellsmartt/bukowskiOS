@@ -46,28 +46,24 @@ describe("assistant memory service", () => {
       )
       .run(assetsAgent?.id ?? null);
 
+    // Standing memory must surface per scope regardless of the current message
+    // — the overlay no longer requires the stored body to contain the user's
+    // turn (that filter left real, full-sentence queries with an empty overlay).
     const overlay = memory.getOverlay({
       agentId: assetsAgent?.id ?? null,
       projectId: "project-aurora",
-      query: "warehouse",
+      query: "hicimos varios ajustes en el inventario hoy",
       limit: 6,
     });
 
-    expect(overlay.agentEntries).toHaveLength(0);
-    expect(overlay.workspaceEntries).toHaveLength(1);
+    expect(overlay.agentEntries).toHaveLength(1);
+    expect(overlay.agentEntries[0]?.body).toContain("serial numbers");
+    // Two active workspace-scoped entries exist (Warehouse fact + the stale
+    // low-confidence one not yet pruned); both surface, most recent first.
+    expect(overlay.workspaceEntries).toHaveLength(2);
     expect(overlay.workspaceEntries[0]?.body).toContain("Warehouse A");
-    expect(overlay.projectEntries).toHaveLength(0);
-
-    const broadOverlay = memory.getOverlay({
-      agentId: assetsAgent?.id ?? null,
-      projectId: "project-aurora",
-      query: "",
-      limit: 6,
-    });
-
-    expect(broadOverlay.agentEntries).toHaveLength(1);
-    expect(broadOverlay.workspaceEntries).toHaveLength(2);
-    expect(broadOverlay.projectEntries).toHaveLength(1);
+    expect(overlay.projectEntries).toHaveLength(1);
+    expect(overlay.projectEntries[0]?.body).toContain("Aurora");
 
     memory.pruneStaleEntries({
       maxAgeDays: 30,
@@ -86,6 +82,45 @@ describe("assistant memory service", () => {
       .get() as { status: string };
 
     expect(staleEntry.status).toBe("archived");
+
+    cleanup();
+  });
+
+  it("captures Spanish instructions and preferences (not only English)", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-assistant-memory-es");
+    const memory = createAssistantMemoryService(database);
+    const now = "2026-04-24T00:00:00.000Z";
+
+    database
+      .prepare(
+        `
+          INSERT INTO assistant_chat_threads (
+            id, workspace_id, title, context_key, context_label, summary_text, created_at, updated_at, deleted_at
+          ) VALUES (?, 'workspace-metadata', 'Memoria ES', '/agents/chat', 'App', '', ?, ?, NULL)
+        `,
+      )
+      .run("thread-es-1", now, now);
+
+    memory.extractAndPersist({
+      message: "Recuerda que siempre debemos etiquetar los assets con el número de serie.",
+      context: { activeProjectId: null },
+      threadId: "thread-es-1",
+      messageId: null,
+      routedAgentId: null,
+    });
+    memory.extractAndPersist({
+      message: "Prefiero que me respondas en español y de forma breve.",
+      context: { activeProjectId: null },
+      threadId: "thread-es-1",
+      messageId: null,
+      routedAgentId: null,
+    });
+
+    const overlay = memory.getOverlay({ agentId: null, projectId: null, query: "", limit: 6 });
+    const bodies = overlay.workspaceEntries.map((entry) => entry.body).join(" || ");
+
+    expect(overlay.workspaceEntries.length).toBeGreaterThanOrEqual(1);
+    expect(bodies.toLowerCase()).toContain("número de serie");
 
     cleanup();
   });

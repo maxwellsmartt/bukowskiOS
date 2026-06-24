@@ -97,7 +97,13 @@ const matchCandidate = (message: string, context: { activeProjectId?: string | n
     });
   };
 
-  if (/(remember|from now on|always|never)\b/i.test(normalized)) {
+  // Triggers are bilingual (EN + ES): the product is used in Spanish, so an
+  // English-only matcher captured almost nothing. Accented and unaccented
+  // Spanish forms are both listed because users type either.
+  if (
+    /(remember|from now on|always|never)\b/i.test(normalized) ||
+    /(recuerda|recordá|recordar que|de ahora en adelante|a partir de ahora|de aquí en adelante|siempre|nunca)\b/i.test(lower)
+  ) {
     pushCandidate({
       body: normalized,
       kind: "instruction",
@@ -108,7 +114,10 @@ const matchCandidate = (message: string, context: { activeProjectId?: string | n
     });
   }
 
-  if (/(i prefer|prefer that|please answer|call me)\b/i.test(lower)) {
+  if (
+    /(i prefer|prefer that|please answer|call me)\b/i.test(lower) ||
+    /(prefiero|preferiría|me gustaría que|por favor responde|respóndeme|respondeme|ll[aá]mame|trátame de|tratame de)\b/i.test(lower)
+  ) {
     pushCandidate({
       body: normalized,
       kind: "preference",
@@ -119,7 +128,10 @@ const matchCandidate = (message: string, context: { activeProjectId?: string | n
     });
   }
 
-  if (/(my name is|we use|our workspace uses|this project uses|means that)\b/i.test(lower)) {
+  if (
+    /(my name is|we use|our workspace uses|this project uses|means that)\b/i.test(lower) ||
+    /(me llamo|mi nombre es|usamos|nuestro (workspace|equipo|estudio) usa|este proyecto usa|significa que|nos referimos a|en (nuestra|la) (empresa|productora) )\b/i.test(lower)
+  ) {
     pushCandidate({
       body: normalized,
       kind: "stable_fact",
@@ -331,24 +343,30 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
       limit?: number;
     }) {
       const limit = Math.max(1, Math.min(args.limit ?? 6, 12));
+      // Standing memory (instructions/preferences/stable facts) must surface
+      // regardless of the current message. The previous query filter required
+      // the stored body to contain the entire user turn (body LIKE %query%),
+      // which almost never held, so the overlay came back empty. Surface the
+      // most recent entries per scope instead and let the model judge relevance.
+      const overlayQuery = "";
       const agentEntries =
         args.agentId === null
           ? []
           : selectEntries({
-              query: args.query,
+              query: overlayQuery,
               limit: Math.min(2, limit),
               where: "agent_id = ? AND project_id IS NULL",
               params: [args.agentId],
             }).map(toEntry);
       const workspaceEntries = selectEntries({
-        query: args.query,
+        query: overlayQuery,
         limit: Math.min(2, limit),
         where: "agent_id IS NULL AND project_id IS NULL",
         params: [],
       }).map(toEntry);
       const projectEntries = args.projectId
         ? selectEntries({
-            query: args.query,
+            query: overlayQuery,
             limit: Math.min(2, limit),
             where: "project_id = ?",
             params: [args.projectId],
