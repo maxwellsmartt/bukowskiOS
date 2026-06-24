@@ -905,6 +905,7 @@ const applyProjectSnapshot = (
       )
       .run(toSqlInputValue(row.project_unit_id), toSqlInputValue(row.department_id), toSqlInputValue(row.created_at));
   }
+  let createdPlaceholderCrew = false;
   for (const row of crewAssignments) {
     try {
       if (!rowExists(db, "crew_members", row.crew_member_id)) {
@@ -923,11 +924,24 @@ const applyProjectSnapshot = (
           updatedAt,
           updatedAt,
         );
+        createdPlaceholderCrew = true;
       }
       upsertCrewAssignmentRow(db, row);
     } catch {
       logger.warn("Skipped remote project crew assignment because related crew is unavailable.", { id: row.id });
     }
+  }
+
+  // Placeholder crew names ("Remote crew abc123") only get a real name from the
+  // crew catalog pull. That pull is cursor-incremental, so an unchanged remote
+  // crew row whose updated_at predates the cursor would never re-pull and the
+  // placeholder would stick forever. Resetting the crew cursor forces the next
+  // catalog pull to re-fetch and hydrate the real names.
+  if (createdPlaceholderCrew) {
+    db.prepare(
+      `UPDATE sync_pull_cursors SET last_synced_at = NULL, updated_at = ?
+         WHERE workspace_id = ? AND entity_type = 'crew_members'`,
+    ).run(new Date().toISOString(), context.workspaceId);
   }
 };
 
