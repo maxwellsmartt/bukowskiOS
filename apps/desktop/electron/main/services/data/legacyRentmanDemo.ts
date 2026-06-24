@@ -145,6 +145,16 @@ const clearPreviousLegacyImport = (db: DatabaseSync) => {
   db.prepare("DELETE FROM assets WHERE id LIKE 'asset-legacy-rentman-%'").run();
 };
 
+/**
+ * Remove all legacy Rentman demo rows (assets, imports, and the loc-legacy /
+ * cat-legacy scaffolding). Idempotent; safe to run when demo data is disabled.
+ */
+export const cleanupLegacyRentmanDemo = (db: DatabaseSync) => {
+  clearPreviousLegacyImport(db);
+  db.prepare("DELETE FROM locations WHERE id LIKE 'loc-legacy-%'").run();
+  db.prepare("DELETE FROM asset_categories WHERE id LIKE 'cat-legacy-%'").run();
+};
+
 const getLocationId = (warehouseSlot: string) =>
   warehouseSlot ? `loc-legacy-${slugify(warehouseSlot)}` : fallbackLocationId;
 

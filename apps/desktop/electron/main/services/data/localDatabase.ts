@@ -83,8 +83,8 @@ import { applyOperationalFilesMigration, ensureWorkspaceFilesTable, createFileUp
 import { createIncidentMutationService } from "./incidentMutationService";
 import { createPackingMutationService } from "./packingMutationService";
 import { cleanupPerformanceFoundationData, seedPerformanceFoundationData } from "./performanceFoundationSeed";
-import { seedFoundationData } from "./foundationSeed";
-import { bootstrapLegacyRentmanDemo } from "./legacyRentmanDemo";
+import { cleanupFoundationDemoData, seedFoundationData } from "./foundationSeed";
+import { bootstrapLegacyRentmanDemo, cleanupLegacyRentmanDemo } from "./legacyRentmanDemo";
 import {
   applyProjectArchiveFoundationMigration,
   applyProjectCreationWizardFoundationMigration,
@@ -330,8 +330,12 @@ const isSupabaseSyncEnabled = () => {
 };
 
 const isDemoDataEnabled = () => {
+  // Demo/seed data is OFF by default everywhere (dev included). It only turns on
+  // when explicitly requested via BUKOWSKI_ENABLE_DEMO_DATA. The old default
+  // auto-seeded demo projects/crew/Rentman/perf data in every dev run, which
+  // accumulated as noise in the local workspace.
   const value = process.env.BUKOWSKI_ENABLE_DEMO_DATA?.trim().toLowerCase();
-  return value === "1" || value === "true" || (!app.isPackaged && value !== "0" && value !== "false");
+  return value === "1" || value === "true";
 };
 
 const parseJsonObject = (value: string | null) => {
@@ -491,6 +495,12 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   if (demoDataEnabled) {
     runStartupStep("ensure local project shell defaults", () => ensureProjectShellDefaults(database));
     runStartupStep("bootstrap legacy Rentman demo", () => bootstrapLegacyRentmanDemo(database));
+  } else {
+    // Demo data is off: sweep out any demo dataset seeded by an earlier run so
+    // it stops adding noise. Both cleanups target only known demo ids under
+    // workspace-metadata and never touch the user's real workspace.
+    runStartupStep("cleanup foundation demo data", () => cleanupFoundationDemoData(database));
+    runStartupStep("cleanup legacy Rentman demo", () => cleanupLegacyRentmanDemo(database));
   }
   runStartupStep("apply asset quantity foundation migration", () =>
     applyTrackedStep(database, "runtime_asset_quantity_foundation_v1", () => applyAssetQuantityFoundationMigration(database)),

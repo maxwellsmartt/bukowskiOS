@@ -1161,3 +1161,72 @@ export const seedFoundationData = (db: DatabaseSync, options: { includeDemoData?
     throw error;
   }
 };
+
+// Demo ids seeded by seedFoundationData (all under workspace-metadata). Kept in
+// sync with the INSERTs above so cleanup never guesses.
+const DEMO_PROJECT_IDS = ["project-aurora", "project-studio", "project-house"];
+const DEMO_ASSET_IDS = ["asset-teradek-bolt", "asset-sachtler-flowtech", "asset-smallhd-cine7", "asset-aputure-600d"];
+const DEMO_INCIDENT_IDS = ["incident-cine7-scratch", "incident-flowtech-latch", "incident-hdmi-clamp"];
+const DEMO_RMA_IDS = ["rma-flowtech-latch", "rma-flowtech-latch-asset-1"];
+const DEMO_PACKING_IDS = ["packing-1039", "packing-1041", "packing-1042"];
+const DEMO_DEPARTMENT_IDS = ["dept-camera", "dept-ge", "dept-video", "dept-ops"];
+const DEMO_LOCATION_IDS = ["loc-warehouse-a", "loc-set-cam-b", "loc-video-village", "loc-service-bench", "loc-studio-3"];
+const DEMO_USER_IDS = ["user-paola", "user-luis", "user-miguel", "user-ops"];
+const DEMO_CREW_IDS = ["crew-user-paola", "crew-user-luis", "crew-user-miguel", "crew-user-ops"];
+
+const hasTableForCleanup = (db: DatabaseSync, table: string) =>
+  Boolean(
+    db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1").get(table) as
+      | { name: string }
+      | undefined,
+  );
+
+const deleteByColumn = (db: DatabaseSync, table: string, column: string, ids: readonly string[]) => {
+  if (!ids.length || !hasTableForCleanup(db, table)) {
+    return;
+  }
+  try {
+    db.prepare(`DELETE FROM ${table} WHERE ${column} IN (${ids.map(() => "?").join(", ")})`).run(...ids);
+  } catch {
+    // Table may lack the column in older schemas — skip rather than abort.
+  }
+};
+
+/**
+ * Remove the demo dataset seeded by seedFoundationData. Targets ONLY the known
+ * demo ids under workspace-metadata, never the user's real workspace. Foreign
+ * keys are disabled for the sweep so child/parent order is irrelevant; this is
+ * a self-contained demo subgraph. Idempotent.
+ */
+export const cleanupFoundationDemoData = (db: DatabaseSync) => {
+  db.exec("PRAGMA foreign_keys = OFF");
+  try {
+    db.exec("BEGIN");
+    // Child rows first by their foreign keys, then the parents.
+    deleteByColumn(db, "asset_events", "asset_id", DEMO_ASSET_IDS);
+    deleteByColumn(db, "asset_assignments", "asset_id", DEMO_ASSET_IDS);
+    deleteByColumn(db, "asset_files", "asset_id", DEMO_ASSET_IDS);
+    deleteByColumn(db, "asset_current_state", "asset_id", DEMO_ASSET_IDS);
+    deleteByColumn(db, "asset_valuations", "asset_id", DEMO_ASSET_IDS);
+    deleteByColumn(db, "packing_items", "packing_slip_id", DEMO_PACKING_IDS);
+    deleteByColumn(db, "rma_assets", "rma_id", DEMO_RMA_IDS);
+    deleteByColumn(db, "rma_cases", "id", DEMO_RMA_IDS);
+    deleteByColumn(db, "incidents", "id", DEMO_INCIDENT_IDS);
+    deleteByColumn(db, "packing_slips", "id", DEMO_PACKING_IDS);
+    deleteByColumn(db, "crew_assignments", "crew_member_id", DEMO_CREW_IDS);
+    deleteByColumn(db, "project_units", "project_id", DEMO_PROJECT_IDS);
+    deleteByColumn(db, "projects", "id", DEMO_PROJECT_IDS);
+    deleteByColumn(db, "assets", "id", DEMO_ASSET_IDS);
+    deleteByColumn(db, "crew_members", "id", DEMO_CREW_IDS);
+    deleteByColumn(db, "departments", "id", DEMO_DEPARTMENT_IDS);
+    deleteByColumn(db, "locations", "id", DEMO_LOCATION_IDS);
+    deleteByColumn(db, "workspace_memberships", "user_id", DEMO_USER_IDS);
+    deleteByColumn(db, "users", "id", DEMO_USER_IDS);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
+  }
+};
