@@ -144,6 +144,7 @@ describe("agent provider config", () => {
         sendMessage: async () => {
           throw new Error("Not used in this test.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },
@@ -236,6 +237,7 @@ describe("agent provider config", () => {
         sendMessage: async () => {
           throw new Error("Not used in this test.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },
@@ -318,6 +320,7 @@ describe("agent provider config", () => {
         sendMessage: async () => {
           throw new Error("Not used in this test.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },

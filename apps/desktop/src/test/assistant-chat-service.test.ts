@@ -19,6 +19,7 @@ describe("assistant chat service", () => {
         sendMessage: async () => {
           throw new Error("Not used in this test.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },
@@ -91,6 +92,7 @@ describe("assistant chat service", () => {
             nextSteps: ["No follow-up required."],
           },
         }),
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },
@@ -191,6 +193,7 @@ describe("assistant chat service", () => {
         sendMessage: async () => {
           throw new Error("Not used in this test.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },
@@ -263,6 +266,7 @@ describe("assistant chat service", () => {
         sendMessage: async () => {
           throw new Error("Not used in this test.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },

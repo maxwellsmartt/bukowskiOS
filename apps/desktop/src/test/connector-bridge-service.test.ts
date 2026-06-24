@@ -20,6 +20,7 @@ describe("connector bridge service", () => {
         sendMessage: async () => {
           throw new Error("Not used in this test.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },
@@ -77,6 +78,7 @@ describe("connector bridge service", () => {
         sendMessage: async () => {
           throw new Error("Should not reach gateway for unlinked users.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },
@@ -162,6 +164,7 @@ describe("connector bridge service", () => {
             draftRunDescription: null,
           },
         }),
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },
@@ -292,6 +295,7 @@ describe("connector bridge service", () => {
             draftRunDescription: null,
           },
         }),
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },
@@ -474,6 +478,7 @@ describe("connector bridge service", () => {
             },
           };
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },
@@ -571,6 +576,7 @@ describe("connector bridge service", () => {
         sendMessage: async () => {
           throw new Error("Should not reach gateway when the current bot workspace has no link.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },
@@ -656,6 +662,7 @@ describe("connector bridge service", () => {
             draftRunDescription: null,
           },
         }),
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },
@@ -787,6 +794,7 @@ describe("connector bridge service", () => {
                   draftRunDescription: null,
                 },
               },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
         },

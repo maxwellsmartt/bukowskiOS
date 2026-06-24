@@ -2168,6 +2168,66 @@ export const createAssistantGatewayService = (
       return runGatewayTurn(request);
     },
 
+    // Generate a short, clean conversation title (Codex/Claude style) from the
+    // first user message. Returns null on any provider/config gap so the caller
+    // simply keeps the heuristic title. Cheap: tiny output, no tools, no schema.
+    async generateThreadTitle(workspaceId: string, firstMessage: string): Promise<string | null> {
+      const trimmedMessage = firstMessage.trim();
+      if (!trimmedMessage) {
+        return null;
+      }
+
+      const resolvedWorkspaceId = workspaceId || defaultWorkspaceId;
+      const supervisor = loadSupervisorConfig(db, resolvedWorkspaceId);
+      if (!supervisor) {
+        return null;
+      }
+      const providerKey = supervisor.provider_key ?? "openai";
+      const providerWorkspaceId = supervisor.workspace_id ?? resolvedWorkspaceId;
+      const provider = loadProviderConfig(db, providerKey, providerWorkspaceId);
+      const apiKey = options.secretStore.getProviderSecret(providerWorkspaceId, providerKey);
+      if (!provider || provider.enabled !== 1 || !apiKey) {
+        return null;
+      }
+
+      try {
+        const { result } = await createProviderResponse(
+          providerKey,
+          {
+            apiKey,
+            baseUrl: provider.base_url,
+            defaultModelKey: supervisor.model_key ?? "openai:gpt-5.2",
+            fallbackModelKey: provider.fallback_model_key,
+            timeoutMs: provider.timeout_ms,
+          },
+          {
+            model: supervisor.model_key ?? "openai:gpt-5.2",
+            instructions:
+              "You name chat conversations. Given the user's first message, reply with ONLY a short title of 3-6 words " +
+              "in the same language as the message. No quotes, no trailing punctuation, no prefix like 'Title:'. " +
+              "Capture the concrete topic or task, not a generic label.",
+            input: trimmedMessage.slice(0, 2000),
+            maxOutputTokens: 30,
+          },
+        );
+
+        if (!result.ok) {
+          return null;
+        }
+
+        const cleaned = result.outputText
+          .replace(/\s+/g, " ")
+          .replace(/^["'“”\s]+|["'“”\s.]+$/g, "")
+          .trim();
+        if (!cleaned) {
+          return null;
+        }
+        return cleaned.length > 60 ? `${cleaned.slice(0, 57).trimEnd()}...` : cleaned;
+      } catch {
+        return null;
+      }
+    },
+
     async continueApprovedRun(args: {
       workspaceId: string;
       threadId: string;

@@ -113,6 +113,7 @@ describe("assistant gateway service", () => {
         sendMessage: async () => {
           throw new Error("Not used while setting provider config.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used while setting provider config.");
         },
@@ -252,6 +253,7 @@ describe("assistant gateway service", () => {
         sendMessage: async () => {
           throw new Error("Not used while setting provider config.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used while setting provider config.");
         },
@@ -387,6 +389,7 @@ describe("assistant gateway service", () => {
         sendMessage: async () => {
           throw new Error("Not used while setting provider config.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used while setting provider config.");
         },
@@ -559,6 +562,7 @@ describe("assistant gateway service", () => {
         sendMessage: async () => {
           throw new Error("Not used while setting provider config.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used while setting provider config.");
         },
@@ -700,6 +704,7 @@ describe("assistant gateway service", () => {
         sendMessage: async () => {
           throw new Error("Not used while setting provider config.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used while setting provider config.");
         },
@@ -1031,6 +1036,7 @@ describe("assistant gateway service", () => {
         sendMessage: async () => {
           throw new Error("Not used while setting provider config.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used while setting provider config.");
         },
@@ -1244,6 +1250,7 @@ describe("assistant gateway service", () => {
         sendMessage: async () => {
           throw new Error("Not used while setting provider config.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used while setting provider config.");
         },
@@ -1459,6 +1466,7 @@ describe("assistant gateway service", () => {
         sendMessage: async () => {
           throw new Error("Not used while setting provider config.");
         },
+        generateThreadTitle: async () => null,
         continueApprovedRun: async () => {
           throw new Error("Not used while setting provider config.");
         },

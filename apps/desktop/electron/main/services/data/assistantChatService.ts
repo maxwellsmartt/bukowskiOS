@@ -802,7 +802,8 @@ export const createAssistantChatService = (
       const userMessageId = `assistant-user-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
       const now = new Date().toISOString();
       const userBody = getPrimaryAttachmentMessage(input.message, input.attachments ?? []);
-      const nextTitle = thread.title === defaultThreadTitle ? deriveThreadTitle(userBody) : thread.title;
+      const wasFirstTurn = thread.title === defaultThreadTitle;
+      const nextTitle = wasFirstTurn ? deriveThreadTitle(userBody) : thread.title;
 
       db.prepare(
         `
@@ -861,9 +862,26 @@ export const createAssistantChatService = (
 
       markThreadPending(input.threadId, assistantMessageId, loadSupervisorAgentId(db), !input.source?.connectorKey);
 
+      // Kick off an AI-generated thread title in parallel with the (much
+      // longer) gateway turn so it adds no perceptible latency and lands in the
+      // snapshot returned below. Only on the first turn; failures are swallowed
+      // and we simply keep the heuristic title.
+      const titlePromise: Promise<string | null> = wasFirstTurn
+        ? options.assistantGatewayService.generateThreadTitle(input.workspaceId, userBody).catch(() => null)
+        : Promise.resolve(null);
+
       try {
         const response = await options.assistantGatewayService.sendMessage(input);
         completeAssistantMessage(input.threadId, assistantMessageId, userBody, response);
+
+        const aiTitle = await titlePromise;
+        if (aiTitle && aiTitle !== nextTitle) {
+          db.prepare(`UPDATE assistant_chat_threads SET title = ?, updated_at = ? WHERE id = ?`).run(
+            aiTitle,
+            new Date().toISOString(),
+            input.threadId,
+          );
+        }
         options.onWorkspaceDataChanged?.({
           source: "assistant-tool",
           workspaceId: input.workspaceId,
