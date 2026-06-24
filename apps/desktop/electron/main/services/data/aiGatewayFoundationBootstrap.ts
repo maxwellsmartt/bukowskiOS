@@ -545,53 +545,65 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
         now,
       );
 
-      // Additive allowlist merge for system agents on a config version bump.
+      // Re-seed the system-managed fields ONLY when the config version actually
+      // changed. The old code re-ran this every boot and stamped updated_at =
+      // now on every agent row — which defeated the cross-machine sync: the
+      // automation-control-plane pull is last-write-wins on updated_at, so a row
+      // freshly bumped at boot always looked newer than a teammate's earlier
+      // rename/model/tool change and the pull skipped it. Gating on the
+      // seed_version bump means routine boots leave updated_at untouched, so
+      // remote agent changes propagate; system-field changes (prompts, etc.)
+      // still re-apply once when a new config version ships.
       const existingRow = readAgentReseedRow.get(workspace.id, agentId) as
         | { seed_version: string | null; allowed_tools_json: string | null; allowed_domains_json: string | null; is_system_agent: number }
         | undefined;
-      if (existingRow && existingRow.is_system_agent === 1 && existingRow.seed_version !== agent.seedVersion) {
-        applyReseededAllowlist.run(
-          mergeAllowlistJson(existingRow.allowed_tools_json, agentConfigRow.allowed_tools_json),
-          mergeAllowlistJson(existingRow.allowed_domains_json, agentConfigRow.allowed_domains_json),
+      const needsSystemReseed = !existingRow || existingRow.seed_version !== agent.seedVersion;
+
+      if (needsSystemReseed) {
+        if (existingRow && existingRow.is_system_agent === 1) {
+          applyReseededAllowlist.run(
+            mergeAllowlistJson(existingRow.allowed_tools_json, agentConfigRow.allowed_tools_json),
+            mergeAllowlistJson(existingRow.allowed_domains_json, agentConfigRow.allowed_domains_json),
+            now,
+            workspace.id,
+            agentId,
+          );
+          // Communications was paused until outbound send existed; now it does.
+          if (agent.agentKey === "communications-agent") {
+            activatePausedAgent.run(now, workspace.id, agentId);
+          }
+        }
+
+        updateSystemAgent.run(
+          agent.agentKey,
+          agent.roleLabel,
+          agent.emoji,
+          agent.domainKey,
+          agent.agentType,
+          agent.iconKey,
+          agent.soul,
+          agent.skillsJson,
+          agent.specializationJson,
+          agent.basePrompt,
+          agent.canCreateDraftRuns,
+          agent.canExecuteWriteActions,
+          agent.isSystemAgent,
+          agent.visibility,
+          agent.isSupervisor,
+          agent.seedVersion,
+          agent.sortOrder,
           now,
           workspace.id,
           agentId,
         );
-        // Communications was paused until outbound send existed; now it does.
-        if (agent.agentKey === "communications-agent") {
-          activatePausedAgent.run(now, workspace.id, agentId);
-        }
+        updateLegacyToolAllowlist.run(
+          agent.allowedToolsJson,
+          agent.allowedDomainsJson,
+          now,
+          workspace.id,
+          agentId,
+        );
       }
-
-      updateSystemAgent.run(
-        agent.agentKey,
-        agent.roleLabel,
-        agent.emoji,
-        agent.domainKey,
-        agent.agentType,
-        agent.iconKey,
-        agent.soul,
-        agent.skillsJson,
-        agent.specializationJson,
-        agent.basePrompt,
-        agent.canCreateDraftRuns,
-        agent.canExecuteWriteActions,
-        agent.isSystemAgent,
-        agent.visibility,
-        agent.isSupervisor,
-        agent.seedVersion,
-        agent.sortOrder,
-        now,
-        workspace.id,
-        agentId,
-      );
-      updateLegacyToolAllowlist.run(
-        agent.allowedToolsJson,
-        agent.allowedDomainsJson,
-        now,
-        workspace.id,
-        agentId,
-      );
     });
   });
 };
