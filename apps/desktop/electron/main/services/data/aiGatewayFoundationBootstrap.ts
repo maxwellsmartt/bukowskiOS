@@ -168,6 +168,10 @@ export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
   ensureColumn(db, "assistant_chat_thread_state", "session_approval_agent_id", "TEXT");
   ensureColumn(db, "assistant_chat_thread_state", "session_approval_granted_at", "TEXT");
   ensureColumn(db, "assistant_chat_thread_state", "preferred_approval_mode", "TEXT DEFAULT 'unsupervised'");
+  // Per-thread model + reasoning overrides chosen in the chat header. NULL =
+  // use the agent's configured defaults.
+  ensureColumn(db, "assistant_chat_thread_state", "preferred_model_key", "TEXT");
+  ensureColumn(db, "assistant_chat_thread_state", "preferred_reasoning_effort", "TEXT");
   db.exec(`
     CREATE TABLE IF NOT EXISTS ai_provider_model_cache (
       id TEXT PRIMARY KEY,

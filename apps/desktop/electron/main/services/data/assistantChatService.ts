@@ -6,6 +6,7 @@ import type {
   AgentNotificationIntent,
   AssistantActionLink,
   AssistantApprovalPreference,
+  AssistantReasoningEffort,
   AssistantChatAttachmentRow,
   AssistantChatAttachmentStatus,
   AssistantChatMessageMeta,
@@ -213,6 +214,8 @@ type ThreadRow = {
   last_routed_agent_id: string | null;
   last_intent: string | null;
   preferred_approval_mode: AssistantApprovalPreference | null;
+  preferred_model_key: string | null;
+  preferred_reasoning_effort: AssistantReasoningEffort | null;
   is_active: number | null;
 };
 
@@ -381,6 +384,8 @@ export const createAssistantChatService = (
           assistant_chat_thread_state.last_routed_agent_id,
           assistant_chat_thread_state.last_intent,
           assistant_chat_thread_state.preferred_approval_mode,
+          assistant_chat_thread_state.preferred_model_key,
+          assistant_chat_thread_state.preferred_reasoning_effort,
           assistant_chat_thread_state.is_active
         FROM assistant_chat_threads
         LEFT JOIN assistant_chat_thread_state
@@ -397,6 +402,8 @@ export const createAssistantChatService = (
       contextLabel: thread.context_label,
       summaryText: thread.summary_text,
       preferredApprovalMode: thread.preferred_approval_mode ?? "unsupervised",
+      preferredModelKey: thread.preferred_model_key ?? null,
+      preferredReasoningEffort: thread.preferred_reasoning_effort ?? null,
       state: thread.last_state ?? "idle",
       lastErrorCode: thread.last_error_code,
       lastErrorSummary: thread.last_error_summary,
@@ -861,6 +868,25 @@ export const createAssistantChatService = (
       ).run(nextTitle, input.context.activePath ?? "/agents", input.context.currentView ?? "Agents", now, input.threadId);
 
       markThreadPending(input.threadId, assistantMessageId, loadSupervisorAgentId(db), !input.source?.connectorKey);
+
+      // Persist the chat header's per-thread model + reasoning choices so they
+      // survive reload and apply to every later turn in this thread.
+      if (input.context.requestedModelKey !== undefined || input.context.requestedReasoningEffort !== undefined) {
+        db.prepare(
+          `
+            UPDATE assistant_chat_thread_state
+            SET preferred_model_key = COALESCE(?, preferred_model_key),
+                preferred_reasoning_effort = COALESCE(?, preferred_reasoning_effort),
+                updated_at = ?
+            WHERE thread_id = ?
+          `,
+        ).run(
+          input.context.requestedModelKey ?? null,
+          input.context.requestedReasoningEffort ?? null,
+          now,
+          input.threadId,
+        );
+      }
 
       // Kick off an AI-generated thread title in parallel with the (much
       // longer) gateway turn so it adds no perceptible latency and lands in the

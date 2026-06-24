@@ -6,6 +6,15 @@ export type AgentApprovalMode = "auto" | "supervised" | "needs_approval";
 
 export type AssistantApprovalPreference = "supervised" | "needs_approval" | "unsupervised";
 
+export type AssistantReasoningEffort = "low" | "medium" | "high";
+
+/** A model the chat header can switch to, surfaced from configured providers. */
+export type AssistantModelOption = {
+  modelKey: string;
+  label: string;
+  providerKey: string;
+};
+
 export type AgentRunStatus = "queued" | "routing" | "running" | "needs_approval" | "approved" | "denied" | "done" | "failed" | "paused";
 
 export type AgentRunApprovalDecision = "pending" | "approved" | "approved_for_session" | "denied";
@@ -123,6 +132,8 @@ export type AssistantChatThreadRow = {
   contextLabel: string;
   summaryText: string;
   preferredApprovalMode: AssistantApprovalPreference;
+  preferredModelKey: string | null;
+  preferredReasoningEffort: AssistantReasoningEffort | null;
   state: AssistantChatThreadState;
   lastErrorCode: string | null;
   lastErrorSummary: string | null;

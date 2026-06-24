@@ -29,17 +29,16 @@ import {
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { AssistantChatSession, AssistantChatSessionState } from "@app/providers/AssistantChatContext";
-import type { AssistantApprovalPreference, AssistantChatMessageMeta, AssistantChatSnapshot, AssistantGatewayAttachment } from "@contracts";
+import type { AssistantApprovalPreference, AssistantChatMessageMeta, AssistantChatSnapshot, AssistantGatewayAttachment, AssistantReasoningEffort } from "@contracts";
 
 import { useAssistantChat } from "@app/providers/AssistantChatContext";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { useNotifications } from "@app/providers/NotificationsProvider";
-import { requestAgentPermission, reviewAgentRun, transcribeAssistantAudio } from "@features/agents/useAgentsData";
+import { requestAgentPermission, reviewAgentRun, transcribeAssistantAudio, useAgentModels } from "@features/agents/useAgentsData";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { readJsonPreference, uiPreferenceKeys, writeJsonPreference } from "@shared/lib/preferences";
 
-const modelOptions = ["GPT-5.4", "Claude Sonnet", "OpenClaw Balanced"];
-const reasoningOptions = ["Low", "Medium", "High"];
+const reasoningOptions: AssistantReasoningEffort[] = ["low", "medium", "high"];
 const approvalOptions: Array<{ labelKey: string; value: AssistantApprovalPreference }> = [
   { labelKey: "assistantChat.approvalMode.supervised", value: "supervised" },
   { labelKey: "assistantChat.approvalMode.needs_approval", value: "needs_approval" },
@@ -613,9 +612,30 @@ export const GlobalAssistantChat = () => {
   } = useAssistantChat();
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("GPT-5.4");
-  const [selectedReasoning, setSelectedReasoning] = useState("High");
+  // selectedModel holds a real "provider:model" key (or "" = agent default).
+  const [selectedModel, setSelectedModel] = useState("");
+  const [selectedReasoning, setSelectedReasoning] = useState<AssistantReasoningEffort>("medium");
   const [selectedApproval, setSelectedApproval] = useState<AssistantApprovalPreference>("unsupervised");
+  const { data: agentModelsData } = useAgentModels({ workspaceId });
+  const modelChoices = useMemo<Array<{ modelKey: string; label: string }>>(() => {
+    const choices: Array<{ modelKey: string; label: string }> = [];
+    const seen = new Set<string>();
+    for (const provider of agentModelsData?.providers ?? []) {
+      if (!provider.enabled || !provider.supportsLiveRequests) {
+        continue;
+      }
+      for (const option of provider.modelOptions) {
+        const modelKey = option.key.includes(":") ? option.key : `${provider.providerKey}:${option.key}`;
+        if (seen.has(modelKey)) {
+          continue;
+        }
+        seen.add(modelKey);
+        choices.push({ modelKey, label: option.label });
+      }
+    }
+    return choices;
+  }, [agentModelsData]);
+  const selectedModelLabel = modelChoices.find((choice) => choice.modelKey === selectedModel)?.label;
   const [panelScale, setPanelScale] = useState(1);
   const [isPanelResizing, setIsPanelResizing] = useState(false);
   const [attachments, setAttachments] = useState<AssistantGatewayAttachment[]>([]);
@@ -791,11 +811,18 @@ export const GlobalAssistantChat = () => {
     setExpandedMessageDetails({});
     setOptimisticAssistantMessage(null);
     setSelectedApproval(activeVisibleSession.preferredApprovalMode);
+    setSelectedModel(activeVisibleSession.preferredModelKey ?? "");
+    setSelectedReasoning(activeVisibleSession.preferredReasoningEffort ?? "medium");
 
     if (attachmentInputRef.current) {
       attachmentInputRef.current.value = "";
     }
-  }, [activeVisibleSession.preferredApprovalMode, resolvedActiveSession.id]);
+  }, [
+    activeVisibleSession.preferredApprovalMode,
+    activeVisibleSession.preferredModelKey,
+    activeVisibleSession.preferredReasoningEffort,
+    resolvedActiveSession.id,
+  ]);
 
   useEffect(() => {
     if (!sessions.some((session) => session.id === expandedSessionId)) {
@@ -1136,6 +1163,8 @@ export const GlobalAssistantChat = () => {
           currentView: resolvedActiveSession.contextLabel,
           activeFilters: {},
           requestedApprovalMode: selectedApproval,
+          requestedModelKey: selectedModel || null,
+          requestedReasoningEffort: selectedReasoning,
         },
       });
       const latestMeta = getLatestAssistantMeta(nextSnapshot, sessionId);
@@ -1989,24 +2018,39 @@ export const GlobalAssistantChat = () => {
                     onClick={() => setActiveSelector((current) => (current === "model" ? null : "model"))}
                     type="button"
                   >
-                    <span>{selectedModel}</span>
+                    <span>{selectedModelLabel ?? t("assistantChat.model.agentDefault", { defaultValue: "Modelo del agente" })}</span>
                     <ChevronDown size={14} />
                   </button>
                   {activeSelector === "model" ? (
                     <div className="assistant-chat-selector-popover">
-                      {modelOptions.map((option) => (
+                      <button
+                        className={`assistant-chat-selector-option${selectedModel === "" ? " is-selected" : ""}`}
+                        onClick={() => {
+                          setSelectedModel("");
+                          setActiveSelector(null);
+                        }}
+                        type="button"
+                      >
+                        {t("assistantChat.model.agentDefault", { defaultValue: "Modelo del agente" })}
+                      </button>
+                      {modelChoices.map((choice) => (
                         <button
-                          key={option}
-                          className={`assistant-chat-selector-option${selectedModel === option ? " is-selected" : ""}`}
+                          key={choice.modelKey}
+                          className={`assistant-chat-selector-option${selectedModel === choice.modelKey ? " is-selected" : ""}`}
                           onClick={() => {
-                            setSelectedModel(option);
+                            setSelectedModel(choice.modelKey);
                             setActiveSelector(null);
                           }}
                           type="button"
                         >
-                          {option}
+                          {choice.label}
                         </button>
                       ))}
+                      {modelChoices.length === 0 ? (
+                        <span className="assistant-chat-selector-empty">
+                          {t("assistantChat.model.empty", { defaultValue: "Configura un proveedor en Modelos" })}
+                        </span>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

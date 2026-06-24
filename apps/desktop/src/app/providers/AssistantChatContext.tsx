@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 
 import type {
   AssistantApprovalPreference,
+  AssistantReasoningEffort,
   AssistantChatAttachmentRow,
   AssistantChatMessageMeta,
   AssistantChatMessageRow,
@@ -48,6 +49,8 @@ export type AssistantChatSession = {
   updatedAt: number;
   summaryText: string;
   preferredApprovalMode: AssistantApprovalPreference;
+  preferredModelKey: string | null;
+  preferredReasoningEffort: AssistantReasoningEffort | null;
   threadState: AssistantChatThreadState;
   lastErrorSummary: string | null;
   lastIntent: string | null;
@@ -107,6 +110,8 @@ const buildFallbackSession = (pathname: string): AssistantChatSession => ({
   updatedAt: Date.now(),
   summaryText: "",
   preferredApprovalMode: "unsupervised",
+  preferredModelKey: null,
+  preferredReasoningEffort: null,
   threadState: "idle",
   lastErrorSummary: null,
   lastIntent: null,
@@ -185,6 +190,8 @@ const normalizeThread = (thread: AssistantChatThreadRow): AssistantChatSession =
     updatedAt: parseTimestamp(thread.updatedAt),
     summaryText: thread.summaryText,
     preferredApprovalMode: thread.preferredApprovalMode,
+    preferredModelKey: thread.preferredModelKey,
+    preferredReasoningEffort: thread.preferredReasoningEffort,
     threadState: thread.state,
     lastErrorSummary: thread.lastErrorSummary,
     lastIntent: thread.lastIntent,

@@ -1273,6 +1273,35 @@ export const createAssistantGatewayService = (
       );
     }
 
+    // Per-thread model + reasoning overrides chosen in the chat header. The
+    // model override applies to BOTH the supervisor and the specialist; it is
+    // only honoured when it resolves to a configured, enabled provider with a
+    // key (otherwise we silently keep the agent defaults). Reasoning effort is
+    // passed straight to the provider (OpenAI ignores it on non-reasoning
+    // models).
+    const requestedReasoningEffort = request.context.requestedReasoningEffort ?? null;
+    const requestedModelKey = request.context.requestedModelKey?.trim() || null;
+    const modelOverride = (() => {
+      if (!requestedModelKey) {
+        return null;
+      }
+      const separatorIndex = requestedModelKey.indexOf(":");
+      const providerKey = separatorIndex > 0 ? requestedModelKey.slice(0, separatorIndex) : "openai";
+      const provider = loadProviderConfig(db, providerKey, workspaceId);
+      const apiKey = options.secretStore.getProviderSecret(workspaceId, providerKey);
+      if (!provider || provider.enabled !== 1 || !apiKey) {
+        return null;
+      }
+      return { providerKey, modelKey: requestedModelKey, provider, apiKey };
+    })();
+
+    const effectiveSupervisorProviderKey = modelOverride?.providerKey ?? supervisorProviderKey;
+    const effectiveSupervisorModelKey = modelOverride?.modelKey ?? supervisorModelKey;
+    const effectiveSupervisorBaseUrl = modelOverride?.provider.base_url ?? supervisorProvider.base_url;
+    const effectiveSupervisorFallback = modelOverride?.provider.fallback_model_key ?? supervisorProvider.fallback_model_key;
+    const effectiveSupervisorTimeout = modelOverride?.provider.timeout_ms ?? supervisorProvider.timeout_ms;
+    const effectiveSupervisorApiKey = modelOverride?.apiKey ?? supervisorApiKey;
+
     const sessionSnapshot = options.sessionStore.read(request.workspaceId, request.threadId);
     options.sessionStore.touchMessage(request.workspaceId, request.threadId, summarizeMessageForSession(request));
 
@@ -1379,24 +1408,25 @@ export const createAssistantGatewayService = (
     );
 
     let previousResponseId = sessionSnapshot.isExpired ? null : sessionSnapshot.previousResponseId;
-    let supervisorRuntimeModelKey = supervisorModelKey;
+    let supervisorRuntimeModelKey = effectiveSupervisorModelKey;
     const initialProviderResponse = await createProviderResponse(
-      supervisorProviderKey,
+      effectiveSupervisorProviderKey,
       {
-        apiKey: supervisorApiKey,
-        baseUrl: supervisorProvider.base_url,
-        defaultModelKey: supervisorModelKey,
-        fallbackModelKey: supervisorProvider.fallback_model_key,
-        timeoutMs: supervisorProvider.timeout_ms,
+        apiKey: effectiveSupervisorApiKey,
+        baseUrl: effectiveSupervisorBaseUrl,
+        defaultModelKey: effectiveSupervisorModelKey,
+        fallbackModelKey: effectiveSupervisorFallback,
+        timeoutMs: effectiveSupervisorTimeout,
       },
       {
-        model: supervisorModelKey,
+        model: effectiveSupervisorModelKey,
         instructions: supervisorInstructions,
         input: initialPrompt,
         previousResponseId,
         tools: supervisorToolDefinitions,
         toolChoice: "auto",
         maxOutputTokens: 1500,
+        reasoningEffort: requestedReasoningEffort,
         textFormat: orchestrationSchema,
       },
     );
@@ -1538,13 +1568,13 @@ export const createAssistantGatewayService = (
       }
 
       const nextProviderResponse = await createProviderResponse(
-        supervisorProviderKey,
+        effectiveSupervisorProviderKey,
         {
-          apiKey: supervisorApiKey,
-          baseUrl: supervisorProvider.base_url,
+          apiKey: effectiveSupervisorApiKey,
+          baseUrl: effectiveSupervisorBaseUrl,
           defaultModelKey: supervisorRuntimeModelKey,
-          fallbackModelKey: supervisorProvider.fallback_model_key,
-          timeoutMs: supervisorProvider.timeout_ms,
+          fallbackModelKey: effectiveSupervisorFallback,
+          timeoutMs: effectiveSupervisorTimeout,
         },
         {
           model: supervisorRuntimeModelKey,
@@ -1553,6 +1583,7 @@ export const createAssistantGatewayService = (
           tools: supervisorToolDefinitions,
           toolChoice: "auto",
           maxOutputTokens: 1500,
+          reasoningEffort: requestedReasoningEffort,
           textFormat: orchestrationSchema,
         },
       );
@@ -1669,8 +1700,12 @@ export const createAssistantGatewayService = (
       const targetApiKey = options.secretStore.getProviderSecret(workspaceId, targetProviderKey);
 
       if (targetProvider?.enabled === 1 && targetApiKey) {
-        responseProviderKey = targetProviderKey;
-        responseModelKey = targetRuntime.model_key || supervisorRuntimeModelKey;
+        responseProviderKey = modelOverride?.providerKey ?? targetProviderKey;
+        responseModelKey = modelOverride?.modelKey ?? (targetRuntime.model_key || supervisorRuntimeModelKey);
+        const effSpecialistApiKey = modelOverride?.apiKey ?? targetApiKey;
+        const effSpecialistBaseUrl = modelOverride?.provider.base_url ?? targetProvider.base_url;
+        const effSpecialistFallback = modelOverride?.provider.fallback_model_key ?? targetProvider.fallback_model_key;
+        const effSpecialistTimeout = modelOverride?.provider.timeout_ms ?? targetProvider.timeout_ms;
 
         const todayIso = new Date().toISOString().slice(0, 10);
         const todayHumanEs = new Date().toLocaleDateString("es-DO", {
@@ -1748,13 +1783,13 @@ export const createAssistantGatewayService = (
           orchestration.tool_call_requested && executedToolPayloads.length === 0 && deferredWriteToolCalls.length === 0;
 
         const initialSpecialistProviderResponse = await createProviderResponse(
-          targetProviderKey,
+          responseProviderKey,
           {
-            apiKey: targetApiKey,
-            baseUrl: targetProvider.base_url,
+            apiKey: effSpecialistApiKey,
+            baseUrl: effSpecialistBaseUrl,
             defaultModelKey: responseModelKey,
-            fallbackModelKey: targetProvider.fallback_model_key,
-            timeoutMs: targetProvider.timeout_ms,
+            fallbackModelKey: effSpecialistFallback,
+            timeoutMs: effSpecialistTimeout,
           },
           {
             model: responseModelKey,
@@ -1763,6 +1798,7 @@ export const createAssistantGatewayService = (
             tools: targetToolDefinitions,
             toolChoice: specialistMustUseTool ? "required" : "auto",
             maxOutputTokens: 3000,
+            reasoningEffort: requestedReasoningEffort,
           },
         );
         let specialistResult = initialSpecialistProviderResponse.result;
@@ -1872,13 +1908,13 @@ export const createAssistantGatewayService = (
           }
 
           const nextSpecialistProviderResponse = await createProviderResponse(
-            targetProviderKey,
+            responseProviderKey,
             {
-              apiKey: targetApiKey,
-              baseUrl: targetProvider.base_url,
+              apiKey: effSpecialistApiKey,
+              baseUrl: effSpecialistBaseUrl,
               defaultModelKey: responseModelKey,
-              fallbackModelKey: targetProvider.fallback_model_key,
-              timeoutMs: targetProvider.timeout_ms,
+              fallbackModelKey: effSpecialistFallback,
+              timeoutMs: effSpecialistTimeout,
             },
             {
               model: responseModelKey,
@@ -1887,6 +1923,7 @@ export const createAssistantGatewayService = (
               tools: targetToolDefinitions,
               toolChoice: "auto",
               maxOutputTokens: 3000,
+              reasoningEffort: requestedReasoningEffort,
             },
           );
           specialistResult = nextSpecialistProviderResponse.result;

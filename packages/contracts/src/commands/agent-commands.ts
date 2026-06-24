@@ -2,6 +2,7 @@ import type {
   AgentApprovalMode,
   AssistantActionLink,
   AssistantApprovalPreference,
+  AssistantReasoningEffort,
   AssistantChatMessageSource,
   AssistantOperationalReceipt,
   AssistantPermissionRequest,
@@ -67,6 +68,10 @@ export type AIGatewayToolContext = {
   currentView?: string | null;
   activeFilters?: Record<string, string>;
   requestedApprovalMode?: AssistantApprovalPreference;
+  /** Per-thread model override chosen in the chat header (provider:model). */
+  requestedModelKey?: string | null;
+  /** Per-thread reasoning effort chosen in the chat header. */
+  requestedReasoningEffort?: AssistantReasoningEffort | null;
   sourceConnectorKey?: string | null;
   sourceChannelId?: string | null;
   sourceExternalMessageId?: string | null;

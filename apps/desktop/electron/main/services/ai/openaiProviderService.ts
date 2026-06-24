@@ -50,6 +50,8 @@ export type OpenAIResponseCreateInput = {
   maxOutputTokens?: number;
   /** Sampling temperature. 0 = deterministic (used for data extraction). */
   temperature?: number;
+  /** Reasoning effort for reasoning-capable models (gpt-5*, o-series). */
+  reasoningEffort?: "low" | "medium" | "high" | null;
   textFormat?: Record<string, unknown>;
 };
 
@@ -139,6 +141,10 @@ const resolveModel = (model: string) => {
   const separatorIndex = normalized.indexOf(":");
   return separatorIndex > 0 ? normalized.slice(separatorIndex + 1) : normalized;
 };
+
+// Only reasoning-capable models accept the `reasoning` param; sending it to a
+// classic chat model returns a 400, so gate on the model family.
+const modelSupportsReasoning = (resolvedModel: string) => /^(gpt-5|o\d)/i.test(resolvedModel.trim());
 
 const stripOpenAIModelVersionSuffix = (value: string) => value.replace(datedModelSuffixPattern, "");
 
@@ -432,6 +438,10 @@ export const createOpenAIProviderService = () => ({
           max_output_tokens: input.maxOutputTokens ?? 800,
           temperature: input.temperature,
           parallel_tool_calls: false,
+          reasoning:
+            input.reasoningEffort && modelSupportsReasoning(resolveModel(input.model))
+              ? { effort: input.reasoningEffort }
+              : undefined,
           text: input.textFormat ? { format: input.textFormat } : undefined,
         }),
       });
