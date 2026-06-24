@@ -30,8 +30,21 @@ import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 const workspaceId = LOCAL_FALLBACK_WORKSPACE_ID;
 
 const normalizeWhitespace = (value: string) => value.replace(/\s+/g, " ").trim();
-const normalizeKey = (kind: MemoryKind, agentId: string | null, projectId: string | null, body: string) =>
-  `${kind}|${agentId ?? "-"}|${projectId ?? "-"}|${normalizeWhitespace(body).toLowerCase()}`;
+const normalizeKey = (
+  kind: MemoryKind,
+  agentId: string | null,
+  projectId: string | null,
+  userId: string | null,
+  body: string,
+) => `${kind}|${agentId ?? "-"}|${projectId ?? "-"}|${userId ?? "-"}|${normalizeWhitespace(body).toLowerCase()}`;
+
+// Personal memory belongs to the user who said it (their preferences and the
+// instructions they gave); everything else (stable operational facts) is shared
+// across the workspace.
+const PERSONAL_MEMORY_KINDS: ReadonlySet<MemoryKind> = new Set(["instruction", "preference"]);
+
+const resolveMemoryOwner = (kind: MemoryKind, userId: string | null) =>
+  PERSONAL_MEMORY_KINDS.has(kind) ? userId : null;
 
 const truncate = (value: string, max = 220) => (value.length > max ? `${value.slice(0, max - 1).trimEnd()}…` : value);
 
@@ -151,6 +164,7 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
     limit: number;
     where: string;
     params: Array<string | null>;
+    userId?: string | null;
   }) =>
     db
       .prepare(
@@ -168,12 +182,19 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
           WHERE workspace_id = ?
             AND status = 'active'
             AND ${args.where}
+            AND (user_id IS NULL OR user_id = ?)
             AND (? IS NULL OR lower(body) LIKE ?)
           ORDER BY updated_at DESC
           LIMIT ${args.limit}
         `,
       )
-      .all(workspaceId, ...args.params, queryFragment(args.query), queryFragment(args.query)) as Array<{
+      .all(
+        workspaceId,
+        ...args.params,
+        args.userId ?? null,
+        queryFragment(args.query),
+        queryFragment(args.query),
+      ) as Array<{
       id: string;
       body: string;
       kind: MemoryKind;
@@ -204,8 +225,12 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
     updatedAt: row.updated_at,
   });
 
-  const upsertMemory = (candidate: MemoryCandidate, source: { threadId: string; messageId: string | null }) => {
-    const normalized = normalizeKey(candidate.kind, candidate.agentId, candidate.projectId, candidate.body);
+  const upsertMemory = (
+    candidate: MemoryCandidate,
+    source: { threadId: string; messageId: string | null; userId: string | null },
+  ) => {
+    const ownerUserId = resolveMemoryOwner(candidate.kind, source.userId);
+    const normalized = normalizeKey(candidate.kind, candidate.agentId, candidate.projectId, ownerUserId, candidate.body);
     const existing = db
       .prepare(
         `
@@ -249,6 +274,7 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
         INSERT INTO assistant_memory_entries (
           id,
           workspace_id,
+          user_id,
           agent_id,
           project_id,
           kind,
@@ -261,11 +287,12 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
           status,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
       `,
     ).run(
       id,
       workspaceId,
+      ownerUserId,
       candidate.agentId,
       candidate.projectId,
       candidate.kind,
@@ -297,6 +324,7 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
       threadId: string;
       messageId: string | null;
       routedAgentId: string | null;
+      userId?: string | null;
     }) {
       const candidates = matchCandidate(args.message, args.context, args.routedAgentId);
 
@@ -317,6 +345,7 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
         upsertMemory(candidate, {
           threadId: args.threadId,
           messageId: args.messageId,
+          userId: args.userId ?? null,
         });
       });
     },
@@ -341,6 +370,7 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
       projectId: string | null;
       query: string;
       limit?: number;
+      userId?: string | null;
     }) {
       const limit = Math.max(1, Math.min(args.limit ?? 6, 12));
       // Standing memory (instructions/preferences/stable facts) must surface
@@ -348,7 +378,10 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
       // the stored body to contain the entire user turn (body LIKE %query%),
       // which almost never held, so the overlay came back empty. Surface the
       // most recent entries per scope instead and let the model judge relevance.
+      // Per-user scoping: shared entries (user_id NULL) plus the requesting
+      // user's own personal entries; other users' personal memory stays hidden.
       const overlayQuery = "";
+      const overlayUserId = args.userId ?? null;
       const agentEntries =
         args.agentId === null
           ? []
@@ -357,12 +390,14 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
               limit: Math.min(2, limit),
               where: "agent_id = ? AND project_id IS NULL",
               params: [args.agentId],
+              userId: overlayUserId,
             }).map(toEntry);
       const workspaceEntries = selectEntries({
         query: overlayQuery,
         limit: Math.min(2, limit),
         where: "agent_id IS NULL AND project_id IS NULL",
         params: [],
+        userId: overlayUserId,
       }).map(toEntry);
       const projectEntries = args.projectId
         ? selectEntries({
@@ -370,6 +405,7 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
             limit: Math.min(2, limit),
             where: "project_id = ?",
             params: [args.projectId],
+            userId: overlayUserId,
           }).map(toEntry)
         : [];
 

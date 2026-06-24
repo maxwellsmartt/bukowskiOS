@@ -124,4 +124,51 @@ describe("assistant memory service", () => {
 
     cleanup();
   });
+
+  it("keeps personal preferences private per user while sharing workspace facts", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-assistant-memory-peruser");
+    const memory = createAssistantMemoryService(database);
+    const now = "2026-04-24T00:00:00.000Z";
+
+    database
+      .prepare(
+        `
+          INSERT INTO assistant_chat_threads (
+            id, workspace_id, title, context_key, context_label, summary_text, created_at, updated_at, deleted_at
+          ) VALUES (?, 'workspace-metadata', 'Memoria usuario', '/agents/chat', 'App', '', ?, ?, NULL)
+        `,
+      )
+      .run("thread-user-1", now, now);
+
+    // Personal preference (private to user-a) + a shared workspace fact.
+    memory.extractAndPersist({
+      message: "Prefiero que me respondas en español y de forma breve.",
+      context: { activeProjectId: null },
+      threadId: "thread-user-1",
+      messageId: null,
+      routedAgentId: null,
+      userId: "user-a",
+    });
+    memory.extractAndPersist({
+      message: "Usamos cámaras Sony en la productora.",
+      context: { activeProjectId: null },
+      threadId: "thread-user-1",
+      messageId: null,
+      routedAgentId: null,
+      userId: "user-a",
+    });
+
+    const overlayA = memory.getOverlay({ agentId: null, projectId: null, query: "", limit: 6, userId: "user-a" });
+    const bodiesA = overlayA.workspaceEntries.map((entry) => entry.body.toLowerCase());
+    expect(bodiesA.some((body) => body.includes("español"))).toBe(true);
+    expect(bodiesA.some((body) => body.includes("sony"))).toBe(true);
+
+    const overlayB = memory.getOverlay({ agentId: null, projectId: null, query: "", limit: 6, userId: "user-b" });
+    const bodiesB = overlayB.workspaceEntries.map((entry) => entry.body.toLowerCase());
+    // user-b sees the shared fact but NOT user-a's private preference.
+    expect(bodiesB.some((body) => body.includes("sony"))).toBe(true);
+    expect(bodiesB.some((body) => body.includes("español"))).toBe(false);
+
+    cleanup();
+  });
 });

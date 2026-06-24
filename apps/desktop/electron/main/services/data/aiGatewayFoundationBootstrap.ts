@@ -172,6 +172,9 @@ export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
   // use the agent's configured defaults.
   ensureColumn(db, "assistant_chat_thread_state", "preferred_model_key", "TEXT");
   ensureColumn(db, "assistant_chat_thread_state", "preferred_reasoning_effort", "TEXT");
+  // Per-user scoping for memory: personal entries (instructions/preferences)
+  // carry the owner's user_id; shared workspace/project facts stay NULL.
+  ensureColumn(db, "assistant_memory_entries", "user_id", "TEXT");
   db.exec(`
     CREATE TABLE IF NOT EXISTS ai_provider_model_cache (
       id TEXT PRIMARY KEY,

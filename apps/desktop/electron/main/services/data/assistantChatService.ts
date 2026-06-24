@@ -921,6 +921,7 @@ export const createAssistantChatService = (
             threadId: input.threadId,
             messageId: userMessageId,
             routedAgentId: response.routedAgentId,
+            userId: input.context.sourceActorUserId ?? input.source?.actorUserId ?? null,
           });
         } catch (error) {
           options.memoryService.recordFailure({

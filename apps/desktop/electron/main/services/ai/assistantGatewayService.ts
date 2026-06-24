@@ -1311,6 +1311,7 @@ export const createAssistantGatewayService = (
         projectId: request.context.activeProjectId ?? null,
         query: request.message,
         limit: 5,
+        userId: trustedContext.sourceActorUserId ?? null,
       }) ?? { agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] };
     const financeContextHint =
       request.context.activePath?.startsWith("/finance")
@@ -1686,6 +1687,7 @@ export const createAssistantGatewayService = (
             projectId: request.context.activeProjectId ?? null,
             query: request.message,
             limit: 5,
+            userId: trustedContext.sourceActorUserId ?? null,
           })
         : { agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] };
 
