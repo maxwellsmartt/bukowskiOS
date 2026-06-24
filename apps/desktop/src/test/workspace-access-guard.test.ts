@@ -366,4 +366,44 @@ describe("workspace access guard", () => {
 
     cleanup();
   });
+
+  it("resolves the signed-in user's real name for assistant turn labels", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-workspace-access-actor-name");
+    const timestamp = "2026-04-24T00:00:00.000Z";
+    database
+      .prepare(
+        `INSERT INTO users (id, full_name, email, phone, is_active, created_at, updated_at)
+           VALUES (?, ?, ?, NULL, 1, ?, ?) ON CONFLICT(id) DO NOTHING`,
+      )
+      .run("user-remote", "Ernesto Martínez", "ernesto@example.test", timestamp, timestamp);
+
+    const guard = createWorkspaceAccessGuard({
+      database,
+      supabaseUrl: "https://example.supabase.co",
+      anonKey: "anon-key",
+      getTokens: async () => ({ accessToken: createJwt({ sub: "user-remote", email: "ernesto@example.test", exp: 9_999_999_999 }) }),
+      fetchImpl: vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })),
+      now: () => 1_000,
+    });
+
+    await expect(guard.getCurrentActorName()).resolves.toBe("Ernesto Martínez");
+
+    cleanup();
+  });
+
+  it("falls back to the generic label when no session is present", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-workspace-access-actor-fallback");
+    const guard = createWorkspaceAccessGuard({
+      database,
+      supabaseUrl: "https://example.supabase.co",
+      anonKey: "anon-key",
+      getTokens: async () => ({ accessToken: null }),
+      fetchImpl: vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })),
+      now: () => 1_000,
+    });
+
+    await expect(guard.getCurrentActorName()).resolves.toBe("Desktop user");
+
+    cleanup();
+  });
 });
