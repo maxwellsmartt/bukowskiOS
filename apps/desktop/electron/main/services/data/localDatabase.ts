@@ -2083,6 +2083,40 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   };
   runOperationalAlertSweep();
   setInterval(runOperationalAlertSweep, 60 * 60 * 1000).unref?.();
+
+  // One-time hydration nudge: project-snapshot imports can leave placeholder
+  // crew ("Remote crew abc123") whose real names only arrive from the
+  // cursor-incremental crew catalog pull. If such placeholders exist, reset the
+  // crew pull cursor (unless one is already pending) so the next catalog pull
+  // re-fetches and fills in the real names.
+  try {
+    const stalePlaceholderWorkspaces = database
+      .prepare(
+        `
+          SELECT DISTINCT crew_members.workspace_id AS workspace_id
+          FROM crew_members
+          LEFT JOIN sync_pull_cursors
+            ON sync_pull_cursors.workspace_id = crew_members.workspace_id
+            AND sync_pull_cursors.entity_type = 'crew_members'
+          WHERE crew_members.notes LIKE 'Created from a project snapshot%'
+            AND sync_pull_cursors.last_synced_at IS NOT NULL
+        `,
+      )
+      .all() as Array<{ workspace_id: string }>;
+    for (const workspace of stalePlaceholderWorkspaces) {
+      database
+        .prepare(
+          `UPDATE sync_pull_cursors SET last_synced_at = NULL, updated_at = ?
+             WHERE workspace_id = ? AND entity_type = 'crew_members'`,
+        )
+        .run(new Date().toISOString(), workspace.workspace_id);
+      logger.info("Reset crew catalog cursor to hydrate placeholder crew names.", { workspaceId: workspace.workspace_id });
+    }
+  } catch (error) {
+    logger.warn("Could not schedule crew placeholder hydration.", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
   try {
     const retentionSummary = dataRetention.run();
     lastRetentionRunAt = new Date().toISOString();

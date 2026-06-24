@@ -233,7 +233,9 @@ export const ProjectInfoPage = () => {
                 {currentProject.hasPreproduction ? (
                   <div className="project-info-summary-window project-info-summary-preproduction">
                     <span>{t("projects.info.schedule.preproduction")}</span>
-                    <strong>{t("projects.info.schedule.preproduction")}</strong>
+                    <strong>
+                      {currentProject.preproductionStartDate ?? t("projects.info.schedule.noStartDate")} → {currentProject.preproductionEndDate ?? t("projects.info.schedule.openEnded")}
+                    </strong>
                     <small>
                       {currentProject.preproductionStartDate ?? t("projects.info.schedule.noStartDate")} - {currentProject.preproductionEndDate ?? t("projects.info.schedule.openEnded")}
                     </small>

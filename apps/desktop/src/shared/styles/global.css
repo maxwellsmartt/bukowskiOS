@@ -8878,6 +8878,10 @@ body.is-resizing-side-rail {
   gap: var(--space-md);
   align-items: stretch;
   min-height: 0;
+  /* Fill the scroll viewport so the columns get a bounded height — that is what
+     lets each card (details + units) scroll its own content internally instead
+     of growing the page and clipping the lower fields/Save button. */
+  flex: 1 1 auto;
 }
 
 .project-info-layout-column {
