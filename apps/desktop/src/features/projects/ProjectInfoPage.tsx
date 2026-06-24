@@ -342,6 +342,8 @@ export const ProjectInfoPage = () => {
                   </label>
                 </div>
 
+                <div className="project-info-section-divider" role="separator" />
+
                 <label className="project-setup-toggle">
                   <input checked={hasPreproduction} onChange={(event) => setHasPreproduction(event.target.checked)} type="checkbox" />
                   <span>{t("projects.info.fields.hasPreproduction")}</span>

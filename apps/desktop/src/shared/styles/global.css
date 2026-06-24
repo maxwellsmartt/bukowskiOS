@@ -8909,6 +8909,22 @@ body.is-resizing-side-rail {
   gap: 12px;
 }
 
+/* The details column is height-matched to the units column (equal-height
+   layout), so its content must scroll internally — otherwise the lower fields
+   and the Save button get clipped below the fold. */
+.project-info-card {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* Hairline divider that sets the pre-production section apart from the
+   core project fields above it. */
+.project-info-section-divider {
+  height: 1px;
+  margin: 4px 0 2px;
+  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+}
+
 .project-info-card .action-form-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
