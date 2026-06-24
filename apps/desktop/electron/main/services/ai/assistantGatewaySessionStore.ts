@@ -2,7 +2,13 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
-const defaultTimeoutMs = 60 * 60 * 1000;
+// Session lifetime for reusing the provider's server-side conversation state
+// (previousResponseId) and the cached recent-message snapshot. The old 1h
+// window dropped context mid-day; 72h survives nights and weekends so a thread
+// the user returns to stays warm. Continuity itself no longer depends on this —
+// the gateway rebuilds a transcript from persisted messages every turn — but a
+// longer window keeps the cheaper server-side state in play.
+const defaultTimeoutMs = 72 * 60 * 60 * 1000;
 
 type SessionSummary = {
   previousResponseId: string | null;
