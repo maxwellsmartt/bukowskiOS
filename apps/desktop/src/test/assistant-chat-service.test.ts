@@ -257,7 +257,7 @@ describe("assistant chat service", () => {
     fs.rmSync(attachmentsRootPath, { recursive: true, force: true });
   });
 
-  it("persists per-thread approval preferences", () => {
+  it("persists per-thread approval, model and reasoning preferences", () => {
     const { cleanup, database } = createTestDatabase("bukowski-assistant-chat-preferences");
     const attachmentsRootPath = createAttachmentsRoot("bukowski-assistant-chat-preferences");
     const service = createAssistantChatService(database, {
@@ -292,9 +292,13 @@ describe("assistant chat service", () => {
       workspaceId: "workspace-metadata",
       threadId,
       preferredApprovalMode: "unsupervised",
+      preferredModelKey: "openai:gpt-5.5-pro",
+      preferredReasoningEffort: "high",
     });
 
     expect(updated.threads[0]?.preferredApprovalMode).toBe("unsupervised");
+    expect(updated.threads[0]?.preferredModelKey).toBe("openai:gpt-5.5-pro");
+    expect(updated.threads[0]?.preferredReasoningEffort).toBe("high");
 
     cleanup();
     fs.rmSync(attachmentsRootPath, { recursive: true, force: true });

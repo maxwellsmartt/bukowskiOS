@@ -12,6 +12,7 @@ import type {
   AssistantChatThreadRow,
   AssistantChatThreadState,
   SendAssistantChatTurnCommand,
+  UpdateAssistantThreadPreferencesCommand,
 } from "@contracts";
 import {
   createAssistantThread,
@@ -74,7 +75,10 @@ type AssistantChatContextValue = {
   createSession: () => Promise<void>;
   selectSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
-  updateSessionApprovalMode: (sessionId: string, preferredApprovalMode: AssistantApprovalPreference) => Promise<void>;
+  updateSessionPreferences: (
+    sessionId: string,
+    preferences: Omit<UpdateAssistantThreadPreferencesCommand, "commandId" | "workspaceId" | "threadId">,
+  ) => Promise<void>;
   renameSession: (sessionId: string, title: string) => Promise<void>;
   sendTurn: (input: SendAssistantChatTurnCommand) => Promise<AssistantChatSnapshot>;
   setCompareTrayVisible: (visible: boolean) => void;
@@ -352,7 +356,7 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
         setSnapshot(nextSnapshot);
         setIsHydrated(true);
       },
-      updateSessionApprovalMode: async (sessionId: string, preferredApprovalMode: AssistantApprovalPreference) => {
+      updateSessionPreferences: async (sessionId: string, preferences) => {
         if (!isWorkspaceReady) {
           return;
         }
@@ -361,7 +365,7 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
           commandId: `cmd-thread-preferences-${Date.now().toString(36)}`,
           workspaceId: activeWorkspaceId,
           threadId: sessionId,
-          preferredApprovalMode,
+          ...preferences,
         });
         setSnapshot(nextSnapshot);
         setIsHydrated(true);

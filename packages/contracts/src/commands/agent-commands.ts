@@ -165,7 +165,9 @@ export type UpdateAssistantThreadPreferencesCommand = {
   commandId: string;
   workspaceId: string;
   threadId: string;
-  preferredApprovalMode: AssistantApprovalPreference;
+  preferredApprovalMode?: AssistantApprovalPreference;
+  preferredModelKey?: string | null;
+  preferredReasoningEffort?: AssistantReasoningEffort | null;
 };
 
 export type RenameAssistantThreadCommand = {

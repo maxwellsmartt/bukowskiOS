@@ -943,11 +943,27 @@ export const createAssistantChatService = (
       db.prepare(
         `
           UPDATE assistant_chat_thread_state
-          SET preferred_approval_mode = ?,
+          SET preferred_approval_mode = COALESCE(?, preferred_approval_mode),
+              preferred_model_key = CASE
+                WHEN ? = 1 THEN ?
+                ELSE preferred_model_key
+              END,
+              preferred_reasoning_effort = CASE
+                WHEN ? = 1 THEN ?
+                ELSE preferred_reasoning_effort
+              END,
               updated_at = ?
           WHERE thread_id = ?
         `,
-      ).run(input.preferredApprovalMode, now, input.threadId);
+      ).run(
+        input.preferredApprovalMode ?? null,
+        input.preferredModelKey !== undefined ? 1 : 0,
+        input.preferredModelKey ?? null,
+        input.preferredReasoningEffort !== undefined ? 1 : 0,
+        input.preferredReasoningEffort ?? null,
+        now,
+        input.threadId,
+      );
 
       return loadSnapshot();
     },

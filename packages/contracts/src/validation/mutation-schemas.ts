@@ -8,6 +8,7 @@ const commandSourceChannelSchema = z.enum(["desktop", "mobile", "api", "whatsapp
 const agentStatusSchema = z.enum(["active", "paused"]);
 const agentApprovalModeSchema = z.enum(["auto", "supervised", "needs_approval"]);
 const assistantApprovalPreferenceSchema = z.enum(["supervised", "needs_approval", "unsupervised"]);
+const assistantReasoningEffortSchema = z.enum(["low", "medium", "high"]);
 const rmaStatusSchema = z.enum([
   "Needs review",
   "Sent to repair",
@@ -230,8 +231,19 @@ export const updateAssistantThreadPreferencesSchema = z
     commandId: nonEmptyString,
     workspaceId: nonEmptyString,
     threadId: nonEmptyString,
-    preferredApprovalMode: assistantApprovalPreferenceSchema,
+    preferredApprovalMode: assistantApprovalPreferenceSchema.optional(),
+    preferredModelKey: optionalNullableString,
+    preferredReasoningEffort: assistantReasoningEffortSchema.nullable().optional(),
   })
+  .refine(
+    (input) =>
+      input.preferredApprovalMode !== undefined ||
+      input.preferredModelKey !== undefined ||
+      input.preferredReasoningEffort !== undefined,
+    {
+      message: "At least one thread preference is required.",
+    },
+  )
   .strict();
 
 export const renameAssistantThreadSchema = z
@@ -272,6 +284,8 @@ export const assistantGatewayToolContextSchema = z
     currentView: optionalNullableString,
     activeFilters: z.record(z.string(), z.string()).optional(),
     requestedApprovalMode: assistantApprovalPreferenceSchema.optional(),
+    requestedModelKey: optionalNullableString,
+    requestedReasoningEffort: assistantReasoningEffortSchema.nullable().optional(),
     sourceConnectorKey: optionalNullableString,
     sourceChannelId: optionalNullableString,
     sourceExternalMessageId: optionalNullableString,

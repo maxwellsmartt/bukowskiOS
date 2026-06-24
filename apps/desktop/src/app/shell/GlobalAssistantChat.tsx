@@ -606,7 +606,7 @@ export const GlobalAssistantChat = () => {
     selectSession,
     sessions,
     setCompareTrayVisible,
-    updateSessionApprovalMode,
+    updateSessionPreferences,
     toggle,
     workspaceId,
   } = useAssistantChat();
@@ -1292,7 +1292,21 @@ export const GlobalAssistantChat = () => {
 
   const handleApprovalPreferenceChange = async (nextValue: AssistantApprovalPreference) => {
     setSelectedApproval(nextValue);
-    await updateSessionApprovalMode(resolvedActiveSession.id, nextValue);
+    await updateSessionPreferences(resolvedActiveSession.id, { preferredApprovalMode: nextValue });
+  };
+
+  const handleModelPreferenceChange = async (nextValue: string) => {
+    setSelectedModel(nextValue);
+    await updateSessionPreferences(resolvedActiveSession.id, {
+      preferredModelKey: nextValue || null,
+    });
+  };
+
+  const handleReasoningPreferenceChange = async (nextValue: AssistantReasoningEffort) => {
+    setSelectedReasoning(nextValue);
+    await updateSessionPreferences(resolvedActiveSession.id, {
+      preferredReasoningEffort: nextValue,
+    });
   };
 
   const handleComposerKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
@@ -2026,7 +2040,7 @@ export const GlobalAssistantChat = () => {
                       <button
                         className={`assistant-chat-selector-option${selectedModel === "" ? " is-selected" : ""}`}
                         onClick={() => {
-                          setSelectedModel("");
+                          void handleModelPreferenceChange("");
                           setActiveSelector(null);
                         }}
                         type="button"
@@ -2038,7 +2052,7 @@ export const GlobalAssistantChat = () => {
                           key={choice.modelKey}
                           className={`assistant-chat-selector-option${selectedModel === choice.modelKey ? " is-selected" : ""}`}
                           onClick={() => {
-                            setSelectedModel(choice.modelKey);
+                            void handleModelPreferenceChange(choice.modelKey);
                             setActiveSelector(null);
                           }}
                           type="button"
@@ -2071,7 +2085,7 @@ export const GlobalAssistantChat = () => {
                           key={option}
                           className={`assistant-chat-selector-option${selectedReasoning === option ? " is-selected" : ""}`}
                           onClick={() => {
-                            setSelectedReasoning(option);
+                            void handleReasoningPreferenceChange(option);
                             setActiveSelector(null);
                           }}
                           type="button"
