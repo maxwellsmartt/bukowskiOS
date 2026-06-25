@@ -882,6 +882,27 @@ app.whenReady().then(async () => {
       durationMs: Date.now() - rendererLoadStartedAt,
       startupDurationMs: Date.now() - startupStartedAt,
     });
+    // The deferred real renderer navigates into the window that was already
+    // shown for the startup splash, so `ready-to-show` (which focused it) has
+    // already fired and does not fire again. On macOS that intermittently
+    // leaves the window visible but not key — content renders yet every click
+    // is ignored until the user hides/shows or minimizes/restores. Re-key the
+    // window and focus the web contents here, mirroring that manual workaround.
+    if (!mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.focus();
+      // On macOS show()/focus() on an already-visible window does not always
+      // re-key it; activating the app reliably restores click handling. Safe
+      // here because this runs once on initial launch, when the user expects
+      // the app they just opened to come forward.
+      if (process.platform === "darwin") {
+        app.focus({ steal: true });
+      }
+    }
     flushPendingDeepLinks();
   });
   void loadMainWindowContent(mainWindow, devServerUrl, rendererDist).catch((error: unknown) => {
