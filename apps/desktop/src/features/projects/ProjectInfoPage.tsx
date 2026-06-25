@@ -12,6 +12,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { useLocale } from "@shared/hooks/useLocale";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { ProjectUnitsManager } from "./ProjectUnitsManager";
@@ -29,6 +30,13 @@ const isValidDateWindow = (start: string, end: string) => !start || !end || star
 
 export const ProjectInfoPage = () => {
   const { t } = useTranslation();
+  const { formatDate } = useLocale();
+  // Format a date-only string (YYYY-MM-DD) in the user's chosen date format,
+  // anchoring at local midnight so it never shifts a day across time zones.
+  // Numeric parts so each mode renders as expected (iso → 2026-07-13,
+  // us → 07/13/2026, eu/locale → 13/07/2026).
+  const formatDayLabel = (value: string | null | undefined) =>
+    value ? formatDate(`${value}T00:00:00`, { year: "numeric", month: "2-digit", day: "2-digit" }) : null;
   const { project, projectId } = useProjectMode();
   const [searchParams] = useSearchParams();
   const toast = useToast();
@@ -128,9 +136,16 @@ export const ProjectInfoPage = () => {
   const cancelledUnits = displayData.timelineSummary?.cancelledUnits ?? 0;
   const totalScheduledUnits = activeUnits + plannedUnits + wrappedUnits + cancelledUnits;
   const wrappedRatio = totalScheduledUnits ? Math.round((wrappedUnits / totalScheduledUnits) * 100) : 0;
-  const scheduleWindow = displayData.schedule?.windowLabel ?? t("projects.fallbacks.unscheduled");
-  const scheduleStart = displayData.schedule?.startDate ?? t("projects.info.schedule.noStartDate");
-  const scheduleEnd = displayData.schedule?.endDate ?? t("projects.info.schedule.openEnded");
+  const scheduleStartLabel = formatDayLabel(displayData.schedule?.startDate);
+  const scheduleEndLabel = formatDayLabel(displayData.schedule?.endDate);
+  const scheduleWindow =
+    scheduleStartLabel && scheduleEndLabel
+      ? `${scheduleStartLabel} → ${scheduleEndLabel}`
+      : displayData.schedule?.windowLabel ?? t("projects.fallbacks.unscheduled");
+  const scheduleStart = scheduleStartLabel ?? t("projects.info.schedule.noStartDate");
+  const scheduleEnd = scheduleEndLabel ?? t("projects.info.schedule.openEnded");
+  const preproductionStartLabel = formatDayLabel(currentProject.preproductionStartDate) ?? t("projects.info.schedule.noStartDate");
+  const preproductionEndLabel = formatDayLabel(currentProject.preproductionEndDate) ?? t("projects.info.schedule.openEnded");
   const scheduleStats = [
     { label: t("projects.info.schedule.activeUnits"), value: activeUnits },
     { label: t("projects.info.schedule.plannedUnits"), value: plannedUnits },
@@ -232,7 +247,7 @@ export const ProjectInfoPage = () => {
                     <div className="project-info-summary-window project-info-summary-preproduction">
                       <span>{t("projects.info.schedule.preproduction")}</span>
                       <strong>
-                        {currentProject.preproductionStartDate ?? t("projects.info.schedule.noStartDate")} → {currentProject.preproductionEndDate ?? t("projects.info.schedule.openEnded")}
+                        {preproductionStartLabel} → {preproductionEndLabel}
                       </strong>
                     </div>
                   ) : null}
@@ -340,37 +355,37 @@ export const ProjectInfoPage = () => {
                   </label>
                 </div>
 
-                <div className="project-info-section-divider" role="separator" />
+                <div className="project-info-preproduction-card">
+                  <label className="project-setup-toggle">
+                    <input checked={hasPreproduction} onChange={(event) => setHasPreproduction(event.target.checked)} type="checkbox" />
+                    <span>{t("projects.info.fields.hasPreproduction")}</span>
+                  </label>
 
-                <label className="project-setup-toggle">
-                  <input checked={hasPreproduction} onChange={(event) => setHasPreproduction(event.target.checked)} type="checkbox" />
-                  <span>{t("projects.info.fields.hasPreproduction")}</span>
-                </label>
+                  {hasPreproduction ? (
+                    <div className="action-field-pair">
+                      <label className="action-field">
+                        <span className="action-field-label">{t("projects.info.fields.preproductionStart")}</span>
+                        <input
+                          className="action-field-control"
+                          onChange={(event) => setPreproductionStartDate(event.target.value)}
+                          type="date"
+                          value={preproductionStartDate}
+                        />
+                      </label>
 
-                {hasPreproduction ? (
-                  <div className="action-field-pair">
-                    <label className="action-field">
-                      <span className="action-field-label">{t("projects.info.fields.preproductionStart")}</span>
-                      <input
-                        className="action-field-control"
-                        onChange={(event) => setPreproductionStartDate(event.target.value)}
-                        type="date"
-                        value={preproductionStartDate}
-                      />
-                    </label>
-
-                    <label className="action-field">
-                      <span className="action-field-label">{t("projects.info.fields.preproductionEnd")}</span>
-                      <input
-                        className="action-field-control"
-                        min={preproductionStartDate || undefined}
-                        onChange={(event) => setPreproductionEndDate(event.target.value)}
-                        type="date"
-                        value={preproductionEndDate}
-                      />
-                    </label>
-                  </div>
-                ) : null}
+                      <label className="action-field">
+                        <span className="action-field-label">{t("projects.info.fields.preproductionEnd")}</span>
+                        <input
+                          className="action-field-control"
+                          min={preproductionStartDate || undefined}
+                          onChange={(event) => setPreproductionEndDate(event.target.value)}
+                          type="date"
+                          value={preproductionEndDate}
+                        />
+                      </label>
+                    </div>
+                  ) : null}
+                </div>
 
                 <label className="action-field action-field-wide">
                   <span className="action-field-label">{t("projects.info.fields.description")}</span>

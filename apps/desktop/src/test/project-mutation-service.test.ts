@@ -143,8 +143,8 @@ describe("project mutation service", () => {
     });
 
     const detail = reads.getProjectDetail("project-aurora");
-    expect(detail.project.startDate).toBe("2026-05-01");
-    expect(detail.project.endDate).toBe("2026-05-20");
+    expect(detail.project?.startDate).toBe("2026-05-01");
+    expect(detail.project?.endDate).toBe("2026-05-20");
     for (const unit of detail.units) {
       if (unit.startDate) {
         expect(unit.startDate >= "2026-05-01").toBe(true);

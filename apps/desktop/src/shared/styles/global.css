@@ -8956,6 +8956,27 @@ body.is-resizing-side-rail {
   grid-column: 1 / -1;
 }
 
+/* Pre-production lives in its own card so it reads as a distinct sub-section,
+   separate from the project's own schedule fields above it. */
+.project-info-card .project-info-preproduction-card {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.05), transparent 46%),
+    rgba(255, 255, 255, 0.018);
+}
+
+.project-info-card .project-info-preproduction-card .action-field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .project-info-card .action-textarea {
   min-height: 104px;
 }
