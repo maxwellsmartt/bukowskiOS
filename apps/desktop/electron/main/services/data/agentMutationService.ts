@@ -1195,12 +1195,12 @@ export const createAgentMutationService = (
     return options.assistantGatewayService.sendMessage(input);
   },
 
-  getAssistantChatSnapshot(): AssistantChatSnapshot {
+  getAssistantChatSnapshot(workspaceId?: string | null): AssistantChatSnapshot {
     if (!options.assistantChatService) {
       throw new Error("Assistant chat service unavailable.");
     }
 
-    return options.assistantChatService.getSnapshot();
+    return options.assistantChatService.getSnapshot(workspaceId);
   },
 
   createAssistantThread(input: CreateAssistantThreadCommand): AssistantChatSnapshot {

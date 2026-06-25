@@ -350,12 +350,12 @@ export const sendAssistantMessage = async (input: AssistantGatewayRequest): Prom
   return result;
 };
 
-export const getAssistantChatSnapshot = async (): Promise<AssistantChatSnapshot> => {
+export const getAssistantChatSnapshot = async (workspaceId?: string | null): Promise<AssistantChatSnapshot> => {
   if (!window.bukowskiAgents) {
     throw new Error("Agents bridge unavailable");
   }
 
-  return window.bukowskiAgents.getAssistantChatSnapshot();
+  return window.bukowskiAgents.getAssistantChatSnapshot(workspaceId);
 };
 
 export const createAssistantThread = async (input: CreateAssistantThreadCommand): Promise<AssistantChatSnapshot> => {

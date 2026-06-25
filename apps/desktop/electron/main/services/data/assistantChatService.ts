@@ -304,7 +304,7 @@ export const createAssistantChatService = (
     }
   };
 
-  const loadSnapshot = (): AssistantChatSnapshot => {
+  const loadSnapshot = (workspaceId?: string | null): AssistantChatSnapshot => {
     const attachmentRows = db.prepare(
       `
         SELECT id, message_id, name, mime_type, byte_size, status, storage_path
@@ -391,9 +391,10 @@ export const createAssistantChatService = (
         LEFT JOIN assistant_chat_thread_state
           ON assistant_chat_thread_state.thread_id = assistant_chat_threads.id
         WHERE assistant_chat_threads.deleted_at IS NULL
+          AND (? IS NULL OR assistant_chat_threads.workspace_id = ?)
         ORDER BY COALESCE(assistant_chat_thread_state.is_active, 0) DESC, assistant_chat_threads.updated_at DESC
       `,
-    ).all() as ThreadRow[];
+    ).all(workspaceId ?? null, workspaceId ?? null) as ThreadRow[];
 
     const snapshotThreads: AssistantChatThreadRow[] = threads.map((thread) => ({
       id: thread.id,
@@ -485,7 +486,7 @@ export const createAssistantChatService = (
     setActiveThreadRow(threadId);
     writeWelcomeMessage(threadId);
 
-    return loadSnapshot();
+    return loadSnapshot(input.workspaceId);
   };
 
   const persistAttachment = (threadId: string, messageId: string, attachment: AssistantGatewayAttachment) => {
@@ -708,13 +709,13 @@ export const createAssistantChatService = (
 
   return {
     reconcileInterruptedThreads,
-    getSnapshot() {
-      return loadSnapshot();
+    getSnapshot(workspaceId?: string | null) {
+      return loadSnapshot(workspaceId);
     },
     createThread,
     setActiveThread(input: SetActiveAssistantThreadCommand) {
       setActiveThreadRow(input.threadId);
-      return loadSnapshot();
+      return loadSnapshot(input.workspaceId);
     },
     deleteThread(input: DeleteAssistantThreadCommand) {
       const now = new Date().toISOString();
@@ -783,10 +784,10 @@ export const createAssistantChatService = (
             LIMIT 1
           `,
         )
-        .get(workspaceId, input.threadId) as { id: string } | undefined;
+        .get(input.workspaceId, input.threadId) as { id: string } | undefined;
       setActiveThreadRow(nextActive?.id ?? null);
 
-      return loadSnapshot();
+      return loadSnapshot(input.workspaceId);
     },
     async sendTurn(input: SendAssistantChatTurnCommand) {
       const thread = db
@@ -936,7 +937,7 @@ export const createAssistantChatService = (
         failAssistantMessage(input.threadId, assistantMessageId, userBody, errorMessage);
       }
 
-      return loadSnapshot();
+      return loadSnapshot(input.workspaceId);
     },
     updateThreadPreferences(input: UpdateAssistantThreadPreferencesCommand) {
       const now = new Date().toISOString();
@@ -972,7 +973,7 @@ export const createAssistantChatService = (
         input.threadId,
       );
 
-      return loadSnapshot();
+      return loadSnapshot(input.workspaceId);
     },
     renameThread(input: RenameAssistantThreadCommand) {
       const trimmedTitle = input.title.trim().slice(0, 120);
@@ -997,7 +998,7 @@ export const createAssistantChatService = (
         throw new Error("Thread not found.");
       }
 
-      return loadSnapshot();
+      return loadSnapshot(input.workspaceId);
     },
     async continueReviewedRun(input: {
       runId: string;

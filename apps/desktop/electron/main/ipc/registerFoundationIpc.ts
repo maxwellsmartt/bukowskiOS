@@ -646,7 +646,7 @@ type RegisterFoundationIpcOptions = {
     testConnectorConnection: (input: TestConnectorConnectionCommand) => unknown;
     createConnectorLinkToken: (input: CreateConnectorLinkTokenCommand) => unknown;
     assignAgentModel: (input: AssignAgentModelCommand) => unknown;
-    getAssistantChatSnapshot: () => AssistantChatSnapshot;
+    getAssistantChatSnapshot: (workspaceId?: string | null) => AssistantChatSnapshot;
     createAssistantThread: (input: CreateAssistantThreadCommand) => AssistantChatSnapshot;
     deleteAssistantThread: (input: DeleteAssistantThreadCommand) => AssistantChatSnapshot;
     setActiveAssistantThread: (input: SetActiveAssistantThreadCommand) => AssistantChatSnapshot;
@@ -953,7 +953,7 @@ export const registerFoundationIpc = ({
   );
   safeHandleRead(
     ipcChannels.agents.getAssistantChatSnapshot,
-    () => agentMutations.getAssistantChatSnapshot(),
+    (_event, workspaceId?: string | null) => agentMutations.getAssistantChatSnapshot(workspaceId),
     "The app could not load the assistant chat.",
   );
   safeHandle(ipcChannels.agents.create, createAgentSchema, async (_event, input) => {

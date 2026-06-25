@@ -308,7 +308,7 @@ declare global {
       getModelsSnapshot: (query?: { workspaceId?: string }) => Promise<AgentModelsSnapshot>;
       getAIProviderConfigs: (query?: { workspaceId?: string }) => Promise<AgentModelRow[]>;
       getConnectorsSnapshot: (query?: { workspaceId?: string }) => Promise<AgentConnectorRow[]>;
-      getAssistantChatSnapshot: () => Promise<AssistantChatSnapshot>;
+      getAssistantChatSnapshot: (workspaceId?: string | null) => Promise<AssistantChatSnapshot>;
       create: (input: CreateAgentCommand) => Promise<AgentMutationResult>;
       update: (input: UpdateAgentCommand) => Promise<AgentMutationResult>;
       setStatus: (input: SetAgentStatusCommand) => Promise<AgentMutationResult>;

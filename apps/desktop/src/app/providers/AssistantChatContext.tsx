@@ -227,7 +227,7 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
       return null;
     }
 
-    const currentSnapshot = await getAssistantChatSnapshot();
+    const currentSnapshot = await getAssistantChatSnapshot(activeWorkspaceId);
 
     if (currentSnapshot.threads.length) {
       setSnapshot(currentSnapshot);

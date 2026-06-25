@@ -432,7 +432,8 @@ const bukowskiAgents = {
     ipcRenderer.invoke(ipcChannels.agents.getAIProviderConfigs, query) as Promise<AgentModelRow[]>,
   getConnectorsSnapshot: (query?: { workspaceId?: string }) =>
     ipcRenderer.invoke(ipcChannels.agents.getConnectorsSnapshot, query) as Promise<AgentConnectorRow[]>,
-  getAssistantChatSnapshot: () => ipcRenderer.invoke(ipcChannels.agents.getAssistantChatSnapshot) as Promise<AssistantChatSnapshot>,
+  getAssistantChatSnapshot: (workspaceId?: string | null) =>
+    ipcRenderer.invoke(ipcChannels.agents.getAssistantChatSnapshot, workspaceId) as Promise<AssistantChatSnapshot>,
   create: (input: CreateAgentCommand) => ipcRenderer.invoke(ipcChannels.agents.create, input) as Promise<AgentMutationResult>,
   update: (input: UpdateAgentCommand) => ipcRenderer.invoke(ipcChannels.agents.update, input) as Promise<AgentMutationResult>,
   setStatus: (input: SetAgentStatusCommand) =>

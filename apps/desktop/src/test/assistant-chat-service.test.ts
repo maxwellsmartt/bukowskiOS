@@ -300,6 +300,16 @@ describe("assistant chat service", () => {
     expect(updated.threads[0]?.preferredModelKey).toBe("openai:gpt-5.5-pro");
     expect(updated.threads[0]?.preferredReasoningEffort).toBe("high");
 
+    // The snapshot must be scoped to the requested workspace: a thread in
+    // workspace-metadata must not leak into another workspace's snapshot, or its
+    // activeThreadId points cross-workspace and the next sendTurn (which filters
+    // by workspace_id) fails with "Assistant thread was not found".
+    const scoped = service.getSnapshot("workspace-metadata");
+    expect(scoped.threads.length).toBeGreaterThan(0);
+    const otherWorkspace = service.getSnapshot("00000000-0000-4000-8000-000000000000");
+    expect(otherWorkspace.threads).toHaveLength(0);
+    expect(otherWorkspace.activeThreadId).toBeNull();
+
     cleanup();
     fs.rmSync(attachmentsRootPath, { recursive: true, force: true });
   });
