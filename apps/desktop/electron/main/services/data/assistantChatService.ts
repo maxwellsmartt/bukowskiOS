@@ -940,6 +940,13 @@ export const createAssistantChatService = (
     },
     updateThreadPreferences(input: UpdateAssistantThreadPreferencesCommand) {
       const now = new Date().toISOString();
+      // Ensure a state row exists: a thread the user has not sent a turn in yet
+      // has no assistant_chat_thread_state row (it is created on first send), so
+      // a bare UPDATE would touch 0 rows and the chosen model/reasoning would not
+      // persist — making the selector snap back to the default.
+      db.prepare(
+        `INSERT OR IGNORE INTO assistant_chat_thread_state (thread_id, updated_at) VALUES (?, ?)`,
+      ).run(input.threadId, now);
       db.prepare(
         `
           UPDATE assistant_chat_thread_state

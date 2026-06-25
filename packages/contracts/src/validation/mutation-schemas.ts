@@ -284,6 +284,7 @@ export const assistantGatewayToolContextSchema = z
     currentView: optionalNullableString,
     activeFilters: z.record(z.string(), z.string()).optional(),
     requestedApprovalMode: assistantApprovalPreferenceSchema.optional(),
+    actorDisplayName: optionalNullableString,
     requestedModelKey: optionalNullableString,
     requestedReasoningEffort: assistantReasoningEffortSchema.nullable().optional(),
     sourceConnectorKey: optionalNullableString,

@@ -637,7 +637,13 @@ export const GlobalAssistantChat = () => {
     }
     return choices;
   }, [agentModelsData]);
-  const selectedModelLabel = modelChoices.find((choice) => choice.modelKey === selectedModel)?.label;
+  // When a model is selected, always show *something* for it — its catalog
+  // label, or the key itself if the model list has not loaded yet (or no longer
+  // lists it). Falling through to undefined made the header flash back to
+  // "Modelo del agente" even though the choice was set and persisted.
+  const selectedModelLabel = selectedModel
+    ? modelChoices.find((choice) => choice.modelKey === selectedModel)?.label ?? selectedModel
+    : undefined;
   // The supervisor's real (possibly user-renamed) name, so the thinking/pending
   // state shows it instead of the generic "Supervisor Agent".
   const supervisorName = useMemo(
