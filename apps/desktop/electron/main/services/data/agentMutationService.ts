@@ -1391,6 +1391,7 @@ export const createAgentMutationService = (
       if (options.assistantChatService && run.thread_id) {
         try {
           await options.assistantChatService.continueReviewedRun({
+            workspaceId,
             runId: run.id,
             decision: input.decision,
             approverUserId: approverUserId ?? null,

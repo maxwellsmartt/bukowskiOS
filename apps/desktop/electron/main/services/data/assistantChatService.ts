@@ -1001,6 +1001,7 @@ export const createAssistantChatService = (
       return loadSnapshot(input.workspaceId);
     },
     async continueReviewedRun(input: {
+      workspaceId: string;
       runId: string;
       decision: "approve" | "deny" | "approve_for_session";
       approverUserId?: string | null;
@@ -1022,7 +1023,7 @@ export const createAssistantChatService = (
             LIMIT 1
           `,
         )
-        .get(workspaceId, input.runId) as
+        .get(input.workspaceId, input.runId) as
         | {
             id: string;
             thread_id: string | null;
@@ -1034,7 +1035,7 @@ export const createAssistantChatService = (
         | undefined;
 
       if (!run?.thread_id) {
-        return loadSnapshot();
+        return loadSnapshot(input.workspaceId);
       }
 
       const summarySeed = `Approval review · ${run.title}`;
@@ -1084,7 +1085,7 @@ export const createAssistantChatService = (
             WHERE thread_id = ?
           `,
         ).run(run.agent_id, messageId, completedAt, run.thread_id);
-        return loadSnapshot();
+        return loadSnapshot(input.workspaceId);
       }
 
       const pendingMeta: AssistantChatMessageMeta = {
@@ -1109,7 +1110,7 @@ export const createAssistantChatService = (
 
       try {
         const response = await options.assistantGatewayService.continueApprovedRun({
-          workspaceId,
+          workspaceId: input.workspaceId,
           threadId: run.thread_id,
           runId: run.id,
           approvalScope: input.decision === "approve_for_session" ? "session" : "run",
@@ -1121,7 +1122,7 @@ export const createAssistantChatService = (
         failAssistantMessage(run.thread_id, assistantMessageId, summarySeed, errorMessage);
       }
 
-      return loadSnapshot();
+      return loadSnapshot(input.workspaceId);
     },
   };
 };
