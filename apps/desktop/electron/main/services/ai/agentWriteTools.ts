@@ -1239,7 +1239,8 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
     name: "update_project",
     requiredPermission: "projects.manage",
     description:
-      "Update an existing project's core details or schedule. Requires approval. Use get_project_detail first so unchanged required fields like code and name are preserved.",
+      "Update an existing project's core details or schedule. Requires approval. Use get_project_detail first so unchanged required fields like code and name are preserved. " +
+      "When you move the project's start_date/end_date and the project has units, set cascade_dates=true so the units (and their crew windows) shift by the same delta and stay inside the new window — otherwise the update is rejected because a unit would fall outside the new range. cascade_dates is the correct way to reschedule a whole project; do NOT try to move the units separately first.",
     requiresApproval: true,
     parameters: {
       type: "object",
@@ -1257,6 +1258,11 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
         description: { type: "string" },
         start_date: { type: "string", description: "YYYY-MM-DD." },
         end_date: { type: "string", description: "YYYY-MM-DD." },
+        cascade_dates: {
+          type: "boolean",
+          description:
+            "When true and start_date/end_date change, shift every unit and crew window by the same delta so they stay inside the new project window. Use this whenever you reschedule a project that has units.",
+        },
         has_preproduction: { type: "boolean" },
         preproduction_start_date: { type: "string", description: "YYYY-MM-DD." },
         preproduction_end_date: { type: "string", description: "YYYY-MM-DD." },
@@ -1281,6 +1287,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
         description: asOptionalString(args.description),
         startDate: asOptionalString(args.start_date),
         endDate: asOptionalString(args.end_date),
+        cascadeDates: asBoolean(args.cascade_dates),
         hasPreproduction: asBoolean(args.has_preproduction),
         preproductionStartDate: asOptionalString(args.preproduction_start_date),
         preproductionEndDate: asOptionalString(args.preproduction_end_date),

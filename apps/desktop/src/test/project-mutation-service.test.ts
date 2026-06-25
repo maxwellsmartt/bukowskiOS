@@ -112,6 +112,50 @@ describe("project mutation service", () => {
     cleanup();
   });
 
+  it("breaks the project/unit reschedule deadlock with cascadeDates", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-reschedule-deadlock");
+    const reads = createFoundationReadService(database);
+    const mutations = createProjectMutationService(database);
+
+    // Moving the project window forward leaves the existing unit (still on its
+    // old dates) before the new start — without cascade this is the deadlock the
+    // agent hit ("falls outside ... Adjust the unit first").
+    expect(() =>
+      mutations.updateProject({
+        projectId: "project-aurora",
+        code: "AURORA",
+        name: "Aurora Campaign",
+        status: "Active",
+        startDate: "2026-05-01",
+        endDate: "2026-05-20",
+      }),
+    ).toThrow("falls outside the new project date window");
+
+    // With cascade the project and its units move together atomically.
+    mutations.updateProject({
+      projectId: "project-aurora",
+      code: "AURORA",
+      name: "Aurora Campaign",
+      status: "Active",
+      startDate: "2026-05-01",
+      endDate: "2026-05-20",
+      cascadeDates: true,
+    });
+
+    const detail = reads.getProjectDetail("project-aurora");
+    expect(detail.project.startDate).toBe("2026-05-01");
+    expect(detail.project.endDate).toBe("2026-05-20");
+    for (const unit of detail.units) {
+      if (unit.startDate) {
+        expect(unit.startDate >= "2026-05-01").toBe(true);
+      }
+      if (unit.endDate) {
+        expect(unit.endDate <= "2026-05-20").toBe(true);
+      }
+    }
+    cleanup();
+  });
+
   it("cascades unit date changes to assigned crew", () => {
     const { cleanup, database } = createTestDatabase("bukowski-project-unit-date-cascade-test");
     const reads = createFoundationReadService(database);
