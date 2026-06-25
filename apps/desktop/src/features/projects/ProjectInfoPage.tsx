@@ -238,11 +238,7 @@ export const ProjectInfoPage = () => {
             >
               <div className="project-info-summary" aria-label={t("projects.info.schedule.title")}>
                 <div className="project-info-summary-windows">
-                  <div className="project-info-summary-window">
-                    <span>{t("projects.info.schedule.window")}</span>
-                    <strong>{scheduleWindow}</strong>
-                  </div>
-
+                  {/* Pre-production first — it happens before the production window. */}
                   {currentProject.hasPreproduction ? (
                     <div className="project-info-summary-window project-info-summary-preproduction">
                       <span>{t("projects.info.schedule.preproduction")}</span>
@@ -251,6 +247,11 @@ export const ProjectInfoPage = () => {
                       </strong>
                     </div>
                   ) : null}
+
+                  <div className="project-info-summary-window">
+                    <span>{t("projects.info.schedule.window")}</span>
+                    <strong>{scheduleWindow}</strong>
+                  </div>
                 </div>
 
                 <div className="project-info-summary-progress">
@@ -376,7 +377,7 @@ export const ProjectInfoPage = () => {
                       <label className="action-field">
                         <span className="action-field-label">{t("projects.info.fields.preproductionEnd")}</span>
                         <input
-                          className="action-field-control"
+                          className="action-field-control project-info-end-date"
                           min={preproductionStartDate || undefined}
                           onChange={(event) => setPreproductionEndDate(event.target.value)}
                           type="date"

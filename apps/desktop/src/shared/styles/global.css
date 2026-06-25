@@ -8964,11 +8964,13 @@ body.is-resizing-side-rail {
   flex-direction: column;
   gap: 10px;
   padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(178, 142, 232, 0.22);
   border-radius: 14px;
+  /* Same purple code as the pre-production schedule card so the section reads
+     as one color-coded family. */
   background:
-    radial-gradient(circle at top left, rgba(126, 183, 178, 0.05), transparent 46%),
-    rgba(255, 255, 255, 0.018);
+    radial-gradient(circle at top left, rgba(178, 142, 232, 0.12), transparent 58%),
+    rgba(126, 91, 180, 0.055);
 }
 
 .project-info-card .project-info-preproduction-card .action-field-pair {
