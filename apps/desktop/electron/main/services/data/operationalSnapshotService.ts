@@ -612,11 +612,14 @@ const resolveProjectSnapshot = (db: DatabaseSync, workspaceId: string, projectId
         )
       : [],
     crewAssignments,
+    // Select the assigned crew by id only (no workspace_id filter): they belong
+    // to this project's assignments regardless of how their catalog row is
+    // workspace-tagged, and the snapshot must always carry their real names so
+    // other machines never fall back to "Remote crew" placeholders.
     crewMembers: crewMemberIds.length
       ? selectMany(
           db,
-          `SELECT * FROM crew_members WHERE workspace_id = ? AND id IN (${crewMemberIds.map(() => "?").join(", ")})`,
-          workspaceId,
+          `SELECT * FROM crew_members WHERE id IN (${crewMemberIds.map(() => "?").join(", ")})`,
           ...crewMemberIds,
         )
       : [],
@@ -905,16 +908,34 @@ const applyProjectSnapshot = (
       )
       .run(toSqlInputValue(row.project_unit_id), toSqlInputValue(row.department_id), toSqlInputValue(row.created_at));
   }
+  // Real crew records carried by the snapshot, keyed by id. We read the RAW
+  // snapshot.crewMembers (not the workspace-filtered `crewMembers` above) so a
+  // workspace_id mismatch between the source and this machine never strips the
+  // names — the crew belong to this project regardless.
+  const snapshotCrewById = new Map<string, Record<string, unknown>>();
+  for (const crew of toRecordArray(snapshot.crewMembers)) {
+    const id = toStringId(crew.id);
+    if (id) snapshotCrewById.set(id, crew);
+  }
+
   let createdPlaceholderCrew = false;
   for (const row of crewAssignments) {
     try {
-      if (!rowExists(db, "crew_members", row.crew_member_id)) {
-        const crewId = String(row.crew_member_id ?? "");
-        if (!crewId) throw new Error("Crew assignment has no crew member id.");
-        // Epoch updated_at: the crew catalog pull is last-write-wins, so a
-        // placeholder dated "now" would block the real crew row (which has an
-        // older timestamp) from ever overwriting it. Dating the stub at the
-        // epoch guarantees the real record always wins and hydrates the name.
+      const crewId = String(row.crew_member_id ?? "");
+      if (!crewId) throw new Error("Crew assignment has no crew member id.");
+
+      const snapshotCrew = snapshotCrewById.get(crewId);
+      const snapshotName = snapshotCrew ? toStringId(snapshotCrew.full_name) : null;
+
+      if (snapshotName) {
+        // The snapshot carried the real crew member — upsert it into this
+        // workspace with its real name/role so it lands correctly even if the
+        // catalog pull never runs, and so any earlier "Remote crew" placeholder
+        // is overwritten.
+        upsertRow(db, "crew_members", { ...snapshotCrew, workspace_id: context.workspaceId });
+      } else if (!rowExists(db, "crew_members", crewId)) {
+        // No crew data anywhere yet — last-resort placeholder. Epoch updated_at
+        // so the last-write-wins catalog pull can still hydrate the real name.
         const placeholderTimestamp = "1970-01-01T00:00:00.000Z";
         db.prepare(
           `INSERT OR IGNORE INTO crew_members (

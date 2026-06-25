@@ -598,6 +598,115 @@ describe("operational snapshot service", () => {
     }
   });
 
+  it("hydrates assigned crew with the real name from the snapshot, even across workspaces", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-crew-name");
+
+    try {
+      const service = createOperationalSnapshotService(database);
+      const projectId = "project-crew-name";
+      const unitId = "unit-crew-name-main";
+      const ts = "2026-05-06T12:24:00.000Z";
+
+      const result = service.applyRemoteSnapshots("workspace-metadata", "project", [
+        {
+          workspace_id: "workspace-metadata",
+          entity_type: "project",
+          entity_id: projectId,
+          updated_at: ts,
+          deleted_at: null,
+          snapshot_json: {
+            project: {
+              id: projectId,
+              workspace_id: "workspace-metadata",
+              code: "PCN",
+              name: "Porto Rico Crew Names",
+              client_name: null,
+              status: "Prep",
+              start_date: "2026-06-01",
+              end_date: "2026-06-10",
+              description: null,
+              created_at: ts,
+              updated_at: ts,
+              client_id: null,
+              color_key: null,
+              production_company_id: null,
+              production_company_name: null,
+              has_preproduction: 0,
+              preproduction_start_date: null,
+              preproduction_end_date: null,
+              archived_at: null,
+            },
+            units: [
+              {
+                id: unitId,
+                workspace_id: "workspace-metadata",
+                project_id: projectId,
+                code: "MAIN",
+                name: "Main Unit",
+                sort_order: 0,
+                status: "planned",
+                status_source: "derived",
+                color_key: null,
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                notes: null,
+                created_at: ts,
+                updated_at: ts,
+              },
+            ],
+            unitWindows: [],
+            projectDepartments: [{ project_id: projectId, department_id: "dept-video", created_at: ts }],
+            unitDepartments: [{ project_unit_id: unitId, department_id: "dept-video", created_at: ts }],
+            crewAssignments: [
+              {
+                id: "assignment-crew-name-a",
+                workspace_id: "workspace-metadata",
+                project_unit_id: unitId,
+                department_id: "dept-video",
+                crew_member_id: "crew-remote-jorge",
+                role_label: "DIT",
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                notes: null,
+                created_at: ts,
+                updated_at: ts,
+              },
+            ],
+            // Real crew record carried by the snapshot, tagged to a DIFFERENT
+            // workspace than the applying machine — the name must still land.
+            crewMembers: [
+              {
+                id: "crew-remote-jorge",
+                workspace_id: "11111111-1111-4111-8111-111111111111",
+                full_name: "Jorge Pérez",
+                role_label: "DIT",
+                email: null,
+                phone: null,
+                notes: null,
+                is_active: 1,
+                created_at: ts,
+                updated_at: ts,
+              },
+            ],
+          },
+        },
+      ]);
+
+      expect(result.errors).toEqual([]);
+
+      const crew = database
+        .prepare("SELECT full_name, workspace_id FROM crew_members WHERE id = ?")
+        .get("crew-remote-jorge") as { full_name: string; workspace_id: string } | undefined;
+
+      expect(crew?.full_name).toBe("Jorge Pérez");
+      expect(crew?.full_name ?? "").not.toMatch(/^Remote crew/);
+      // Adopted into the applying workspace so it joins the local catalog.
+      expect(crew?.workspace_id).toBe("workspace-metadata");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("rejects project snapshots that do not match the synced entity", () => {
     const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-scope");
 
