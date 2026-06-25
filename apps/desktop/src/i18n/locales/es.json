@@ -2958,7 +2958,7 @@
     "approvalResult": {
       "denied": "Denegado. Este borrador supervisado se detiene aquí y no ejecuta nada.",
       "approvedForSession": "Aprobado por esta sesión. Seguimientos similares en este hilo pueden continuar sin volver a preguntar para este especialista.",
-      "approved": "Aprobado. Este borrador puede continuar bajo supervisión, pero la capa de comandos todavía no ejecuta automáticamente."
+      "approved": "Aprobado. Ejecutando la acción y aplicando los cambios."
     },
     "approvalMode": {
       "supervised": "Supervisado",

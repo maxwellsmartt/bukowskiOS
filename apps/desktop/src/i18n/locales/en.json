@@ -2954,7 +2954,7 @@
     "approvalResult": {
       "denied": "Denied. This supervised draft stops here and nothing executes.",
       "approvedForSession": "Approved for this session. Similar follow-ups in this thread can continue without asking again for this specialist.",
-      "approved": "Approved. This draft can continue under supervision, but the command layer still does not execute automatically."
+      "approved": "Approved. Running the action and applying the changes."
     },
     "approvalMode": {
       "supervised": "Supervised",

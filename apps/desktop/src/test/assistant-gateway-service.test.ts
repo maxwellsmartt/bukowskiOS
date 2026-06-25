@@ -1216,7 +1216,7 @@ describe("assistant gateway service", () => {
     cleanup();
   });
 
-  it("keeps approval-required tools gated in unsupervised mode and executes the exact approved payload", async () => {
+  it("gates approval-required tools in supervised mode and executes the exact approved payload", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-assistant-gateway-exact-tool-approval");
     const secrets = new Map<string, string>();
     const secretStore = {
@@ -1380,7 +1380,7 @@ describe("assistant gateway service", () => {
         workspaceId: "workspace-metadata",
         activePath: "/incidents",
         currentView: "Incidents",
-        requestedApprovalMode: "unsupervised",
+        requestedApprovalMode: "supervised",
       },
     });
 
@@ -1428,6 +1428,154 @@ describe("assistant gateway service", () => {
       approval_decision: "approved",
       approval_scope: "run",
     });
+
+    cleanup();
+  });
+
+  it("executes approval-required write tools directly in unsupervised mode", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-assistant-gateway-unsupervised-exec");
+    const secrets = new Map<string, string>();
+    const secretStore = {
+      hasProviderSecret: (workspaceId: string, providerKey: string) => secrets.has(`${workspaceId}:${providerKey}`),
+      getProviderSecret: (workspaceId: string, providerKey: string) => secrets.get(`${workspaceId}:${providerKey}`) ?? null,
+      setProviderSecret: (workspaceId: string, providerKey: string, secret: string) => {
+        secrets.set(`${workspaceId}:${providerKey}`, secret);
+      },
+      clearProviderSecret: (workspaceId: string, providerKey: string) => {
+        secrets.delete(`${workspaceId}:${providerKey}`);
+      },
+    };
+
+    const configMutations = createAgentMutationService(database, {
+      secretStore,
+      openaiProviderService: {
+        createResponse: async () => ({ ok: true as const, responseId: "noop", status: "completed", outputText: "{}", functionCalls: [] }),
+        testConnection: async () => ({ ok: true as const, status: "healthy" as const, summary: "ok" }),
+      },
+      assistantGatewayService: {
+        sendMessage: async () => {
+          throw new Error("unused");
+        },
+        generateThreadTitle: async () => null,
+        continueApprovedRun: async () => {
+          throw new Error("unused");
+        },
+      },
+    });
+    configMutations.saveAIProviderConfig({
+      commandId: "cmd-openai-unsup-exec",
+      workspaceId: "workspace-metadata",
+      providerKey: "openai",
+      enabled: true,
+      apiKey: "sk-test",
+      defaultModelKey: "openai:gpt-5.4",
+      timeoutMs: 20000,
+      retryCount: 1,
+      baseUrl: "",
+    });
+    database
+      .prepare("UPDATE agents SET provider_key = 'openai', model_key = 'openai:gpt-5.4' WHERE agent_key = 'incidents-maintenance-agent'")
+      .run();
+
+    const executedArgs: Array<Record<string, unknown>> = [];
+    const createIncidentDefinition = {
+      type: "function" as const,
+      name: "create_incident",
+      description: "Create an incident.",
+      parameters: { type: "object", additionalProperties: true },
+      requiresApproval: true,
+    };
+    const toolRegistry = {
+      definitions: [createIncidentDefinition],
+      definitionsFor: (toolNames: readonly string[] | null | undefined) =>
+        toolNames?.includes("create_incident") ? [createIncidentDefinition] : [],
+      requiresApproval: (name: string) => name === "create_incident",
+      requiredPermissionFor: () => null,
+      isAllowed: (name: string, toolNames: readonly string[] | null | undefined) =>
+        toolNames === null || toolNames === undefined ? true : toolNames.includes(name),
+      execute: (_name: string, rawArguments: string) => {
+        const args = JSON.parse(rawArguments) as Record<string, unknown>;
+        executedArgs.push(args);
+        return {
+          trace: { toolName: "create_incident", status: "completed" as const, summary: "Created incident." },
+          result: { payload: { incidentId: "incident-unsup-1" }, summary: "Incident created." },
+        };
+      },
+    };
+
+    let providerCallCount = 0;
+    const gateway = createAssistantGatewayService(database, {
+      secretStore,
+      sessionStore: createAssistantGatewaySessionStore(),
+      toolRegistry,
+      openaiProviderService: {
+        createResponse: async () => {
+          providerCallCount += 1;
+          if (providerCallCount === 1) {
+            return {
+              ok: true as const,
+              responseId: "resp-unsup-supervisor",
+              status: "completed",
+              outputText: JSON.stringify({
+                intent: "create_incident",
+                target_agent: "incidents-maintenance-agent",
+                confidence: 0.98,
+                requires_approval: false,
+                tool_call_requested: true,
+                assistant_reply: "Routing to Incidents.",
+                answer_kind: "informational",
+                draft_run_title: null,
+                draft_run_description: null,
+              }),
+              functionCalls: [],
+            };
+          }
+          if (providerCallCount === 2) {
+            return {
+              ok: true as const,
+              responseId: "resp-unsup-tool",
+              status: "completed",
+              outputText: "",
+              functionCalls: [
+                {
+                  id: "fc-unsup-incident",
+                  type: "function_call" as const,
+                  name: "create_incident",
+                  arguments: JSON.stringify({ asset_id: "asset-canon-c300", description: "Cracked lens." }),
+                  call_id: "call-unsup-incident",
+                },
+              ],
+            };
+          }
+          return {
+            ok: true as const,
+            responseId: "resp-unsup-summary",
+            status: "completed",
+            outputText: "Incident created for the Canon C300.",
+            functionCalls: [],
+          };
+        },
+        testConnection: async () => ({ ok: true as const, status: "healthy" as const, summary: "ok" }),
+      },
+    });
+
+    const result = await gateway.sendMessage({
+      commandId: "cmd-unsup-exec-turn",
+      workspaceId: "workspace-metadata",
+      threadId: "thread-unsup-exec",
+      message: "Create an incident for the Canon C300 cracked lens.",
+      context: {
+        workspaceId: "workspace-metadata",
+        activePath: "/incidents",
+        currentView: "Incidents",
+        requestedApprovalMode: "unsupervised",
+      },
+    });
+
+    // Unsupervised: the write ran immediately, no approval checkpoint.
+    expect(executedArgs).toEqual([{ asset_id: "asset-canon-c300", description: "Cracked lens." }]);
+    expect(result.approvalDecision).not.toBe("pending");
+    expect(result.status).not.toBe("draft_created");
 
     cleanup();
   });

@@ -1827,7 +1827,13 @@ export const createAssistantGatewayService = (
               assertActorMayUseTool(options.toolRegistry, call.name, trustedContext);
 
               const toolRequiresApproval = options.toolRegistry.requiresApproval(call.name);
-              const writeToolCanRunNow = !toolRequiresApproval;
+              // In an unsupervised thread (and when the routed agent is not
+              // pinned to needs_approval), routine write tools execute directly
+              // instead of being deferred for approval — that is what "Sin
+              // supervisión" means. Session-approved / bypass runs likewise run
+              // now. Otherwise the write is deferred for a human checkpoint.
+              const writeToolCanRunNow =
+                !toolRequiresApproval || allowUnsupervised || sessionApprovalApplies || approvalBypassApplies;
 
               if (!writeToolCanRunNow) {
                 const parsedArguments = parseToolArgumentsPreview(call.arguments);
