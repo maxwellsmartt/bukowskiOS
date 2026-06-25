@@ -68,6 +68,14 @@ export type AIGatewayToolContext = {
   currentView?: string | null;
   activeFilters?: Record<string, string>;
   requestedApprovalMode?: AssistantApprovalPreference;
+  /**
+   * Display name the renderer already resolved for the signed-in user (from the
+   * profile / user_metadata / email chain). Used only as the chat turn LABEL —
+   * the security-relevant actor id is still resolved server-side from the JWT.
+   * The main process cannot see the remote user_profiles row, so this hint keeps
+   * the chat label consistent with the rest of the UI.
+   */
+  actorDisplayName?: string | null;
   /** Per-thread model override chosen in the chat header (provider:model). */
   requestedModelKey?: string | null;
   /** Per-thread reasoning effort chosen in the chat header. */

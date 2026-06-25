@@ -806,7 +806,11 @@ export const registerFoundationIpc = ({
 
   const withTrustedAssistantActor = async <T extends AssistantGatewayRequest>(input: T): Promise<T> => {
     const actorUserId = await workspaceAccess.getCurrentUserId("send assistant messages");
-    const actorName = await workspaceAccess.getCurrentActorName();
+    // Prefer the renderer-resolved display name (it can see the remote
+    // user_profiles row that the main process cannot); fall back to the
+    // server-side resolution (local users row / JWT / email).
+    const rendererName = input.context.actorDisplayName?.trim();
+    const actorName = rendererName || (await workspaceAccess.getCurrentActorName());
     return {
       ...input,
       context: {

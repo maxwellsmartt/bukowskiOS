@@ -32,6 +32,7 @@ import type { AssistantChatSession, AssistantChatSessionState } from "@app/provi
 import type { AssistantApprovalPreference, AssistantChatMessageMeta, AssistantChatSnapshot, AssistantGatewayAttachment, AssistantReasoningEffort } from "@contracts";
 
 import { useAssistantChat } from "@app/providers/AssistantChatContext";
+import { useSession } from "@app/providers/SessionProvider";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { requestAgentPermission, reviewAgentRun, transcribeAssistantAudio, useAgentModels } from "@features/agents/useAgentsData";
@@ -610,6 +611,7 @@ export const GlobalAssistantChat = () => {
     toggle,
     workspaceId,
   } = useAssistantChat();
+  const { user } = useSession();
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   // selectedModel holds a real "provider:model" key (or "" = agent default).
@@ -636,6 +638,12 @@ export const GlobalAssistantChat = () => {
     return choices;
   }, [agentModelsData]);
   const selectedModelLabel = modelChoices.find((choice) => choice.modelKey === selectedModel)?.label;
+  // The supervisor's real (possibly user-renamed) name, so the thinking/pending
+  // state shows it instead of the generic "Supervisor Agent".
+  const supervisorName = useMemo(
+    () => agentModelsData?.assignments?.find((assignment) => assignment.isSupervisor)?.displayName?.trim() || t("agents.runs.supervisorAgent"),
+    [agentModelsData, t],
+  );
   const [panelScale, setPanelScale] = useState(1);
   const [isPanelResizing, setIsPanelResizing] = useState(false);
   const [attachments, setAttachments] = useState<AssistantGatewayAttachment[]>([]);
@@ -1122,8 +1130,8 @@ export const GlobalAssistantChat = () => {
       label: t("assistantChat.pending.supervisorReviewing"),
       body: t("assistantChat.pending.routingBody"),
       routedAgentId: null,
-      routedAgentName: t("agents.runs.supervisorAgent"),
-      routedAgentRole: t("agents.runs.supervisorAgent"),
+      routedAgentName: supervisorName,
+      routedAgentRole: supervisorName,
       intentLabel,
       commandStateLabel: t("assistantChat.command.noChangesApplied"),
     } satisfies AssistantChatSessionState;
@@ -1163,6 +1171,7 @@ export const GlobalAssistantChat = () => {
           currentView: resolvedActiveSession.contextLabel,
           activeFilters: {},
           requestedApprovalMode: selectedApproval,
+          actorDisplayName: user?.displayName ?? null,
           requestedModelKey: selectedModel || null,
           requestedReasoningEffort: selectedReasoning,
         },
@@ -1219,8 +1228,8 @@ export const GlobalAssistantChat = () => {
                 ? t("assistantChat.review.sessionApprovalBody")
                 : t("assistantChat.review.approvalBody"),
             routedAgentId: resolvedActiveSession.lastRoutedAgentId,
-            routedAgentName: activeSessionState?.routedAgentName ?? t("agents.runs.supervisorAgent"),
-            routedAgentRole: activeSessionState?.routedAgentRole ?? t("agents.runs.supervisorAgent"),
+            routedAgentName: activeSessionState?.routedAgentName ?? supervisorName,
+            routedAgentRole: activeSessionState?.routedAgentRole ?? supervisorName,
             intentLabel: t("assistantChat.review.decisionRecorded"),
             commandStateLabel: t("assistantChat.command.noChangesApplied"),
             draftRunId: runId,
@@ -1595,7 +1604,7 @@ export const GlobalAssistantChat = () => {
                           <div className="assistant-chat-assigned-agent">
                             <strong>
                               {hasState
-                                ? session.latestState?.routedAgentName ?? t("agents.runs.supervisorAgent")
+                                ? session.latestState?.routedAgentName ?? supervisorName
                                 : t("assistantChat.session.notRoutedYet")}
                             </strong>
                             {hasState && session.latestState?.routedAgentRole ? (
@@ -1694,7 +1703,7 @@ export const GlobalAssistantChat = () => {
                     <div className="assistant-chat-message-meta">
                       <div className="assistant-chat-speaker-meta">
                         <span className={`assistant-chat-speaker-pill${messageState ? ` assistant-chat-speaker-pill-${messageState.tone}` : ""}`}>
-                          {messageState?.routedAgentName ?? t("agents.runs.supervisorAgent")}
+                          {messageState?.routedAgentName ?? supervisorName}
                         </span>
                         {messageState?.routedAgentRole ? (
                           <span className="assistant-chat-speaker-role">{messageState.routedAgentRole}</span>
@@ -1880,7 +1889,7 @@ export const GlobalAssistantChat = () => {
               {isSending && activeSessionState?.tone === "sending" ? (
                 <div className="assistant-chat-inline-status">
                   <div className="assistant-chat-inline-thinking">
-                    <span className="assistant-chat-inline-thinking-label">Supervisor thinking</span>
+                    <span className="assistant-chat-inline-thinking-label">{t("assistantChat.thinkingLabel", { defaultValue: "{{name}} thinking", name: supervisorName })}</span>
                     <span aria-hidden="true" className="assistant-chat-inline-thinking-dots">
                       <span />
                       <span />

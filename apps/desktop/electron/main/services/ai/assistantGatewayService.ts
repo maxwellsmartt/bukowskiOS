@@ -1273,13 +1273,18 @@ export const createAssistantGatewayService = (
       );
     }
 
-    // Per-thread model + reasoning overrides chosen in the chat header. The
-    // model override applies to BOTH the supervisor and the specialist; it is
-    // only honoured when it resolves to a configured, enabled provider with a
-    // key (otherwise we silently keep the agent defaults). Reasoning effort is
-    // passed straight to the provider (OpenAI ignores it on non-reasoning
-    // models).
-    const requestedReasoningEffort = request.context.requestedReasoningEffort ?? null;
+    // Per-thread model override chosen in the chat header. Applies to BOTH the
+    // supervisor and the specialist; only honoured when it resolves to a
+    // configured, enabled provider with a key (otherwise keep the agent
+    // defaults).
+    //
+    // NOTE: reasoning effort is intentionally NOT forwarded to the provider yet.
+    // On reasoning models (gpt-5*/o-series) the Responses API needs the reasoning
+    // items carried through every function-call continuation; sending `reasoning`
+    // without that made the tool-using turns fail with "No tool call found for
+    // function call output" (the supervised answer error) and slowed every turn.
+    // The selector still persists per thread; wiring it correctly (replaying
+    // reasoning items across tool loops) is a follow-up.
     const requestedModelKey = request.context.requestedModelKey?.trim() || null;
     const modelOverride = (() => {
       if (!requestedModelKey) {
@@ -1427,7 +1432,6 @@ export const createAssistantGatewayService = (
         tools: supervisorToolDefinitions,
         toolChoice: "auto",
         maxOutputTokens: 1500,
-        reasoningEffort: requestedReasoningEffort,
         textFormat: orchestrationSchema,
       },
     );
@@ -1584,7 +1588,6 @@ export const createAssistantGatewayService = (
           tools: supervisorToolDefinitions,
           toolChoice: "auto",
           maxOutputTokens: 1500,
-          reasoningEffort: requestedReasoningEffort,
           textFormat: orchestrationSchema,
         },
       );
@@ -1800,7 +1803,6 @@ export const createAssistantGatewayService = (
             tools: targetToolDefinitions,
             toolChoice: specialistMustUseTool ? "required" : "auto",
             maxOutputTokens: 3000,
-            reasoningEffort: requestedReasoningEffort,
           },
         );
         let specialistResult = initialSpecialistProviderResponse.result;
@@ -1925,7 +1927,6 @@ export const createAssistantGatewayService = (
               tools: targetToolDefinitions,
               toolChoice: "auto",
               maxOutputTokens: 3000,
-              reasoningEffort: requestedReasoningEffort,
             },
           );
           specialistResult = nextSpecialistProviderResponse.result;
