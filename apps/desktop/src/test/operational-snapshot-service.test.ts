@@ -219,6 +219,128 @@ describe("operational snapshot service", () => {
     }
   });
 
+  it("applies a project snapshot (with real crew names) even when a crew assignment's department is unresolved", () => {
+    // Regression: a crew assignment whose department_id is not carried by the
+    // snapshot and is not local used to fail the deferred department_id foreign
+    // key, rolling back the ENTIRE project snapshot. That dropped the real crew
+    // names the snapshot carried, so remote machines were stuck showing
+    // "Remote crew xxxxx" placeholders. The whole project must still land, with
+    // the unresolved department reference nulled rather than fatal.
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-crew-ghost-department");
+
+    try {
+      const service = createOperationalSnapshotService(database);
+      const projectId = "project-crew-ghost-dept";
+      const unitId = "unit-crew-ghost-dept-main";
+      const crewId = "crew-ghost-dept-paola";
+      const assignmentId = "assignment-crew-ghost-dept";
+      const timestamp = "2026-05-06T12:30:00.000Z";
+
+      const result = service.applyRemoteSnapshots("workspace-metadata", "project", [
+        {
+          workspace_id: "workspace-metadata",
+          entity_type: "project",
+          entity_id: projectId,
+          updated_at: timestamp,
+          deleted_at: null,
+          snapshot_json: {
+            project: {
+              id: projectId,
+              workspace_id: "workspace-metadata",
+              code: "CGD",
+              name: "Crew Ghost Department",
+              client_name: null,
+              client_id: null,
+              status: "Prep",
+              start_date: "2026-06-01",
+              end_date: "2026-06-10",
+              description: null,
+              color_key: null,
+              production_company_id: null,
+              production_company_name: null,
+              has_preproduction: 0,
+              preproduction_start_date: null,
+              preproduction_end_date: null,
+              archived_at: null,
+              created_at: timestamp,
+              updated_at: timestamp,
+            },
+            units: [
+              {
+                id: unitId,
+                workspace_id: "workspace-metadata",
+                project_id: projectId,
+                code: "MAIN",
+                name: "Main Unit",
+                sort_order: 0,
+                status: "planned",
+                status_source: "derived",
+                color_key: null,
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                notes: null,
+                created_at: timestamp,
+                updated_at: timestamp,
+              },
+            ],
+            unitWindows: [],
+            projectDepartments: [],
+            unitDepartments: [],
+            departments: [],
+            crewMembers: [
+              {
+                id: crewId,
+                workspace_id: "workspace-metadata",
+                full_name: "Paola Operadora",
+                role_label: "VTR Operator",
+                email: null,
+                phone: null,
+                notes: null,
+                is_active: 1,
+                created_at: timestamp,
+                updated_at: timestamp,
+              },
+            ],
+            crewAssignments: [
+              {
+                id: assignmentId,
+                workspace_id: "workspace-metadata",
+                project_unit_id: unitId,
+                department_id: "dept-ghost-9000",
+                crew_member_id: crewId,
+                role_label: "VTR Operator",
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                notes: null,
+                created_at: timestamp,
+                updated_at: timestamp,
+              },
+            ],
+          },
+        },
+      ]);
+
+      expect(result.errors).toEqual([]);
+      expect(result.appliedCount).toBe(1);
+
+      const crew = database
+        .prepare("SELECT full_name FROM crew_members WHERE id = ?")
+        .get(crewId) as { full_name: string } | undefined;
+      // The real name lands — no "Remote crew" placeholder.
+      expect(crew?.full_name).toBe("Paola Operadora");
+      expect(crew?.full_name ?? "").not.toMatch(/^Remote crew/);
+
+      const assignment = database
+        .prepare("SELECT crew_member_id, department_id FROM project_unit_crew_assignments WHERE id = ?")
+        .get(assignmentId) as { crew_member_id: string; department_id: string | null } | undefined;
+      expect(assignment?.crew_member_id).toBe(crewId);
+      // The unresolved department reference is nulled, not fatal.
+      expect(assignment?.department_id).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
   it("adopts equivalent local catalog ids before applying a project snapshot", () => {
     const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-catalog-rekey");
 

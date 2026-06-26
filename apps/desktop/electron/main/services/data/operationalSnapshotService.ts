@@ -576,9 +576,16 @@ const resolveProjectSnapshot = (db: DatabaseSync, workspaceId: string, projectId
   const unitDepartments = unitIds.length
     ? selectMany(db, `SELECT * FROM project_unit_departments WHERE project_unit_id IN (${placeholders})`, ...unitIds)
     : [];
+  // The snapshot must carry every department it references, including the ones a
+  // crew assignment points to directly. Collecting only the matrix departments
+  // (project/unit) meant a crew assignment with a department outside those
+  // matrices shipped without its department row, so applying the snapshot on
+  // another machine hit a project_unit_crew_assignments.department_id foreign key
+  // error and rolled back the WHOLE project — dropping the real crew names, which
+  // is exactly why remote machines fell back to "Remote crew" placeholders.
   const departmentIds = [
     ...new Set(
-      [...projectDepartments, ...unitDepartments]
+      [...projectDepartments, ...unitDepartments, ...crewAssignments]
         .map((row) => String(row.department_id ?? ""))
         .filter(Boolean),
     ),
@@ -951,7 +958,22 @@ const applyProjectSnapshot = (
         );
         createdPlaceholderCrew = true;
       }
-      upsertCrewAssignmentRow(db, row);
+
+      // Guard the optional department reference. If this machine can't resolve the
+      // assignment's department (adopting a legacy/equivalent row when possible),
+      // null the reference instead of letting a single deferred foreign-key error
+      // roll back the entire project snapshot — which would also strip every real
+      // crew name and leave "Remote crew" placeholders behind. A later snapshot or
+      // catalog pull restores the department once it lands locally.
+      const assignmentRow = { ...row };
+      const assignmentDepartmentId = toStringId(assignmentRow.department_id);
+      if (
+        assignmentDepartmentId &&
+        !adoptLegacyDepartmentReference(db, context.workspaceId, assignmentDepartmentId)
+      ) {
+        assignmentRow.department_id = null;
+      }
+      upsertCrewAssignmentRow(db, assignmentRow);
     } catch {
       logger.warn("Skipped remote project crew assignment because related crew is unavailable.", { id: row.id });
     }
