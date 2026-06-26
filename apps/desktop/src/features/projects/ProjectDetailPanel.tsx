@@ -18,7 +18,7 @@ import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { formatProjectAssignmentInline } from "@shared/lib/assetQuantityPresentation";
 import { projectStatusTone, resolveProjectColor } from "@shared/lib/projectColors";
-import { cleanDisplay, isPlaceholderValue } from "@shared/lib/displayValue";
+import { isPlaceholderValue } from "@shared/lib/displayValue";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { hasFinanceAccess } from "@shared/lib/financeAccess";
 
@@ -90,6 +90,17 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
   }
 
   const project = data.project;
+  // Operational triage data for the "needs attention" panel: schedule conflicts
+  // (crew/asset double-bookings surfaced per unit) and still-open incidents.
+  const openIncidents = data.incidents.filter(
+    (incident) => incident.status === "Open" || incident.status === "In review",
+  );
+  const conflictUnits = data.units.filter((unit) => unit.conflictCount > 0);
+  const totalConflicts = conflictUnits.reduce((sum, unit) => sum + unit.conflictCount, 0);
+  const attentionCount = conflictUnits.length + openIncidents.length;
+  const MAX_ATTENTION_INCIDENTS = 4;
+  const attentionIncidents = openIncidents.slice(0, MAX_ATTENTION_INCIDENTS);
+  const hiddenIncidentCount = openIncidents.length - attentionIncidents.length;
   const canCloseProject = project.status !== "Wrapped";
   const projectDescription = (project.description ?? "").trim();
   const displayProjectDescription =
@@ -117,8 +128,15 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
     },
     {
       label: t("projects.detail.signals.incidents"),
-      value: t("projects.detail.signals.incidentsValue", { count: project.incidentCount }),
-      tone: project.incidentCount ? "critical" : "success",
+      value: t("projects.detail.signals.incidentsValue", { count: openIncidents.length }),
+      tone: openIncidents.length ? "critical" : "success",
+    },
+    {
+      label: t("projects.detail.signals.conflicts"),
+      value: totalConflicts
+        ? t("projects.detail.signals.conflictsValue", { count: totalConflicts })
+        : t("projects.detail.signals.conflictsNone"),
+      tone: totalConflicts ? "critical" : "success",
     },
   ] as const;
   const quickActions = [
@@ -261,30 +279,88 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
           ))}
         </div>
 
-        <div className="compact-summary-grid project-overview-summary">
-          <div className="summary-row">
-            <span className="summary-label">{t("projects.detail.summary.assignedAssets")}</span>
-            <span className="summary-value">{project.assetCount}</span>
+        <section className="project-attention" aria-label={t("projects.detail.attention.title")}>
+          <div className="project-attention-head">
+            <strong>{t("projects.detail.attention.title")}</strong>
+            {attentionCount > 0 ? (
+              <StatusBadge tone="critical">{t("projects.detail.attention.badge", { count: attentionCount })}</StatusBadge>
+            ) : (
+              <StatusBadge tone="success">{t("projects.detail.attention.allClearBadge")}</StatusBadge>
+            )}
           </div>
-          <div className="summary-row">
-            <span className="summary-label">{t("projects.detail.summary.openIncidents")}</span>
-            <span className="summary-value">{project.incidentCount}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-label">{t("projects.detail.summary.client")}</span>
-            <span className="summary-value">{cleanDisplay(project.client)}</span>
-          </div>
-          {canAccessFinance ? (
-            <div className="summary-row">
-              <span className="summary-label">{t("projects.detail.summary.exposure")}</span>
-              <span className="summary-value">{project.exposure}</span>
+
+          {attentionCount === 0 ? (
+            <div className="project-attention-clear">
+              <CheckCircle2 size={18} aria-hidden="true" />
+              <div>
+                <strong>{t("projects.detail.attention.allClearTitle")}</strong>
+                <span>{t("projects.detail.attention.allClearBody")}</span>
+              </div>
             </div>
-          ) : null}
-          <div className="summary-row">
-            <span className="summary-label">{t("projects.detail.summary.timeline")}</span>
-            <span className="summary-value">{data.schedule?.windowLabel ?? t("projects.fallbacks.unscheduled")}</span>
-          </div>
-        </div>
+          ) : (
+            <div className="project-attention-groups">
+              {conflictUnits.length ? (
+                <div className="project-attention-group">
+                  <span className="project-attention-group-label">{t("projects.detail.attention.conflictsHeading")}</span>
+                  <div className="queue-list">
+                    {conflictUnits.map((unit) => (
+                      <button
+                        key={unit.id}
+                        className="queue-item queue-item-button"
+                        onClick={() => navigate(`/projects/${project.id}/info`)}
+                        type="button"
+                      >
+                        <div className="identity-cell">
+                          <span className="identity-title">{unit.code} · {unit.name}</span>
+                          <span className="identity-meta">
+                            {unit.conflictSummary ?? t("projects.units.conflicts", { count: unit.conflictCount })}
+                          </span>
+                        </div>
+                        <StatusBadge tone="critical">{t("projects.units.conflicts", { count: unit.conflictCount })}</StatusBadge>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {openIncidents.length ? (
+                <div className="project-attention-group">
+                  <span className="project-attention-group-label">{t("projects.detail.attention.incidentsHeading")}</span>
+                  <div className="queue-list">
+                    {attentionIncidents.map((incident) => (
+                      <button
+                        key={incident.id}
+                        className="queue-item queue-item-button"
+                        onClick={() => navigate(`/projects/${project.id}/incidents`)}
+                        type="button"
+                      >
+                        <div className="identity-cell">
+                          <span className="identity-title">{incident.title}</span>
+                          <span className="identity-meta">
+                            {t(`incidents.severity.${incident.severity}`, { defaultValue: incident.severity })}
+                            {incident.responsible && !isPlaceholderValue(incident.responsible) ? ` · ${incident.responsible}` : ""}
+                          </span>
+                        </div>
+                        <StatusBadge tone="critical">
+                          {t(`incidents.statuses.${incident.status}`, { defaultValue: incident.status })}
+                        </StatusBadge>
+                      </button>
+                    ))}
+                  </div>
+                  {hiddenIncidentCount > 0 ? (
+                    <button
+                      className="project-attention-more"
+                      onClick={() => navigate(`/projects/${project.id}/incidents`)}
+                      type="button"
+                    >
+                      {t("projects.detail.attention.moreIncidents", { count: hiddenIncidentCount })}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </section>
 
         <div className="project-quick-action-grid">
           {quickActions.map((action) => (

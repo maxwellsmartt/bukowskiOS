@@ -4439,7 +4439,23 @@
         "schedule": "Ventana",
         "title": "Señales operativas",
         "units": "Unidades",
-        "unitsValue": "{{active}} activas · {{planned}} planificadas"
+        "unitsValue": "{{active}} activas · {{planned}} planificadas",
+        "conflicts": "Conflictos",
+        "conflictsValue_one": "{{count}} sin resolver",
+        "conflictsValue_other": "{{count}} sin resolver",
+        "conflictsNone": "Sin conflictos"
+      },
+      "attention": {
+        "title": "Necesita atención",
+        "badge_one": "{{count}} pendiente",
+        "badge_other": "{{count}} pendientes",
+        "allClearBadge": "Al día",
+        "allClearTitle": "Todo en orden",
+        "allClearBody": "No hay conflictos de agenda ni incidentes abiertos en este proyecto.",
+        "conflictsHeading": "Conflictos de agenda",
+        "incidentsHeading": "Incidentes abiertos",
+        "moreIncidents_one": "+{{count}} incidente más",
+        "moreIncidents_other": "+{{count}} incidentes más"
       },
       "quickActions": {
         "assets": "Equipos",

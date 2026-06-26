@@ -4435,7 +4435,23 @@
         "schedule": "Window",
         "title": "Operational signals",
         "units": "Units",
-        "unitsValue": "{{active}} active · {{planned}} planned"
+        "unitsValue": "{{active}} active · {{planned}} planned",
+        "conflicts": "Conflicts",
+        "conflictsValue_one": "{{count}} unresolved",
+        "conflictsValue_other": "{{count}} unresolved",
+        "conflictsNone": "No conflicts"
+      },
+      "attention": {
+        "title": "Needs attention",
+        "badge_one": "{{count}} pending",
+        "badge_other": "{{count}} pending",
+        "allClearBadge": "All caught up",
+        "allClearTitle": "All clear",
+        "allClearBody": "No schedule conflicts or open incidents on this project.",
+        "conflictsHeading": "Schedule conflicts",
+        "incidentsHeading": "Open incidents",
+        "moreIncidents_one": "+{{count}} more incident",
+        "moreIncidents_other": "+{{count}} more incidents"
       },
       "quickActions": {
         "assets": "Assets",
