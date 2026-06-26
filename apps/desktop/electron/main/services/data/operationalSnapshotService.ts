@@ -237,6 +237,35 @@ const rowExists = (db: DatabaseSync, table: string, id: unknown) => {
   return Boolean(row);
 };
 
+/**
+ * Returns a copy of a snapshot row with any peripheral foreign key that can't be
+ * resolved locally replaced by its fallback (null by default). A not-yet-synced
+ * teammate or department must never make the whole snapshot row fail its foreign
+ * keys and freeze the operational pull cursor — the reference backfills on a
+ * later snapshot once the parent lands. Structural parents (asset, project,
+ * manufacturer) are NOT passed here; those still defer so they retry.
+ */
+const nullMissingReferences = (
+  db: DatabaseSync,
+  row: Record<string, unknown>,
+  references: Array<{ column: string; table: string; fallback?: string | null }>,
+  context: { id: unknown; kind: string },
+) => {
+  const safe = { ...row };
+  for (const reference of references) {
+    const value = safe[reference.column];
+    if (value && !rowExists(db, reference.table, value)) {
+      logger.warn(`Applied remote ${context.kind} without an unresolved ${reference.column}.`, {
+        id: context.id,
+        column: reference.column,
+        value,
+      });
+      safe[reference.column] = reference.fallback ?? null;
+    }
+  }
+  return safe;
+};
+
 const findEquivalentCrewAssignmentId = (db: DatabaseSync, row: Record<string, unknown>) => {
   if (!row.id || !row.project_unit_id || !row.crew_member_id) return null;
   const existing = db
@@ -1035,15 +1064,60 @@ const applyPackingSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown
 const applyIncidentSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown>) => {
   const incident = snapshot.incident as Record<string, unknown> | undefined;
   if (!incident) throw new Error("Incident snapshot is missing incident.");
-  upsertRow(db, "incidents", incident);
-  for (const row of (snapshot.files as Record<string, unknown>[] | undefined) ?? []) upsertRow(db, "incident_files", row);
+  // Structural parents must exist — defer (retry) until they sync.
+  if (incident.asset_id && !rowExists(db, "assets", incident.asset_id)) {
+    throw new Error(`Incident references unavailable asset ${String(incident.asset_id)}; snapshot deferred.`);
+  }
+  if (incident.project_id && !rowExists(db, "projects", incident.project_id)) {
+    throw new Error(`Incident references unavailable project ${String(incident.project_id)}; snapshot deferred.`);
+  }
+  const safeIncident = nullMissingReferences(
+    db,
+    incident,
+    [
+      { column: "department_id", table: "departments" },
+      { column: "assignment_id", table: "asset_assignments" },
+      { column: "responsible_user_id", table: "users" },
+      // reported_by_user_id is NOT NULL; fall back to the local operator rather
+      // than failing the row when the reporter hasn't synced to this machine.
+      { column: "reported_by_user_id", table: "users", fallback: "user-ops" },
+    ],
+    { id: incident.id, kind: "incident" },
+  );
+  upsertRow(db, "incidents", safeIncident);
+  for (const row of (snapshot.files as Record<string, unknown>[] | undefined) ?? []) {
+    const safeFile = nullMissingReferences(
+      db,
+      row,
+      [{ column: "uploaded_by_user_id", table: "users" }],
+      { id: row.id, kind: "incident file" },
+    );
+    upsertRow(db, "incident_files", safeFile);
+  }
 };
 
 const applyRmaSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown>) => {
   const rmaCase = snapshot.rmaCase as Record<string, unknown> | undefined;
   if (!rmaCase) throw new Error("RMA snapshot is missing rmaCase.");
-  upsertRow(db, "rma_cases", rmaCase);
-  for (const row of (snapshot.assets as Record<string, unknown>[] | undefined) ?? []) upsertRow(db, "rma_case_assets", row);
+  // manufacturer_id is NOT NULL with no safe fallback — defer until the catalog
+  // pull delivers the manufacturer.
+  if (rmaCase.manufacturer_id && !rowExists(db, "manufacturers", rmaCase.manufacturer_id)) {
+    throw new Error(`RMA references unavailable manufacturer ${String(rmaCase.manufacturer_id)}; snapshot deferred.`);
+  }
+  const safeCase = nullMissingReferences(
+    db,
+    rmaCase,
+    // created_by_user_id is NOT NULL; fall back to the local operator.
+    [{ column: "created_by_user_id", table: "users", fallback: "user-ops" }],
+    { id: rmaCase.id, kind: "RMA case" },
+  );
+  upsertRow(db, "rma_cases", safeCase);
+  for (const row of (snapshot.assets as Record<string, unknown>[] | undefined) ?? []) {
+    if (!rowExists(db, "assets", row.asset_id)) {
+      throw new Error(`RMA case references unavailable asset ${String(row.asset_id)}; snapshot deferred.`);
+    }
+    upsertRow(db, "rma_case_assets", row);
+  }
 };
 
 /**

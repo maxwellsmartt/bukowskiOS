@@ -341,6 +341,71 @@ describe("operational snapshot service", () => {
     }
   });
 
+  it("applies an incident snapshot with unresolved user/department references instead of freezing", () => {
+    // Hardening: an incident whose reporter, responsible or department hasn't
+    // synced to this machine must still apply (peripheral refs nulled, the
+    // required reporter falling back to the local operator) rather than failing
+    // its foreign keys and wedging the incident pull cursor.
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-incident-refs");
+
+    try {
+      const service = createOperationalSnapshotService(database);
+      const incidentId = "incident-remote-refs";
+      const timestamp = "2026-05-06T13:00:00.000Z";
+
+      const result = service.applyRemoteSnapshots("workspace-metadata", "incident", [
+        {
+          workspace_id: "workspace-metadata",
+          entity_type: "incident",
+          entity_id: incidentId,
+          updated_at: timestamp,
+          deleted_at: null,
+          snapshot_json: {
+            incident: {
+              id: incidentId,
+              workspace_id: "workspace-metadata",
+              asset_id: null,
+              project_id: null,
+              department_id: "dept-not-synced",
+              assignment_id: null,
+              reported_by_user_id: "user-not-synced",
+              responsible_user_id: "user-not-synced",
+              incident_type: "Damage",
+              severity: "Medium",
+              status: "Open",
+              title: "Remote incident",
+              description: "Reported from another machine",
+              reported_at: timestamp,
+              resolved_at: null,
+              cost_estimate: null,
+              currency: null,
+              financial_status: null,
+              notes: null,
+              created_at: timestamp,
+              updated_at: timestamp,
+            },
+            files: [],
+          },
+        },
+      ]);
+
+      expect(result.errors).toEqual([]);
+      expect(result.appliedCount).toBe(1);
+
+      const incident = database
+        .prepare("SELECT reported_by_user_id, responsible_user_id, department_id FROM incidents WHERE id = ?")
+        .get(incidentId) as
+        | { reported_by_user_id: string; responsible_user_id: string | null; department_id: string | null }
+        | undefined;
+      // The required reporter falls back to the local operator; peripheral refs null out.
+      expect(incident?.reported_by_user_id).toBe("user-ops");
+      expect(incident?.responsible_user_id).toBeNull();
+      expect(incident?.department_id).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
   it("adopts equivalent local catalog ids before applying a project snapshot", () => {
     const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-catalog-rekey");
 
