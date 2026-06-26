@@ -16,6 +16,8 @@ import type {
   AgentRosterRow,
   AgentRunRow,
   AddDepartmentToProjectUnitInput,
+  ApplyAssetDuplicateAuditCommand,
+  ApplyAssetDuplicateAuditResult,
   AssignAgentModelCommand,
   ArchiveAssetCommand,
   ArchiveAssetsCommand,
@@ -78,6 +80,7 @@ import type {
   AppUsersSnapshot,
   AppUsersSnapshotQuery,
   AssetsOverviewSnapshot,
+  AssetDuplicateAuditPreview,
   CreateAgentCommand,
   CreateAppUserCommand,
   DeleteAppUserCommand,
@@ -492,6 +495,8 @@ const bukowskiAssets = {
   getList: (query?: AssetListQuery) => ipcRenderer.invoke(ipcChannels.assets.getList, query) as Promise<AssetListRow[]>,
   getSummary: (query?: AssetWorkspaceQuery) => ipcRenderer.invoke(ipcChannels.assets.getSummary, query) as Promise<AssetSummarySnapshot>,
   getOverview: (query?: AssetWorkspaceQuery) => ipcRenderer.invoke(ipcChannels.assets.getOverview, query) as Promise<AssetsOverviewSnapshot>,
+  getDuplicateAudit: (query?: AssetWorkspaceQuery) =>
+    ipcRenderer.invoke(ipcChannels.assets.getDuplicateAudit, query) as Promise<AssetDuplicateAuditPreview>,
   getDetail: (assetId: string) =>
     ipcRenderer.invoke(ipcChannels.assets.getDetail, assetId) as Promise<AssetDetailSnapshot>,
   uploadFiles: (assetId: string) =>
@@ -513,6 +518,8 @@ const bukowskiAssets = {
     ipcRenderer.invoke(ipcChannels.assets.archiveMany, input) as Promise<ArchiveAssetsResult>,
   reconcileQuantities: (input: ReconcileAssetQuantitiesCommand) =>
     ipcRenderer.invoke(ipcChannels.assets.reconcileQuantities, input) as Promise<ReconcileAssetQuantitiesResult>,
+  applyDuplicateAudit: (input: ApplyAssetDuplicateAuditCommand) =>
+    ipcRenderer.invoke(ipcChannels.assets.applyDuplicateAudit, input) as Promise<ApplyAssetDuplicateAuditResult>,
 };
 
 const bukowskiPacking = {

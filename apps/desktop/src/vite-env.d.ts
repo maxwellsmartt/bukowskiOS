@@ -15,6 +15,8 @@ import type {
   AgentRosterRow,
   AgentRunRow,
   AddDepartmentToProjectUnitInput,
+  ApplyAssetDuplicateAuditCommand,
+  ApplyAssetDuplicateAuditResult,
   ArchiveAssetCommand,
   ArchiveProjectInput,
   AssetListQuery,
@@ -53,6 +55,7 @@ import type {
   AppUsersSnapshot,
   AppUsersSnapshotQuery,
   AssetsOverviewSnapshot,
+  AssetDuplicateAuditPreview,
   CreateAgentCommand,
   CreateAppUserCommand,
   DeleteAppUserCommand,
@@ -352,6 +355,7 @@ declare global {
       getList: (query?: AssetListQuery) => Promise<AssetListRow[]>;
       getSummary: (query?: AssetWorkspaceQuery) => Promise<AssetSummarySnapshot>;
       getOverview: (query?: AssetWorkspaceQuery) => Promise<AssetsOverviewSnapshot>;
+      getDuplicateAudit: (query?: AssetWorkspaceQuery) => Promise<AssetDuplicateAuditPreview>;
       getDetail: (assetId: string) => Promise<AssetDetailSnapshot>;
       uploadFiles: (assetId: string) => Promise<FileUploadMutationResult>;
       uploadImages: (assetId: string) => Promise<FileUploadMutationResult>;
@@ -363,6 +367,7 @@ declare global {
       archive: (input: ArchiveAssetCommand) => Promise<AssetEditorMutationResult>;
       archiveMany: (input: ArchiveAssetsCommand) => Promise<ArchiveAssetsResult>;
       reconcileQuantities: (input: ReconcileAssetQuantitiesCommand) => Promise<ReconcileAssetQuantitiesResult>;
+      applyDuplicateAudit: (input: ApplyAssetDuplicateAuditCommand) => Promise<ApplyAssetDuplicateAuditResult>;
     };
     bukowskiPacking?: {
       getList: (query?: PackingSlipListQuery) => Promise<PackingSlipRow[]>;

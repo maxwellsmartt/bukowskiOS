@@ -1,6 +1,9 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
+  ApplyAssetDuplicateAuditCommand,
+  ApplyAssetDuplicateAuditResult,
+  AssetDuplicateAuditGroup,
   ArchiveAssetCommand,
   ArchiveAssetsCommand,
   ArchiveAssetsResult,
@@ -13,6 +16,7 @@ import type {
   UpdateAssetCommand,
 } from "@contracts";
 
+import { buildAssetDuplicateAuditPreview } from "./assetDuplicateAuditService";
 import { createCodeGenerationService } from "./codeGenerationService";
 import { assertProjectUnitSupportsOperationalFlow } from "./projectScheduling";
 
@@ -2396,6 +2400,350 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         input.sourceChannel,
         now,
         error instanceof Error ? error.message : "Unknown asset quantity reconciliation error",
+      );
+      throw error;
+    }
+  },
+
+  applyAssetDuplicateAudit(input: ApplyAssetDuplicateAuditCommand): ApplyAssetDuplicateAuditResult {
+    const existingReceipt = db
+      .prepare("SELECT outcome_status, error_message FROM command_receipts WHERE command_id = ? LIMIT 1")
+      .get(input.commandId) as { outcome_status: string; error_message: string | null } | undefined;
+
+    if (existingReceipt?.outcome_status === "success") {
+      return {
+        commandId: input.commandId,
+        appliedGroups: 0,
+        archivedAssets: 0,
+        reconciledAssets: 0,
+        skippedGroups: 0,
+        repeated: true,
+        summary: "This duplicate cleanup command was already applied.",
+      };
+    }
+
+    if (existingReceipt?.outcome_status === "failed") {
+      throw new Error(buildFailedCommandMessage("asset duplicate cleanup", existingReceipt.error_message));
+    }
+
+    const requestedGroupIds = Array.from(new Set(input.groupIds.map((groupId) => groupId.trim()).filter(Boolean)));
+    if (!requestedGroupIds.length) {
+      throw new Error("Select at least one duplicate group to clean up.");
+    }
+
+    const preview = buildAssetDuplicateAuditPreview(db, input.workspaceId);
+    const requestedGroups = requestedGroupIds
+      .map((groupId) => preview.groups.find((group) => group.id === groupId))
+      .filter((group): group is AssetDuplicateAuditGroup => Boolean(group));
+    const eligibleGroups = requestedGroups.filter((group) => group.strategy !== "review" && !group.blockers.length);
+    if (!eligibleGroups.length) {
+      throw new Error("No selected duplicate groups are safe to apply. Review blockers before cleaning up.");
+    }
+
+    const duplicateAssetIds = eligibleGroups.flatMap((group) => group.duplicateAssetIds);
+    const archivableRows = loadArchivableAssets(db, input.workspaceId, duplicateAssetIds);
+    const archivableById = new Map(archivableRows.map((row) => [row.id, row]));
+    const missingArchiveIds = duplicateAssetIds.filter((assetId) => !archivableById.has(assetId));
+    if (missingArchiveIds.length) {
+      throw new Error(`${missingArchiveIds.length} duplicate asset${missingArchiveIds.length === 1 ? "" : "s"} changed before cleanup. Refresh the audit and try again.`);
+    }
+    const blockers = archivableRows.map(explainArchiveBlocker).filter((message): message is string => Boolean(message));
+    if (blockers.length) {
+      throw new Error(summarizeBlockers(blockers));
+    }
+
+    const now = new Date().toISOString();
+    let archivedAssets = 0;
+    let reconciledAssets = 0;
+    let appliedGroups = 0;
+
+    db.exec("BEGIN");
+    try {
+      for (const group of eligibleGroups) {
+        const canonicalItem = group.items.find((item) => item.id === group.canonicalAssetId);
+        if (!canonicalItem) {
+          continue;
+        }
+
+        if (group.strategy === "reconcile_quantity" && group.totalQuantityAfter && group.totalQuantityAfter !== canonicalItem.totalQuantity) {
+          const canonicalState = db
+            .prepare(
+              `
+                SELECT
+                  assets.id,
+                  assets.name,
+                  asset_current_state.version,
+                  asset_current_state.current_location_id,
+                  asset_current_state.current_project_id,
+                  asset_current_state.current_department_id,
+                  asset_current_state.assigned_quantity,
+                  asset_current_state.checked_out_quantity,
+                  asset_current_state.available_quantity,
+                  asset_current_state.total_quantity
+                FROM assets
+                JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+                WHERE assets.workspace_id = ?
+                  AND assets.id = ?
+                  AND assets.is_active = 1
+                LIMIT 1
+              `,
+            )
+            .get(input.workspaceId, group.canonicalAssetId) as
+            | {
+                id: string;
+                name: string;
+                version: number;
+                current_location_id: string | null;
+                current_project_id: string | null;
+                current_department_id: string | null;
+                assigned_quantity: number;
+                checked_out_quantity: number;
+                available_quantity: number;
+                total_quantity: number;
+              }
+            | undefined;
+
+          if (!canonicalState) {
+            continue;
+          }
+
+          const reservedQuantity = canonicalState.assigned_quantity + canonicalState.checked_out_quantity;
+          if (group.totalQuantityAfter < reservedQuantity) {
+            throw new Error(`${canonicalState.name} cannot be reconciled below its assigned or checked-out quantity.`);
+          }
+
+          const reconcileEventId = `event-${input.commandId}-reconcile-${group.canonicalAssetId}`;
+          const nextAvailableQuantity = Math.max(0, group.totalQuantityAfter - reservedQuantity);
+          const reconcileMetadataJson = JSON.stringify({
+            kind: "duplicate_quantity_reconciled",
+            duplicateAuditGroupId: group.id,
+            duplicateAssetIds: group.duplicateAssetIds,
+            previousTotalQuantity: canonicalState.total_quantity,
+            nextTotalQuantity: group.totalQuantityAfter,
+            previousAvailableQuantity: canonicalState.available_quantity,
+            nextAvailableQuantity,
+            reasons: group.reasons,
+          });
+
+          db.prepare(
+            `
+              INSERT INTO asset_events (
+                id,
+                workspace_id,
+                asset_id,
+                assignment_id,
+                project_id,
+                department_id,
+                performed_by_user_id,
+                event_type,
+                location_id,
+                from_location_id,
+                to_location_id,
+                event_timestamp,
+                command_id,
+                actor_type,
+                source_channel,
+                notes,
+                metadata_json,
+                created_at
+              )
+              VALUES (?, ?, ?, NULL, ?, ?, ?, 'inventory_reconciled', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `,
+          ).run(
+            reconcileEventId,
+            input.workspaceId,
+            group.canonicalAssetId,
+            canonicalState.current_project_id,
+            canonicalState.current_department_id,
+            defaultActorUserId,
+            canonicalState.current_location_id,
+            canonicalState.current_location_id,
+            canonicalState.current_location_id,
+            now,
+            input.commandId,
+            input.actorType,
+            input.sourceChannel,
+            `Consolidated duplicate stock into ${canonicalState.name}: ${canonicalState.total_quantity} → ${group.totalQuantityAfter}.`,
+            reconcileMetadataJson,
+            now,
+          );
+
+          db.prepare(
+            `
+              UPDATE asset_current_state
+              SET
+                total_quantity = ?,
+                available_quantity = ?,
+                last_event_id = ?,
+                version = ?,
+                updated_at = ?
+              WHERE asset_id = ?
+            `,
+          ).run(group.totalQuantityAfter, nextAvailableQuantity, reconcileEventId, canonicalState.version + 1, now, group.canonicalAssetId);
+          db.prepare("UPDATE assets SET updated_at = ? WHERE id = ?").run(now, group.canonicalAssetId);
+          db.prepare(
+            `
+              INSERT INTO sync_outbox (
+                id,
+                workspace_id,
+                entity_type,
+                entity_id,
+                event_id,
+                operation_type,
+                payload_json,
+                status,
+                attempt_count,
+                last_error,
+                next_retry_at,
+                created_at,
+                updated_at
+              )
+              VALUES (?, ?, 'asset_event', ?, ?, 'upsert', ?, 'pending', 0, NULL, NULL, ?, ?)
+            `,
+          ).run(`outbox-${reconcileEventId}`, input.workspaceId, group.canonicalAssetId, reconcileEventId, reconcileMetadataJson, now, now);
+          reconciledAssets += 1;
+        }
+
+        for (const duplicateAssetId of group.duplicateAssetIds) {
+          const row = archivableById.get(duplicateAssetId);
+          if (!row) {
+            continue;
+          }
+          const archiveEventId = `event-${input.commandId}-archive-${row.id}`;
+          const archiveMetadataJson = JSON.stringify({
+            kind: "duplicate_asset_archived",
+            duplicateAuditGroupId: group.id,
+            canonicalAssetId: group.canonicalAssetId,
+            strategy: group.strategy,
+            reasons: group.reasons,
+          });
+
+          db.prepare("UPDATE assets SET is_active = 0, updated_at = ? WHERE id = ?").run(now, row.id);
+          db.prepare(
+            `
+              INSERT INTO asset_events (
+                id,
+                workspace_id,
+                asset_id,
+                assignment_id,
+                project_id,
+                department_id,
+                performed_by_user_id,
+                event_type,
+                location_id,
+                from_location_id,
+                to_location_id,
+                event_timestamp,
+                command_id,
+                actor_type,
+                source_channel,
+                notes,
+                metadata_json,
+                created_at
+              )
+              VALUES (?, ?, ?, NULL, ?, ?, ?, 'status_changed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `,
+          ).run(
+            archiveEventId,
+            input.workspaceId,
+            row.id,
+            row.current_project_id,
+            row.current_department_id,
+            defaultActorUserId,
+            row.current_location_id,
+            row.current_location_id,
+            row.current_location_id,
+            now,
+            input.commandId,
+            input.actorType,
+            input.sourceChannel,
+            `Archived duplicate ${row.name}; canonical asset is ${canonicalItem.code}.`,
+            archiveMetadataJson,
+            now,
+          );
+          db.prepare(
+            `
+              UPDATE asset_current_state
+              SET last_event_id = ?, version = ?, updated_at = ?
+              WHERE asset_id = ?
+            `,
+          ).run(archiveEventId, row.version + 1, now, row.id);
+          db.prepare(
+            `
+              INSERT INTO sync_outbox (
+                id,
+                workspace_id,
+                entity_type,
+                entity_id,
+                event_id,
+                operation_type,
+                payload_json,
+                status,
+                attempt_count,
+                last_error,
+                next_retry_at,
+                created_at,
+                updated_at
+              )
+              VALUES (?, ?, 'asset_event', ?, ?, 'upsert', ?, 'pending', 0, NULL, NULL, ?, ?)
+            `,
+          ).run(`outbox-${archiveEventId}`, input.workspaceId, row.id, archiveEventId, archiveMetadataJson, now, now);
+          archivedAssets += 1;
+        }
+
+        appliedGroups += 1;
+      }
+
+      db.prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'success', NULL)
+        `,
+      ).run(input.commandId, input.workspaceId, defaultActorUserId, input.actorType, input.sourceChannel, now);
+
+      db.exec("COMMIT");
+      return {
+        commandId: input.commandId,
+        appliedGroups,
+        archivedAssets,
+        reconciledAssets,
+        skippedGroups: requestedGroupIds.length - appliedGroups,
+        repeated: false,
+        summary: `${appliedGroups} duplicate group${appliedGroups === 1 ? "" : "s"} cleaned up. ${archivedAssets} duplicate asset${archivedAssets === 1 ? "" : "s"} archived.`,
+      };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      db.prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'failed', ?)
+        `,
+      ).run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        error instanceof Error ? error.message : "Unknown asset duplicate cleanup error",
       );
       throw error;
     }

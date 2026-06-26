@@ -81,6 +81,58 @@ export type AssetsOverviewSnapshot = {
   recentMovements: RecentMovementRow[];
 };
 
+export type AssetDuplicateAuditStrategy = "archive_duplicates" | "reconcile_quantity" | "review";
+
+export type AssetDuplicateAuditConfidence = "high" | "medium" | "review";
+
+export type AssetDuplicateAuditItem = {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  location: string;
+  project: string;
+  projectStatus: string | null;
+  serialNumber: string;
+  qrCode: string;
+  totalQuantity: number;
+  availableQuantity: number;
+  assignedQuantity: number;
+  checkedOutQuantity: number;
+  custody: string;
+  incidentsOpen: number;
+  fileCount: number;
+  createdAt: string;
+  role: "canonical" | "duplicate" | "review";
+  blockers: string[];
+};
+
+export type AssetDuplicateAuditGroup = {
+  id: string;
+  strategy: AssetDuplicateAuditStrategy;
+  confidence: AssetDuplicateAuditConfidence;
+  canonicalAssetId: string;
+  duplicateAssetIds: string[];
+  reasons: string[];
+  blockers: string[];
+  totalQuantityAfter: number | null;
+  items: AssetDuplicateAuditItem[];
+};
+
+export type AssetDuplicateAuditPreview = {
+  workspaceId?: string;
+  generatedAt: string;
+  groups: AssetDuplicateAuditGroup[];
+  summary: {
+    totalGroups: number;
+    safeArchiveGroups: number;
+    reconcileGroups: number;
+    reviewGroups: number;
+    affectedAssets: number;
+    archivableDuplicates: number;
+  };
+};
+
 export type AssetTimelineItem = {
   timestamp: string;
   title: string;

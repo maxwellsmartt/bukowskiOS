@@ -132,6 +132,7 @@ export const ipcChannels = {
     getList: "bukowskiAssets:getList",
     getSummary: "bukowskiAssets:getSummary",
     getOverview: "bukowskiAssets:getOverview",
+    getDuplicateAudit: "bukowskiAssets:getDuplicateAudit",
     getDetail: "bukowskiAssets:getDetail",
     uploadFiles: "bukowskiAssets:uploadFiles",
     uploadImages: "bukowskiAssets:uploadImages",
@@ -143,6 +144,7 @@ export const ipcChannels = {
     archive: "bukowskiAssets:archive",
     archiveMany: "bukowskiAssets:archiveMany",
     reconcileQuantities: "bukowskiAssets:reconcileQuantities",
+    applyDuplicateAudit: "bukowskiAssets:applyDuplicateAudit",
   },
   packing: {
     getList: "bukowskiPacking:getList",

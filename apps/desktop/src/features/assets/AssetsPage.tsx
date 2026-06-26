@@ -3,7 +3,7 @@ import { ClipboardList, ExternalLink, FileUp, GitCompareArrows, Import, MoveRigh
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import type { AssetListQuery, AssetListRow, AssetSortField } from "@contracts";
+import type { AssetDuplicateAuditGroup, AssetDuplicateAuditPreview, AssetListQuery, AssetListRow, AssetSortField } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
@@ -36,8 +36,10 @@ import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
 import {
   archiveAsset,
   archiveAssets,
+  applyAssetDuplicateAudit,
   assignMoveAssets,
   createAsset,
+  getAssetDuplicateAudit,
   openAssetFile,
   reconcileAssetQuantities,
   updateAsset,
@@ -1213,6 +1215,9 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [csvImportProgress, setCsvImportProgress] = useState<AssetCsvImportProgress | null>(null);
   const [csvShowAllRows, setCsvShowAllRows] = useState(false);
   const [csvReportCopied, setCsvReportCopied] = useState(false);
+  const [duplicateAudit, setDuplicateAudit] = useState<AssetDuplicateAuditPreview | null>(null);
+  const [isLoadingDuplicateAudit, setIsLoadingDuplicateAudit] = useState(false);
+  const [isApplyingDuplicateAudit, setIsApplyingDuplicateAudit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const assetEmptyTips = (key: string) => t(key, { returnObjects: true }) as string[];
 
@@ -1322,6 +1327,18 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     ? csvDerivedSummary?.importableDrafts ?? []
     : csvDerivedSummary?.importableDrafts.slice(0, 8) ?? [];
   const csvHiddenReviewCount = Math.max(0, (csvDerivedSummary?.importableDrafts.length ?? 0) - csvReviewDrafts.length);
+  const duplicateAuditApplicableGroups = useMemo(
+    () => duplicateAudit?.groups.filter((group) => group.strategy !== "review" && !group.blockers.length) ?? [],
+    [duplicateAudit],
+  );
+  const duplicateAuditReviewGroups = useMemo(
+    () => duplicateAudit?.groups.filter((group) => group.strategy === "review" || group.blockers.length) ?? [],
+    [duplicateAudit],
+  );
+  const visibleDuplicateAuditGroups = useMemo(
+    () => [...duplicateAuditApplicableGroups.slice(0, 4), ...duplicateAuditReviewGroups.slice(0, 2)],
+    [duplicateAuditApplicableGroups, duplicateAuditReviewGroups],
+  );
   const showGlobalAssetLanding =
     !error &&
     !isLoading &&
@@ -1792,6 +1809,100 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       );
     } finally {
       setIsArchivingAsset(false);
+    }
+  };
+
+  const handleLoadDuplicateAudit = async () => {
+    try {
+      setIsLoadingDuplicateAudit(true);
+      const preview = await getAssetDuplicateAudit({ workspaceId: activeWorkspaceId });
+      setDuplicateAudit(preview);
+      if (!preview.summary.totalGroups) {
+        toast.success(
+          t("assets.duplicates.noneTitle", { defaultValue: "No se detectaron duplicados claros" }),
+          t("assets.duplicates.noneBody", { defaultValue: "El inventario activo no tiene grupos obvios para limpiar." }),
+        );
+      }
+    } catch (nextError) {
+      toast.error(
+        t("assets.duplicates.failedTitle", { defaultValue: "No se pudo auditar duplicados" }),
+        getUserFacingErrorMessage(nextError, t("assets.duplicates.failedBody", { defaultValue: "Inténtalo de nuevo después de sincronizar." })),
+      );
+    } finally {
+      setIsLoadingDuplicateAudit(false);
+    }
+  };
+
+  const handleApplyDuplicateAudit = async () => {
+    if (!duplicateAuditApplicableGroups.length) {
+      return;
+    }
+
+    const reconcileCount = duplicateAuditApplicableGroups.filter((group) => group.strategy === "reconcile_quantity").length;
+    const archiveCount = duplicateAuditApplicableGroups.reduce((total, group) => total + group.duplicateAssetIds.length, 0);
+    const ok = await confirm({
+      title: t("assets.duplicates.applyTitle", {
+        count: duplicateAuditApplicableGroups.length,
+        defaultValue: "Limpiar duplicados seguros?",
+      }),
+      body: t("assets.duplicates.applyBody", {
+        groups: duplicateAuditApplicableGroups.length,
+        archiveCount,
+        reconcileCount,
+        defaultValue: "Se archivarán duplicados seguros y, cuando sean stock sin serial, se consolidará la cantidad en el equipo principal. Los grupos con dudas no se tocarán.",
+      }),
+      details: (
+        <ul className="confirm-dialog-list">
+          {duplicateAuditApplicableGroups.slice(0, 6).map((group) => {
+            const canonical = group.items.find((item) => item.id === group.canonicalAssetId);
+            return (
+              <li key={group.id}>
+                {canonical?.code ?? "—"} · {canonical?.name ?? t("assets.duplicates.assetFallback", { defaultValue: "Equipo" })} ·{" "}
+                {group.strategy === "reconcile_quantity"
+                  ? t("assets.duplicates.reconcileShort", {
+                      quantity: group.totalQuantityAfter ?? 0,
+                      defaultValue: `stock → ${group.totalQuantityAfter ?? 0}`,
+                    })
+                  : t("assets.duplicates.archiveShort", {
+                      count: group.duplicateAssetIds.length,
+                      defaultValue: `${group.duplicateAssetIds.length} duplicados`,
+                    })}
+              </li>
+            );
+          })}
+          {duplicateAuditApplicableGroups.length > 6 ? <li>+{duplicateAuditApplicableGroups.length - 6}</li> : null}
+        </ul>
+      ),
+      confirmLabel: t("assets.duplicates.applyConfirm", { defaultValue: "Aplicar limpieza segura" }),
+      cancelLabel: t("common.cancel"),
+      tone: "danger",
+    });
+    if (!ok) {
+      return;
+    }
+
+    try {
+      setIsApplyingDuplicateAudit(true);
+      const result = await applyAssetDuplicateAudit({
+        commandId: crypto.randomUUID(),
+        workspaceId: activeWorkspaceId,
+        groupIds: duplicateAuditApplicableGroups.map((group) => group.id),
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+      await Promise.all([reload(), refreshProjects()]);
+      const nextPreview = await getAssetDuplicateAudit({ workspaceId: activeWorkspaceId });
+      setDuplicateAudit(nextPreview);
+      clearOperationCart();
+      setSelectedAssetId(null);
+      toast.success(t("assets.toasts.doneTitle"), result.summary);
+    } catch (nextError) {
+      toast.error(
+        t("assets.duplicates.applyFailedTitle", { defaultValue: "No se pudo limpiar duplicados" }),
+        getUserFacingErrorMessage(nextError, t("assets.duplicates.applyFailedBody", { defaultValue: "Revisa blockers, sincroniza y vuelve a auditar." })),
+      );
+    } finally {
+      setIsApplyingDuplicateAudit(false);
     }
   };
 
@@ -2556,6 +2667,19 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     <Import size={14} />
                     <span>{isImportingAssets ? t("assets.importing") : t("assets.importCsv")}</span>
                   </button>
+                  <button
+                    className="ghost-control action-row-button"
+                    disabled={isLoadingDuplicateAudit || isApplyingDuplicateAudit || isImportingAssets}
+                    onClick={() => void handleLoadDuplicateAudit()}
+                    type="button"
+                  >
+                    <GitCompareArrows size={14} />
+                    <span>
+                      {isLoadingDuplicateAudit
+                        ? t("assets.duplicates.loading", { defaultValue: "Auditando…" })
+                        : t("assets.duplicates.audit", { defaultValue: "Auditar duplicados" })}
+                    </span>
+                  </button>
                 </>
               )}
             </div>
@@ -2581,6 +2705,141 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             sortOptions={translatedSortOptions}
             showSortControl={false}
           />
+          {duplicateAudit ? (
+            <div className={`asset-duplicate-audit${duplicateAudit.summary.reviewGroups ? " has-review" : ""}`}>
+              <div className="asset-import-preview-header">
+                <div className="asset-import-preview-copy">
+                  <span className="asset-import-preview-kicker">
+                    {t("assets.duplicates.kicker", { defaultValue: "Auditoría de duplicados" })}
+                  </span>
+                  <strong>
+                    {duplicateAudit.summary.totalGroups
+                      ? t("assets.duplicates.title", {
+                          count: duplicateAudit.summary.totalGroups,
+                          defaultValue: `${duplicateAudit.summary.totalGroups} grupos detectados`,
+                        })
+                      : t("assets.duplicates.cleanTitle", { defaultValue: "Inventario sin duplicados claros" })}
+                  </strong>
+                  <span>
+                    {t("assets.duplicates.body", {
+                      defaultValue:
+                        "El sistema sólo aplica limpieza en grupos seguros. Los grupos ambiguos quedan para revisión manual.",
+                    })}
+                  </span>
+                </div>
+                <div className="asset-import-preview-actions">
+                  <button
+                    className="ghost-control action-row-button"
+                    disabled={isLoadingDuplicateAudit || isApplyingDuplicateAudit}
+                    onClick={() => void handleLoadDuplicateAudit()}
+                    type="button"
+                  >
+                    {t("assets.duplicates.refresh", { defaultValue: "Refrescar" })}
+                  </button>
+                  {duplicateAuditApplicableGroups.length ? (
+                    <button
+                      className="asset-create-button action-row-button"
+                      disabled={isApplyingDuplicateAudit}
+                      onClick={() => void handleApplyDuplicateAudit()}
+                      type="button"
+                    >
+                      <Trash2 size={14} />
+                      <span>
+                        {isApplyingDuplicateAudit
+                          ? t("assets.duplicates.applying", { defaultValue: "Limpiando…" })
+                          : t("assets.duplicates.apply", {
+                              count: duplicateAuditApplicableGroups.length,
+                              defaultValue: "Aplicar seguros",
+                            })}
+                      </span>
+                    </button>
+                  ) : null}
+                  <button
+                    aria-label={t("common.close")}
+                    className="icon-ghost-control asset-import-progress-close"
+                    disabled={isApplyingDuplicateAudit}
+                    onClick={() => setDuplicateAudit(null)}
+                    type="button"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="asset-import-preview-stats">
+                <span>
+                  <strong>{duplicateAudit.summary.reconcileGroups}</strong>
+                  {t("assets.duplicates.stats.reconcile", { defaultValue: "conciliar stock" })}
+                </span>
+                <span>
+                  <strong>{duplicateAudit.summary.safeArchiveGroups}</strong>
+                  {t("assets.duplicates.stats.archive", { defaultValue: "archivar" })}
+                </span>
+                <span className={duplicateAudit.summary.reviewGroups ? "asset-import-stat-warning" : undefined}>
+                  <strong>{duplicateAudit.summary.reviewGroups}</strong>
+                  {t("assets.duplicates.stats.review", { defaultValue: "requieren revisión" })}
+                </span>
+                <span>
+                  <strong>{duplicateAudit.summary.archivableDuplicates}</strong>
+                  {t("assets.duplicates.stats.duplicates", { defaultValue: "duplicados aplicables" })}
+                </span>
+                <span>
+                  <strong>{duplicateAudit.summary.affectedAssets}</strong>
+                  {t("assets.duplicates.stats.assets", { defaultValue: "equipos afectados" })}
+                </span>
+              </div>
+
+              {visibleDuplicateAuditGroups.length ? (
+                <div className="asset-duplicate-audit-groups">
+                  {visibleDuplicateAuditGroups.map((group: AssetDuplicateAuditGroup) => {
+                    const canonical = group.items.find((item) => item.id === group.canonicalAssetId);
+                    const duplicates = group.items.filter((item) => item.id !== group.canonicalAssetId);
+                    const isReview = group.strategy === "review" || group.blockers.length > 0;
+                    return (
+                      <div className={`asset-duplicate-audit-group${isReview ? " is-review" : ""}`} key={group.id}>
+                        <div className="asset-duplicate-audit-group-main">
+                          <span className="asset-import-preview-kicker">
+                            {isReview
+                              ? t("assets.duplicates.reviewBadge", { defaultValue: "Revisión manual" })
+                              : group.strategy === "reconcile_quantity"
+                                ? t("assets.duplicates.reconcileBadge", { defaultValue: "Conciliar stock" })
+                                : t("assets.duplicates.archiveBadge", { defaultValue: "Archivar duplicados" })}
+                          </span>
+                          <strong>{canonical ? `${canonical.code} · ${canonical.name}` : t("assets.duplicates.assetFallback", { defaultValue: "Equipo" })}</strong>
+                          <span>
+                            {group.reasons.join(" · ")}
+                            {group.totalQuantityAfter
+                              ? ` · ${t("assets.duplicates.quantityAfter", {
+                                  quantity: group.totalQuantityAfter,
+                                  defaultValue: `cantidad final ${group.totalQuantityAfter}`,
+                                })}`
+                              : ""}
+                          </span>
+                        </div>
+                        <div className="asset-duplicate-audit-items">
+                          {duplicates.slice(0, 4).map((item) => (
+                            <span key={item.id}>
+                              {item.code} · {item.totalQuantity}u
+                              {item.blockers.length ? ` · ${item.blockers[0]}` : ""}
+                            </span>
+                          ))}
+                          {duplicates.length > 4 ? <span>+{duplicates.length - 4}</span> : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {duplicateAudit.groups.length > visibleDuplicateAuditGroups.length ? (
+                    <span className="asset-duplicate-audit-more">
+                      {t("assets.duplicates.more", {
+                        count: duplicateAudit.groups.length - visibleDuplicateAuditGroups.length,
+                        defaultValue: `+${duplicateAudit.groups.length - visibleDuplicateAuditGroups.length} grupos más`,
+                      })}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {csvImportProgress ? (
             <div className={`asset-import-progress is-${csvImportProgress.status}`}>
               <div className="asset-import-progress-copy">

@@ -1,4 +1,6 @@
 import type {
+  ApplyAssetDuplicateAuditCommand,
+  ApplyAssetDuplicateAuditResult,
   ArchiveAssetCommand,
   ArchiveAssetsCommand,
   ArchiveAssetsResult,
@@ -7,6 +9,7 @@ import type {
   AssetListQuery,
   AssetListRow,
   AssetWorkspaceQuery,
+  AssetDuplicateAuditPreview,
   AssetsOverviewSnapshot,
   AssetSummarySnapshot,
   AssignMoveAssetsInput,
@@ -127,6 +130,14 @@ export const useAssetsOverview = (query: AssetWorkspaceQuery = {}) => {
   );
 };
 
+export const getAssetDuplicateAudit = async (query: AssetWorkspaceQuery = {}): Promise<AssetDuplicateAuditPreview> => {
+  if (!window.bukowskiAssets) {
+    throw new Error("Assets bridge unavailable");
+  }
+
+  return window.bukowskiAssets.getDuplicateAudit(query);
+};
+
 export const useAssetDetail = (assetId: string | undefined) => {
   const refreshVersion = useWorkspaceDataRefreshVersion(assetRefreshFilter);
 
@@ -191,6 +202,16 @@ export const reconcileAssetQuantities = async (
   }
 
   return window.bukowskiAssets.reconcileQuantities(input);
+};
+
+export const applyAssetDuplicateAudit = async (
+  input: ApplyAssetDuplicateAuditCommand,
+): Promise<ApplyAssetDuplicateAuditResult> => {
+  if (!window.bukowskiAssets) {
+    throw new Error("Assets bridge unavailable");
+  }
+
+  return window.bukowskiAssets.applyDuplicateAudit(input);
 };
 
 export const uploadAssetFiles = async (assetId: string) => {

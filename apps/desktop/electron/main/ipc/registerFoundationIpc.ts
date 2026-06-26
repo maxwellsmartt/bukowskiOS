@@ -107,6 +107,7 @@ import {
   createProjectBlueprintSchema,
   createProjectSchema,
   createProjectUnitSchema,
+  applyAssetDuplicateAuditSchema,
   createRmaCaseSchema,
   idReadArgsSchema,
   deleteAssistantThreadSchema,
@@ -170,6 +171,7 @@ import {
 } from "@contracts";
 import type {
   AddDepartmentToProjectUnitInput,
+  ApplyAssetDuplicateAuditCommand,
   AssistantChatSnapshot,
   AssignAgentModelCommand,
   CreateAssistantThreadCommand,
@@ -318,6 +320,7 @@ type RegisterFoundationIpcOptions = {
     archiveAsset: (input: ArchiveAssetCommand) => unknown;
     archiveAssets: (input: ArchiveAssetsCommand) => unknown;
     reconcileAssetQuantities: (input: ReconcileAssetQuantitiesCommand) => unknown;
+    applyAssetDuplicateAudit: (input: ApplyAssetDuplicateAuditCommand) => unknown;
   };
   workspaceAccess: WorkspaceAccessGuard;
   fileUploads: {
@@ -1210,6 +1213,23 @@ export const registerFoundationIpc = ({
     "The app could not load the asset overview.",
   );
   safeHandleReadWithSchema(
+    ipcChannels.assets.getDuplicateAudit,
+    assetWorkspaceReadArgsSchema,
+    async (_event, query: AssetWorkspaceQuery | undefined) => {
+      if (query?.workspaceId) {
+        await workspaceAccess.assertWorkspaceAccess({
+          workspaceId: query.workspaceId,
+          action: "audit duplicate assets",
+          accessLevel: "read",
+          requiredPermission: "assets.read",
+        });
+      }
+
+      return foundationReads.getAssetDuplicateAudit(query);
+    },
+    "The app could not audit duplicate assets.",
+  );
+  safeHandleReadWithSchema(
     ipcChannels.assets.getDetail,
     idReadArgsSchema,
     async (_event, assetId: string) => {
@@ -1277,6 +1297,16 @@ export const registerFoundationIpc = ({
     });
 
     return assetMutations.reconcileAssetQuantities(input);
+  });
+  safeHandle(ipcChannels.assets.applyDuplicateAudit, applyAssetDuplicateAuditSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "clean up duplicate assets",
+      accessLevel: "write",
+      requiredPermission: "assets.manage",
+    });
+
+    return assetMutations.applyAssetDuplicateAudit(input);
   });
   safeHandleReadWithSchema(
     ipcChannels.assets.uploadFiles,
