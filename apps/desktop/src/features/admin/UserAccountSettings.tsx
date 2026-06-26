@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Camera, LogOut, Save, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { useSession } from "@app/providers/SessionProvider";
+import { clearCachedAvatar, useSession } from "@app/providers/SessionProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -162,6 +162,9 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
     try {
       await updateUserMetadata({ avatar_url: null });
       await upsertProfile({ avatarUrl: null });
+      if (user?.id) {
+        clearCachedAvatar(user.id);
+      }
       await refreshUser();
       toast.success(
         t("settings.account.toasts.avatarRemovedTitle"),

@@ -3,6 +3,11 @@ import { z } from "zod";
 import { ipcChannels } from "@contracts/ipc/channels";
 
 import {
+  cacheAvatar as persistStoredAvatar,
+  clearStoredAvatar,
+  readStoredAvatar,
+} from "../services/auth/avatarCacheStore";
+import {
   clearStoredSupabaseTokens,
   getFreshStoredAccessToken,
   setStoredSupabaseTokens,
@@ -95,6 +100,33 @@ export const registerAuthIpc = (options: RegisterAuthIpcOptions = {}) => {
     avatarUrlSchema,
     (_event, avatarUrl) => fetchTrustedAvatarDataUrl(avatarUrl),
     "The app could not prepare this avatar.",
+  );
+
+  safeHandle(
+    ipcChannels.auth.getStoredAvatar,
+    z.string().trim().min(1),
+    (_event, userId) => readStoredAvatar(userId),
+    "The app could not read the saved avatar.",
+  );
+
+  safeHandle(
+    ipcChannels.auth.cacheAvatar,
+    z.object({ userId: z.string().trim().min(1), dataUrl: z.string().trim().min(1) }),
+    (_event, input) => {
+      persistStoredAvatar(input.userId, input.dataUrl);
+      return true;
+    },
+    "The app could not save the avatar locally.",
+  );
+
+  safeHandle(
+    ipcChannels.auth.clearStoredAvatar,
+    z.string().trim().min(1),
+    (_event, userId) => {
+      clearStoredAvatar(userId);
+      return true;
+    },
+    "The app could not clear the saved avatar.",
   );
 
   safeHandle(

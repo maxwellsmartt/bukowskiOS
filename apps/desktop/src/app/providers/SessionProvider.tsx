@@ -136,13 +136,18 @@ const isAccessTokenFresh = (accessToken: string | null | undefined) => {
 const AVATAR_CACHE_PREFIX = "bukowski:avatar:";
 
 const cacheAvatarDataUrl = (userId: string, avatarUrl: string | null) => {
-  try {
-    if (avatarUrl && avatarUrl.startsWith("data:")) {
-      window.localStorage.setItem(`${AVATAR_CACHE_PREFIX}${userId}`, avatarUrl);
-    }
-  } catch {
-    /* storage unavailable — avatar simply won't persist offline */
+  if (!avatarUrl || !avatarUrl.startsWith("data:")) {
+    return;
   }
+  try {
+    window.localStorage.setItem(`${AVATAR_CACHE_PREFIX}${userId}`, avatarUrl);
+  } catch {
+    /* storage unavailable — the durable copy below still persists it */
+  }
+  // Durable, offline-first copy in the main process. localStorage can be cleared
+  // (storage pressure, partition changes); this file survives so the avatar
+  // keeps rendering on a cold start instead of flickering back to initials.
+  void window.bukowskiAuth?.cacheAvatar?.({ userId, dataUrl: avatarUrl }).catch(() => undefined);
 };
 
 const readCachedAvatarDataUrl = (userId: string): string | null => {
@@ -151,6 +156,17 @@ const readCachedAvatarDataUrl = (userId: string): string | null => {
   } catch {
     return null;
   }
+};
+
+// Drop both the fast (localStorage) and durable (main-process) avatar copies so
+// removing a photo doesn't leave a stale cached image behind.
+export const clearCachedAvatar = (userId: string) => {
+  try {
+    window.localStorage.removeItem(`${AVATAR_CACHE_PREFIX}${userId}`);
+  } catch {
+    /* storage unavailable */
+  }
+  void window.bukowskiAuth?.clearStoredAvatar?.(userId).catch(() => undefined);
 };
 
 const buildCachedSessionUser = (accessToken: string | null | undefined): BukowskiSessionUser | null => {
@@ -185,9 +201,12 @@ const buildCachedSessionUser = (accessToken: string | null | undefined): Bukowsk
       user_metadata: userMetadata,
     });
 
-    // The JWT only carries an OAuth avatar (if any); fall back to the locally
-    // cached data URL so an uploaded/Supabase avatar survives an offline start.
-    return sessionUser.avatarUrl ? sessionUser : { ...sessionUser, avatarUrl: readCachedAvatarDataUrl(userId) };
+    // Prefer the locally cached data URL over the JWT's remote avatar URL. A
+    // remote <img> can fail to load (transient network) and collapse to
+    // initials, while a data URL always renders; resolveSessionUser refreshes it
+    // once the session is online.
+    const cachedAvatar = readCachedAvatarDataUrl(userId);
+    return cachedAvatar ? { ...sessionUser, avatarUrl: cachedAvatar } : sessionUser;
   } catch {
     return null;
   }
@@ -249,9 +268,19 @@ const resolveSessionUser = async (
     cacheAvatarDataUrl(sessionUser.id, avatarDataUrl);
     return { ...sessionUser, avatarUrl: avatarDataUrl };
   }
-  // No data URL (e.g. offline): reuse the cached avatar before falling back to a
-  // remote URL that may be blocked by connectivity/CSP and collapse to initials.
-  return { ...sessionUser, avatarUrl: readCachedAvatarDataUrl(sessionUser.id) ?? sessionUser.avatarUrl };
+  // No fresh data URL (e.g. offline): reuse a cached data URL before falling
+  // back to a remote URL that may fail to load and collapse to initials. Try the
+  // fast localStorage copy first, then the durable main-process copy (which
+  // survives a localStorage clear), and repopulate localStorage from it.
+  const durableAvatar =
+    readCachedAvatarDataUrl(sessionUser.id) ??
+    (await window.bukowskiAuth?.getStoredAvatar?.(sessionUser.id).catch(() => null)) ??
+    null;
+  if (durableAvatar) {
+    cacheAvatarDataUrl(sessionUser.id, durableAvatar);
+    return { ...sessionUser, avatarUrl: durableAvatar };
+  }
+  return { ...sessionUser, avatarUrl: sessionUser.avatarUrl };
 };
 
 const acceptWorkspaceInvite = async (workspaceId: string | null) => {
@@ -295,6 +324,33 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   );
   const [authError, setAuthError] = useState<string | null>(null);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+
+  // Offline-first avatar: whenever we're not already rendering a durable data
+  // URL, pull the cached photo from the main process. This covers a cold start
+  // where localStorage was cleared and the auth-change path that briefly sets a
+  // remote avatar URL — both would otherwise fall back to initials.
+  useEffect(() => {
+    const userId = user?.id;
+    if (!userId || user?.avatarUrl?.startsWith("data:")) {
+      return undefined;
+    }
+    let cancelled = false;
+    void window.bukowskiAuth
+      ?.getStoredAvatar?.(userId)
+      .then((dataUrl) => {
+        if (cancelled || !dataUrl) return;
+        cacheAvatarDataUrl(userId, dataUrl);
+        setUser((current) =>
+          current && current.id === userId && current.avatarUrl !== dataUrl
+            ? { ...current, avatarUrl: dataUrl }
+            : current,
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.avatarUrl]);
 
   useEffect(() => {
     if (!authSupabase || !supabase) {

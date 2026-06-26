@@ -264,6 +264,9 @@ declare global {
       getAccessToken: () => Promise<string | null>;
       getOAuthRedirectUrl: () => Promise<string>;
       getAvatarDataUrl: (url: string) => Promise<string | null>;
+      getStoredAvatar: (userId: string) => Promise<string | null>;
+      cacheAvatar: (input: { userId: string; dataUrl: string }) => Promise<boolean>;
+      clearStoredAvatar: (userId: string) => Promise<boolean>;
       updateUser: (input: { password?: string; data?: Record<string, unknown> }) => Promise<unknown>;
       setStoredTokens: (tokens: {
         accessToken: string | null;
