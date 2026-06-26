@@ -28,7 +28,7 @@ export const useAsyncValue = <T>(
     setState((current) => ({
       ...current,
       error: null,
-      isLoading: true,
+      isLoading: current.isLoading && current.data === initialValue,
     }));
 
     load()
@@ -44,12 +44,12 @@ export const useAsyncValue = <T>(
       })
       .catch((error: unknown) => {
         if (!isCancelled) {
-          setState({
-            data: initialValue,
+          setState((current) => ({
+            ...current,
             error: getUserFacingErrorMessage(error, "Unknown loading error"),
             isLoading: false,
             reload: () => setReloadToken((current) => current + 1),
-          });
+          }));
         }
       });
 

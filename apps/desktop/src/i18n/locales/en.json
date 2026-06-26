@@ -700,7 +700,8 @@
     "empty": {
       "globalTitle": "Your asset registry is still empty",
       "projectTitle": "No assets are assigned to this project yet",
-      "globalBody": "Create the first asset once your catalog is ready.",
+      "globalKicker": "Operational inventory",
+      "globalBody": "Import your reviewed CSV or create the first asset manually. The catalog stays clean when locations, categories and codes are validated before saving.",
       "projectBody": "This project does not have assets yet.",
       "tipsGlobal": [
         "Set locations and categories in Catalog first",
@@ -793,6 +794,8 @@
       "skippedExisting_other": "Skipped {{count}} existing codes.",
       "leftForReview_one": "Left {{count}} row for review.",
       "leftForReview_other": "Left {{count}} rows for review.",
+      "skippedFailed_one": "Skipped {{count}} row with an error and continued the rest.",
+      "skippedFailed_other": "Skipped {{count}} rows with errors and continued the rest.",
       "progress": {
         "title": "Import result",
         "running": "Importing {{fileName}}…",
@@ -812,6 +815,7 @@
         "needsReview": "Needs review",
         "totalUnits": "Total units",
         "existing": "Existing",
+        "generatedCodes": "Suggested codes",
         "mergedRows": "Merged rows",
         "warnings": "warnings",
         "errors": "errors"

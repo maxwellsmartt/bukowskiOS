@@ -247,7 +247,7 @@ export const SyncOutboxPage = () => {
     () => {
       void load();
     },
-    { intervalMs: 10_000 },
+    { intervalMs: 2_500 },
   );
 
   const workspacePullCursors = useMemo(

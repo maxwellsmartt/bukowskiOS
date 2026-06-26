@@ -179,7 +179,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     () => {
       void loadSyncSnapshot();
     },
-    { intervalMs: 15_000 },
+    { intervalMs: 2_500 },
   );
 
   const workspacePullCursors = pullCursors.filter(

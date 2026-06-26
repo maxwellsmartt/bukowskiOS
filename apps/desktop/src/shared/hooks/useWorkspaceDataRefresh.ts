@@ -7,6 +7,11 @@ export type WorkspaceDataChangedDetail = {
   entities?: string[];
 };
 
+type WorkspaceDataRefreshFilter = {
+  entities?: string[];
+  ignoreSources?: WorkspaceDataChangedDetail["source"][];
+};
+
 export const notifyWorkspaceDataChanged = (detail: WorkspaceDataChangedDetail = {}) => {
   window.dispatchEvent(new CustomEvent<WorkspaceDataChangedDetail>(workspaceDataChangedEvent, { detail }));
 };
@@ -24,11 +29,23 @@ export const requestImmediatePull = () => {
   window.dispatchEvent(new Event(immediatePullEvent));
 };
 
-export const useWorkspaceDataRefreshVersion = () => {
+export const useWorkspaceDataRefreshVersion = (filter: WorkspaceDataRefreshFilter = {}) => {
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
-    const handleRefresh = () => {
+    const handleRefresh = (event: Event) => {
+      const detail = (event as CustomEvent<WorkspaceDataChangedDetail>).detail ?? {};
+      if (filter.ignoreSources?.includes(detail.source)) {
+        return;
+      }
+
+      if (filter.entities?.length && detail.entities?.length) {
+        const matchesEntity = detail.entities.some((entity) => filter.entities?.includes(entity));
+        if (!matchesEntity) {
+          return;
+        }
+      }
+
       setVersion((current) => current + 1);
     };
 
@@ -36,7 +53,7 @@ export const useWorkspaceDataRefreshVersion = () => {
     return () => {
       window.removeEventListener(workspaceDataChangedEvent, handleRefresh);
     };
-  }, []);
+  }, [filter.entities?.join("|"), filter.ignoreSources?.join("|")]);
 
   return version;
 };

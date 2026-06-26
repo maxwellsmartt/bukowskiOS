@@ -71,8 +71,12 @@ const defaultAssetListQuery: AssetListQuery = {
   sortDirection: "asc",
 };
 
+const assetRefreshFilter = {
+  entities: ["assets", "catalog", "deletions", "workspace_files"],
+};
+
 export const useAssetsList = (query: AssetListQuery = defaultAssetListQuery) => {
-  const refreshVersion = useWorkspaceDataRefreshVersion();
+  const refreshVersion = useWorkspaceDataRefreshVersion(assetRefreshFilter);
 
   return useAsyncValue(
     async () => {
@@ -88,7 +92,7 @@ export const useAssetsList = (query: AssetListQuery = defaultAssetListQuery) => 
 };
 
 export const useAssetSummary = (query: AssetWorkspaceQuery = {}) => {
-  const refreshVersion = useWorkspaceDataRefreshVersion();
+  const refreshVersion = useWorkspaceDataRefreshVersion(assetRefreshFilter);
 
   return useAsyncValue(
     async () => {
@@ -104,7 +108,7 @@ export const useAssetSummary = (query: AssetWorkspaceQuery = {}) => {
 };
 
 export const useAssetsOverview = (query: AssetWorkspaceQuery = {}) => {
-  const refreshVersion = useWorkspaceDataRefreshVersion();
+  const refreshVersion = useWorkspaceDataRefreshVersion(assetRefreshFilter);
 
   return useAsyncValue(
     async () => {
@@ -120,7 +124,7 @@ export const useAssetsOverview = (query: AssetWorkspaceQuery = {}) => {
 };
 
 export const useAssetDetail = (assetId: string | undefined) => {
-  const refreshVersion = useWorkspaceDataRefreshVersion();
+  const refreshVersion = useWorkspaceDataRefreshVersion(assetRefreshFilter);
 
   return useAsyncValue(
     async () => {

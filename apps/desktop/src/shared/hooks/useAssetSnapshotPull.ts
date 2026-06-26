@@ -184,6 +184,7 @@ export const useAssetSnapshotPull = () => {
           });
           if (dependencyResult.errors.length) {
             console.warn("[asset-snapshot-pull] Catalog dependency hydration failed", dependencyResult.errors);
+            break;
           }
 
           const result = await appApi!.applyRemoteAssetSnapshots({
@@ -265,6 +266,7 @@ export const useAssetSnapshotPull = () => {
           });
           if (dependencyResult.errors.length) {
             console.warn("[asset-snapshot-pull] Metadata dependency hydration failed", dependencyResult.errors);
+            break;
           }
           const result = await appApi!.applyRemoteAssetSnapshots({
             workspaceId: activeWorkspaceId,

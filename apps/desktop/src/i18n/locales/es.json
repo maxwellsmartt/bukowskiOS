@@ -702,7 +702,8 @@
     "empty": {
       "globalTitle": "Tu inventario aún está vacío",
       "projectTitle": "Este proyecto aún no tiene equipos asignados",
-      "globalBody": "Crea el primer equipo cuando tengas listo el catálogo.",
+      "globalKicker": "Inventario operativo",
+      "globalBody": "Importa tu CSV revisado o crea el primer equipo manualmente. El catálogo queda limpio cuando ubicaciones, categorías y códigos se validan antes de guardar.",
       "projectBody": "Este proyecto aún no tiene equipos.",
       "tipsGlobal": [
         "Define ubicaciones y categorías primero en Catálogo",
@@ -795,6 +796,8 @@
       "skippedExisting_other": "Se omitieron {{count}} códigos existentes.",
       "leftForReview_one": "Quedó {{count}} fila para revisar.",
       "leftForReview_other": "Quedaron {{count}} filas para revisar.",
+      "skippedFailed_one": "Se omitió {{count}} fila con error y el resto continuó.",
+      "skippedFailed_other": "Se omitieron {{count}} filas con error y el resto continuó.",
       "progress": {
         "title": "Resultado de importación",
         "running": "Importando {{fileName}}…",
@@ -814,6 +817,7 @@
         "needsReview": "Requieren revisión",
         "totalUnits": "Unidades totales",
         "existing": "Existentes",
+        "generatedCodes": "Códigos sugeridos",
         "mergedRows": "Filas fusionadas",
         "warnings": "avisos",
         "errors": "errores"

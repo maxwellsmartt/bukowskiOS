@@ -351,6 +351,255 @@ const parseJsonObject = (value: string | null) => {
   }
 };
 
+const readAssetCreatedQuantity = (metadataJson: string | null): number => {
+  const metadata = parseJsonObject(metadataJson);
+  const rawQuantity = metadata?.totalQuantity;
+  return typeof rawQuantity === "number" && Number.isFinite(rawQuantity) && rawQuantity > 0 ? Math.trunc(rawQuantity) : 1;
+};
+
+const repairMissingAssetCurrentStates = (db: DatabaseSync) => {
+  type MissingAssetStateRow = {
+    id: string;
+    workspace_id: string;
+    default_location_id: string | null;
+    created_at: string;
+    latest_event_id: string | null;
+    created_metadata_json: string | null;
+  };
+
+  const now = new Date().toISOString();
+  const batchSize = 1_000;
+  const maxBatches = 20;
+  const selectMissingStates = db.prepare(
+    `
+      SELECT
+        assets.id,
+        assets.workspace_id,
+        assets.default_location_id,
+        assets.created_at,
+        (
+          SELECT asset_events.id
+          FROM asset_events
+          WHERE asset_events.asset_id = assets.id
+            AND asset_events.workspace_id = assets.workspace_id
+          ORDER BY asset_events.event_timestamp DESC, asset_events.created_at DESC
+          LIMIT 1
+        ) AS latest_event_id,
+        (
+          SELECT asset_events.metadata_json
+          FROM asset_events
+          WHERE asset_events.asset_id = assets.id
+            AND asset_events.workspace_id = assets.workspace_id
+            AND asset_events.event_type = 'asset_created'
+          ORDER BY asset_events.event_timestamp ASC, asset_events.created_at ASC
+          LIMIT 1
+        ) AS created_metadata_json
+      FROM assets
+      LEFT JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+      WHERE assets.is_active = 1
+        AND asset_current_state.asset_id IS NULL
+      ORDER BY
+        CASE WHEN assets.workspace_id = ? THEN 1 ELSE 0 END,
+        assets.created_at ASC,
+        assets.id ASC
+      LIMIT ?
+    `,
+  );
+  const insertRepairEvent = db.prepare(
+    `
+      INSERT OR IGNORE INTO asset_events (
+        id,
+        workspace_id,
+        asset_id,
+        assignment_id,
+        project_id,
+        department_id,
+        performed_by_user_id,
+        event_type,
+        location_id,
+        from_location_id,
+        to_location_id,
+        event_timestamp,
+        command_id,
+        actor_type,
+        source_channel,
+        notes,
+        metadata_json,
+        created_at
+      )
+      VALUES (?, ?, ?, NULL, NULL, NULL, 'user-ops', 'asset_state_repaired', ?, NULL, ?, ?, ?, 'system', 'startup-self-heal', ?, ?, ?)
+    `,
+  );
+  const insertState = db.prepare(
+    `
+      INSERT OR IGNORE INTO asset_current_state (
+        asset_id,
+        workspace_id,
+        current_location_id,
+        current_project_id,
+        current_department_id,
+        current_responsible_user_id,
+        active_assignment_id,
+        condition_status,
+        operational_status,
+        custody_status,
+        total_quantity,
+        available_quantity,
+        assigned_quantity,
+        checked_out_quantity,
+        last_event_id,
+        version,
+        updated_at
+      )
+      VALUES (?, ?, ?, NULL, NULL, NULL, NULL, 'Good', 'available', 'available', ?, ?, 0, 0, ?, 1, ?)
+    `,
+  );
+
+  let repairedCount = 0;
+  for (let batch = 0; batch < maxBatches; batch += 1) {
+    const rows = selectMissingStates.all(LOCAL_FALLBACK_WORKSPACE_ID, batchSize) as MissingAssetStateRow[];
+    if (!rows.length) {
+      break;
+    }
+
+    db.exec("BEGIN");
+    try {
+      for (const row of rows) {
+        const repairEventId = `event-repair-state-${row.id}`;
+        const eventId = row.latest_event_id ?? repairEventId;
+        const quantity = readAssetCreatedQuantity(row.created_metadata_json);
+        if (!row.latest_event_id) {
+          insertRepairEvent.run(
+            repairEventId,
+            row.workspace_id,
+            row.id,
+            row.default_location_id,
+            row.default_location_id,
+            now,
+            repairEventId,
+            "Repaired missing current state for an active asset during startup.",
+            JSON.stringify({ kind: "asset_state_repaired", reason: "missing_current_state" }),
+            now,
+          );
+        }
+        insertState.run(row.id, row.workspace_id, row.default_location_id, quantity, quantity, eventId, now);
+      }
+      db.exec("COMMIT");
+      repairedCount += rows.length;
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  const remaining = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM assets
+        LEFT JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+        WHERE assets.is_active = 1
+          AND asset_current_state.asset_id IS NULL
+      `,
+    )
+    .get() as { count: number };
+
+  return { repairedCount, remainingCount: remaining.count };
+};
+
+const getAssetPersistenceDiagnostics = (db: DatabaseSync) => {
+  const workspaces = db
+    .prepare(
+      `
+        SELECT
+          workspaces.id,
+          workspaces.name,
+          COALESCE((SELECT COUNT(*) FROM assets WHERE assets.workspace_id = workspaces.id), 0) AS asset_count,
+          COALESCE((SELECT COUNT(*) FROM assets WHERE assets.workspace_id = workspaces.id AND assets.is_active = 1), 0) AS active_asset_count,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM assets
+            JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+            WHERE assets.workspace_id = workspaces.id
+              AND assets.is_active = 1
+          ), 0) AS visible_asset_count,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM assets
+            LEFT JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+            WHERE assets.workspace_id = workspaces.id
+              AND assets.is_active = 1
+              AND asset_current_state.asset_id IS NULL
+          ), 0) AS active_assets_missing_state,
+          COALESCE((
+            SELECT SUM(asset_current_state.total_quantity)
+            FROM assets
+            JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+            WHERE assets.workspace_id = workspaces.id
+              AND assets.is_active = 1
+          ), 0) AS visible_unit_count
+        FROM workspaces
+        WHERE workspaces.is_active = 1
+        ORDER BY visible_asset_count DESC, active_asset_count DESC, workspaces.name ASC
+      `,
+    )
+    .all() as Array<{
+    id: string;
+    name: string;
+    asset_count: number;
+    active_asset_count: number;
+    visible_asset_count: number;
+    active_assets_missing_state: number;
+    visible_unit_count: number;
+  }>;
+
+  const recentAssets = db
+    .prepare(
+      `
+        SELECT
+          assets.workspace_id,
+          assets.internal_code,
+          assets.name,
+          assets.is_active,
+          assets.updated_at,
+          CASE WHEN asset_current_state.asset_id IS NULL THEN 0 ELSE 1 END AS has_state
+        FROM assets
+        LEFT JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+        ORDER BY assets.updated_at DESC
+        LIMIT 8
+      `,
+    )
+    .all() as Array<{
+    workspace_id: string;
+    internal_code: string;
+    name: string;
+    is_active: number;
+    updated_at: string;
+    has_state: number;
+  }>;
+
+  return {
+    workspaceCount: workspaces.length,
+    workspaces: workspaces.map((workspace) => ({
+      id: workspace.id,
+      name: workspace.name,
+      assetCount: workspace.asset_count,
+      activeAssetCount: workspace.active_asset_count,
+      visibleAssetCount: workspace.visible_asset_count,
+      activeAssetsMissingState: workspace.active_assets_missing_state,
+      visibleUnitCount: workspace.visible_unit_count,
+    })),
+    recentAssets: recentAssets.map((asset) => ({
+      workspaceId: asset.workspace_id,
+      code: asset.internal_code,
+      name: asset.name,
+      isActive: Boolean(asset.is_active),
+      hasState: Boolean(asset.has_state),
+      updatedAt: asset.updated_at,
+    })),
+  };
+};
+
 const withRecoveredDatabase = async (databasePath: string, backupPath: string) => {
   const keyStore = createLocalDatabaseKeyStore();
 
@@ -539,6 +788,13 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       logger.info("Removed synthetic performance dataset from the local workspace.", { cleanedRows });
     }
   }
+  const stateRepairResult = runStartupStep("repair missing asset current state rows", () =>
+    repairMissingAssetCurrentStates(database),
+  );
+  if (stateRepairResult.repairedCount > 0 || stateRepairResult.remainingCount > 0) {
+    logger.warn("Repaired missing asset current state rows during startup.", stateRepairResult);
+  }
+  logger.info("Asset persistence diagnostics after startup hydration.", getAssetPersistenceDiagnostics(database));
   runStartupStep("run post-migration integrity checks", () => runIntegrityChecks(database));
   lastIntegrityCheckAt = new Date().toISOString();
   lastIntegrityCheckStatus = "healthy";

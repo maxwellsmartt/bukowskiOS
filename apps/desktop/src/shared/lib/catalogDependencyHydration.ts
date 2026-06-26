@@ -26,9 +26,35 @@ type CatalogDependencyAppApi = {
 };
 
 const MAX_IDS_PER_QUERY = 100;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const REMOTE_UUID_ENTITY_TYPES = new Set<CatalogDependencyType>([
+  "asset_categories",
+  "locations",
+  "clients",
+  "production_companies",
+  "crew_members",
+  "departments",
+]);
 
 const uniqueIds = (values: Iterable<string | null | undefined>): string[] =>
   Array.from(new Set(Array.from(values).filter((value): value is string => Boolean(value))));
+
+const queryableRemoteIds = (entityType: CatalogDependencyType, ids: string[]) =>
+  REMOTE_UUID_ENTITY_TYPES.has(entityType) ? ids.filter((id) => UUID_RE.test(id)) : ids;
+
+const describeRemoteError = (error: unknown) => {
+  if (!error || typeof error !== "object") {
+    return String(error ?? "unknown remote error");
+  }
+
+  const record = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown };
+  return [
+    typeof record.code === "string" ? record.code : null,
+    typeof record.message === "string" ? record.message : null,
+    typeof record.details === "string" ? record.details : null,
+    typeof record.hint === "string" ? record.hint : null,
+  ].filter(Boolean).join(" · ") || "unknown remote error";
+};
 
 const chunksOf = <T,>(values: T[], size: number): T[][] => {
   const chunks: T[][] = [];
@@ -56,14 +82,15 @@ export const hydrateCatalogDependencies = async (input: {
   >) {
     if (!values) continue;
     const ids = uniqueIds(values);
-    for (const idsChunk of chunksOf(ids, MAX_IDS_PER_QUERY)) {
+    const remoteIds = queryableRemoteIds(entityType, ids);
+    for (const idsChunk of chunksOf(remoteIds, MAX_IDS_PER_QUERY)) {
       const { data, error } = await input.remote
         .from(entityType)
         .select("*")
         .eq("workspace_id", input.workspaceId)
         .in("id", idsChunk);
       if (error) {
-        errors.push(`${entityType}: remote dependency query failed`);
+        errors.push(`${entityType}: remote dependency query failed (${describeRemoteError(error)})`);
         continue;
       }
 

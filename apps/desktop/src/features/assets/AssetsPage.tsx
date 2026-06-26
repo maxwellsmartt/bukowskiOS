@@ -223,8 +223,8 @@ const parseEditableCsvMoney = (value: string, label: string, rowIssues: string[]
 const joinCsvNotes = (parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join("\n");
 const getErrorMessage = (error: unknown) =>
   getUserFacingErrorMessage(error, typeof error === "string" ? error : String(error));
-const isDuplicateRegistryCodeError = (error: unknown) =>
-  /(?:registry|asset) code .* already in use/i.test(getErrorMessage(error));
+const isAssetInternalCodeDuplicateError = (error: unknown) =>
+  /^Asset code .+ already in use\.$/i.test(getErrorMessage(error));
 
 type AssetCsvDraft = {
   importRowNumber: number;
@@ -273,6 +273,8 @@ type AssetCsvPreview = {
     totalRows: number;
     uniqueCodes: number;
     duplicateRows: number;
+    deconflictedRows: number;
+    generatedCodes: number;
     existingCodes: number;
     importableCount: number;
     importableStock: number;
@@ -303,7 +305,16 @@ type AssetCsvValidationIssue = {
 
 const buildAssetCsvDerivedSummary = (preview: AssetCsvPreview, assets: AssetListRow[]) => {
   const existingCodes = new Set(assets.map((asset) => asset.code.trim().toUpperCase()).filter(Boolean));
-  const importableDrafts = preview.drafts.filter((draft) => !existingCodes.has(draft.internalCode.trim().toUpperCase()));
+  const existingSerials = new Set(assets.map((asset) => asset.serialNumber.trim().toUpperCase()).filter((value) => value && value !== "—"));
+  const importableDrafts = preview.drafts.filter((draft) => {
+    const normalizedCode = draft.internalCode.trim().toUpperCase();
+    const normalizedSerial = draft.serialNumber.trim().toUpperCase();
+
+    return (
+      !existingCodes.has(normalizedCode) &&
+      (!normalizedSerial || !existingSerials.has(normalizedSerial))
+    );
+  });
   const importableCodeCounts = importableDrafts.reduce<Record<string, number>>((counts, draft) => {
     const normalizedCode = draft.internalCode.trim().toUpperCase();
     if (normalizedCode) {
@@ -338,11 +349,21 @@ const buildAssetCsvDerivedSummary = (preview: AssetCsvPreview, assets: AssetList
 
     return issues;
   }, []);
-  const issueCountByRow = validationIssues.reduce<Record<number, number>>((counts, issue) => {
+  const advisoryIssues = importableDrafts.flatMap((draft) =>
+    (draft.importWarnings ?? []).map((message) => ({
+      rowNumber: draft.importRowNumber,
+      message,
+    })),
+  );
+  const issueCountByRow = [...validationIssues, ...advisoryIssues].reduce<Record<number, number>>((counts, issue) => {
     counts[issue.rowNumber] = (counts[issue.rowNumber] ?? 0) + 1;
     return counts;
   }, {});
-  const readyDrafts = importableDrafts.filter((draft) => !issueCountByRow[draft.importRowNumber]);
+  const blockingIssueCountByRow = validationIssues.reduce<Record<number, number>>((counts, issue) => {
+    counts[issue.rowNumber] = (counts[issue.rowNumber] ?? 0) + 1;
+    return counts;
+  }, {});
+  const readyDrafts = importableDrafts.filter((draft) => !blockingIssueCountByRow[draft.importRowNumber]);
   const needsReviewDrafts = importableDrafts.filter((draft) => Boolean(issueCountByRow[draft.importRowNumber]));
 
   return {
@@ -350,10 +371,13 @@ const buildAssetCsvDerivedSummary = (preview: AssetCsvPreview, assets: AssetList
     readyDrafts,
     needsReviewDrafts,
     validationIssues,
+    advisoryIssues,
     issueCountByRow,
+    blockingIssueCountByRow,
     importableCount: importableDrafts.length,
     existingCount: preview.drafts.length - importableDrafts.length,
     importableStock: importableDrafts.reduce((total, draft) => total + draft.totalQuantity, 0),
+    warningCount: preview.summary.warnings.length + advisoryIssues.length,
     canImport: importableDrafts.length > 0 && preview.errors.length === 0 && validationIssues.length === 0,
   };
 };
@@ -533,11 +557,143 @@ const AssetOperationCart = ({
   );
 };
 
+const normalizeGeneratedCodePrefix = (value: string | null | undefined) => {
+  const normalized = value
+    ?.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return normalized || "AST";
+};
+
+const createAssetCsvCodeGenerator = (
+  assets: AssetListRow[],
+  drafts: AssetCsvDraft[],
+  categories: AssetCsvCatalogOption[],
+) => {
+  const usedCodes = new Set<string>();
+  const nextByPrefix = new Map<string, number>();
+  const registerCode = (code: string) => {
+    const normalizedCode = code.trim().toUpperCase();
+    if (!normalizedCode) {
+      return;
+    }
+
+    usedCodes.add(normalizedCode);
+
+    const match = normalizedCode.match(/^([A-Z0-9]+)-(\d+)$/);
+    if (!match) {
+      return;
+    }
+
+    const [, prefix, numericValue] = match;
+    const parsed = Number.parseInt(numericValue, 10);
+    if (Number.isInteger(parsed)) {
+      nextByPrefix.set(prefix, Math.max(nextByPrefix.get(prefix) ?? 1, parsed + 1));
+    }
+  };
+
+  assets.forEach((asset) => registerCode(asset.code));
+  drafts.forEach((draft) => registerCode(draft.internalCode));
+
+  const categoryById = new Map(categories.map((category) => [category.id, category] as const));
+
+  return (categoryId: string) => {
+    const category = categoryById.get(categoryId);
+    const prefix = normalizeGeneratedCodePrefix(category?.code || category?.name);
+    let nextNumber = nextByPrefix.get(prefix) ?? 1;
+    let nextCode = "";
+
+    do {
+      nextCode = `${prefix}-${String(nextNumber).padStart(4, "0")}`;
+      nextNumber += 1;
+    } while (usedCodes.has(nextCode));
+
+    usedCodes.add(nextCode);
+    nextByPrefix.set(prefix, nextNumber);
+    return nextCode;
+  };
+};
+
+const assignGeneratedAssetCsvCodes = (
+  drafts: AssetCsvDraft[],
+  assets: AssetListRow[],
+  categories: AssetCsvCatalogOption[],
+) => {
+  const generateCode = createAssetCsvCodeGenerator(assets, drafts, categories);
+  let generatedCount = 0;
+
+  return {
+    drafts: drafts.map((draft) => {
+      if (draft.internalCode.trim()) {
+        return draft;
+      }
+
+      generatedCount += 1;
+      const generatedCode = generateCode(draft.categoryId);
+
+      return {
+        ...draft,
+        internalCode: generatedCode,
+        notes: joinCsvNotes([
+          draft.notes,
+          `Import preview generated temporary asset code ${generatedCode} because the CSV row did not include an internal code.`,
+        ]),
+        importWarnings: Array.from(
+          new Set([
+            ...(draft.importWarnings ?? []),
+            `Generated temporary code ${generatedCode}. Review it before importing if you already have a physical label or preferred sequence.`,
+          ]),
+        ),
+      };
+    }),
+    generatedCount,
+  };
+};
+
+const createDeconflictedAssetCsvCode = (baseCode: string, usedCodes: Set<string>) => {
+  const normalizedBase = normalizeGeneratedCodePrefix(baseCode) || "AST";
+  let suffix = 2;
+  let candidate = `${normalizedBase}-${suffix}`;
+
+  while (usedCodes.has(candidate)) {
+    suffix += 1;
+    candidate = `${normalizedBase}-${suffix}`;
+  }
+
+  usedCodes.add(candidate);
+  return candidate;
+};
+
+const ASSET_CSV_CODE_DECONFLICT_MAX_ATTEMPTS = 50;
+
 const aggregateAssetCsvDrafts = (drafts: AssetCsvDraft[]) => {
   const draftsByCode = new Map<string, AssetCsvDraft & { importRowNumbers: number[]; serialNumbers: string[] }>();
+  const codeOccurrences = new Map<string, number>();
+  const outputDrafts: AssetCsvDraft[] = [];
   let mergedDuplicateRows = 0;
   let duplicateGroups = 0;
   let ambiguousQuantityGroups = 0;
+  let deconflictedRows = 0;
+
+  const shouldMergeDrafts = (left: AssetCsvDraft, right: AssetCsvDraft) => {
+    const leftSerial = left.serialNumber.trim().toUpperCase();
+    const rightSerial = right.serialNumber.trim().toUpperCase();
+
+    if (leftSerial || rightSerial) {
+      return leftSerial === rightSerial;
+    }
+
+    return [
+      left.name.trim().toUpperCase() === right.name.trim().toUpperCase(),
+      left.brand.trim().toUpperCase() === right.brand.trim().toUpperCase(),
+      left.model.trim().toUpperCase() === right.model.trim().toUpperCase(),
+      left.categoryId === right.categoryId,
+    ].every(Boolean);
+  };
 
   for (const draft of drafts) {
     const normalizedCode = draft.internalCode.trim().toUpperCase();
@@ -545,10 +701,34 @@ const aggregateAssetCsvDrafts = (drafts: AssetCsvDraft[]) => {
     const existingDraft = draftsByCode.get(aggregateKey);
 
     if (!existingDraft) {
+      codeOccurrences.set(aggregateKey, 1);
       draftsByCode.set(aggregateKey, {
         ...draft,
         importRowNumbers: [draft.importRowNumber],
         serialNumbers: draft.serialNumber ? [draft.serialNumber] : [],
+      });
+      continue;
+    }
+
+    if (!shouldMergeDrafts(existingDraft, draft)) {
+      const nextOccurrence = (codeOccurrences.get(aggregateKey) ?? 1) + 1;
+      codeOccurrences.set(aggregateKey, nextOccurrence);
+      deconflictedRows += 1;
+      outputDrafts.push({
+        ...draft,
+        internalCode: normalizedCode ? `${draft.internalCode}-${nextOccurrence}` : draft.internalCode,
+        notes: joinCsvNotes([
+          draft.notes,
+          normalizedCode && `Original CSV code repeated: ${draft.internalCode}. Kept as a separate unit because serial/QR/name differs.`,
+        ]),
+        importWarnings: Array.from(
+          new Set([
+            ...(draft.importWarnings ?? []),
+            normalizedCode
+              ? `Code repeated in the CSV and was changed to ${draft.internalCode}-${nextOccurrence} because this row looks like a different unit.`
+              : "Code is missing on a row that looks like a different unit.",
+          ]),
+        ),
       });
       continue;
     }
@@ -573,20 +753,58 @@ const aggregateAssetCsvDrafts = (drafts: AssetCsvDraft[]) => {
   }
 
   return {
-    drafts: Array.from(draftsByCode.values()).map(({ importRowNumbers, serialNumbers, ...draft }) => ({
-      ...draft,
-      importRowNumber: importRowNumbers[0] ?? draft.importRowNumber,
-      notes: joinCsvNotes([
-        draft.notes,
-        serialNumbers.length > 1 && `Source serials: ${serialNumbers.join(", ")}`,
-        importRowNumbers.length > 1 && `Merged CSV rows: ${importRowNumbers.join(", ")}`,
-      ]),
-      importWarnings: draft.importWarnings,
-    })),
+    drafts: [
+      ...Array.from(draftsByCode.values()).map(({ importRowNumbers, serialNumbers, ...draft }) => ({
+        ...draft,
+        importRowNumber: importRowNumbers[0] ?? draft.importRowNumber,
+        notes: joinCsvNotes([
+          draft.notes,
+          serialNumbers.length > 1 && `Source serials: ${serialNumbers.join(", ")}`,
+          importRowNumbers.length > 1 && `Merged CSV rows: ${importRowNumbers.join(", ")}`,
+        ]),
+        importWarnings: draft.importWarnings,
+      })),
+      ...outputDrafts,
+    ].sort((left, right) => left.importRowNumber - right.importRowNumber),
     mergedDuplicateRows,
     duplicateGroups,
     ambiguousQuantityGroups,
+    deconflictedRows,
   };
+};
+
+const sanitizeAssetCsvQrCodes = (drafts: AssetCsvDraft[], assets: AssetListRow[]) => {
+  const csvQrCounts = drafts.reduce<Record<string, number>>((counts, draft) => {
+    const normalizedQr = draft.qrCodeValue.trim().toUpperCase();
+    if (normalizedQr) {
+      counts[normalizedQr] = (counts[normalizedQr] ?? 0) + 1;
+    }
+
+    return counts;
+  }, {});
+  const existingQrCodes = new Set(assets.map((asset) => asset.qrCode.trim().toUpperCase()).filter((value) => value && value !== "—"));
+
+  return drafts.map((draft) => {
+    const normalizedQr = draft.qrCodeValue.trim().toUpperCase();
+    if (!normalizedQr || ((csvQrCounts[normalizedQr] ?? 0) <= 1 && !existingQrCodes.has(normalizedQr))) {
+      return draft;
+    }
+
+    return {
+      ...draft,
+      qrCodeValue: "",
+      notes: joinCsvNotes([
+        draft.notes,
+        `Source QR/barcode preserved from CSV but not used as primary scan code because it is not unique: ${draft.qrCodeValue}`,
+      ]),
+      importWarnings: Array.from(
+        new Set([
+          ...(draft.importWarnings ?? []),
+          "QR/barcode is shared or already exists, so the app will generate a unique scan code from the asset code.",
+        ]),
+      ),
+    };
+  });
 };
 
 const buildAssetCsvPreview = ({
@@ -658,16 +876,13 @@ const buildAssetCsvPreview = ({
         "assetCode",
         "sku",
         "Código",
-        "ID (Número de serie)",
-        "Códigos QR",
+        "codigo",
+        "codigo interno",
+        "código interno",
       ]);
 
       if (!name) {
         rowIssues.push("Asset name is missing.");
-      }
-
-      if (!internalCode) {
-        rowIssues.push("Asset code is missing.");
       }
 
       const categoryValue = resolveCsvValue(row, ["categoryId", "categoryCode", "category"]);
@@ -756,8 +971,23 @@ const buildAssetCsvPreview = ({
 
     return drafts;
   }, []);
-  const { drafts, mergedDuplicateRows, duplicateGroups, ambiguousQuantityGroups } = aggregateAssetCsvDrafts(rawDrafts);
-  const importableDrafts = drafts.filter((draft) => !existingCodes.has(draft.internalCode.trim().toUpperCase()));
+  const sanitizedRawDrafts = sanitizeAssetCsvQrCodes(rawDrafts, assets);
+  const { drafts: codedRawDrafts, generatedCount } = assignGeneratedAssetCsvCodes(
+    sanitizedRawDrafts,
+    assets,
+    catalog.categories,
+  );
+  const { drafts, mergedDuplicateRows, duplicateGroups, ambiguousQuantityGroups, deconflictedRows } = aggregateAssetCsvDrafts(codedRawDrafts);
+  const existingSerials = new Set(assets.map((asset) => asset.serialNumber.trim().toUpperCase()).filter((value) => value && value !== "—"));
+  const importableDrafts = drafts.filter((draft) => {
+    const normalizedCode = draft.internalCode.trim().toUpperCase();
+    const normalizedSerial = draft.serialNumber.trim().toUpperCase();
+
+    return (
+      !existingCodes.has(normalizedCode) &&
+      (!normalizedSerial || !existingSerials.has(normalizedSerial))
+    );
+  });
   const existingMatches = drafts
     .map((draft) => {
       const existingAsset = existingAssetByCode.get(draft.internalCode.trim().toUpperCase());
@@ -804,6 +1034,18 @@ const buildAssetCsvPreview = ({
     );
   }
 
+  if (deconflictedRows) {
+    warnings.add(
+      `${deconflictedRows} repeated code row${deconflictedRows === 1 ? "" : "s"} looked like separate units and were kept separate with a suffix.`,
+    );
+  }
+
+  if (generatedCount) {
+    warnings.add(
+      `${generatedCount} missing asset code${generatedCount === 1 ? "" : "s"} received category-based temporary codes in the preview.`,
+    );
+  }
+
   const editableIssueRows = drafts.filter((draft) => draft.importWarnings?.length).length;
   if (editableIssueRows) {
     warnings.add(`${editableIssueRows} row${editableIssueRows === 1 ? "" : "s"} need review in the editable import table.`);
@@ -818,6 +1060,8 @@ const buildAssetCsvPreview = ({
       totalRows: dataRows.length,
       uniqueCodes: drafts.length,
       duplicateRows: mergedDuplicateRows,
+      deconflictedRows,
+      generatedCodes: generatedCount,
       existingCodes: drafts.length - importableDrafts.length,
       importableCount: importableDrafts.length,
       importableStock: importableDrafts.reduce((total, draft) => total + draft.totalQuantity, 0),
@@ -836,6 +1080,8 @@ const buildAssetCsvIssueReport = (preview: AssetCsvPreview) => {
     `To import: ${preview.summary.importableCount}`,
     `Existing codes skipped: ${preview.summary.existingCodes}`,
     `Duplicate rows merged: ${preview.summary.duplicateRows}`,
+    `Repeated codes kept separate: ${preview.summary.deconflictedRows}`,
+    `Temporary codes generated: ${preview.summary.generatedCodes}`,
     `Stock rule: ${preview.summary.stockSource === "declaredQuantity" ? "declared quantity with duplicate safety checks" : "CSV row count"}`,
     preview.summary.allRowsExist ? "Result: all assets in this CSV already exist. Import is disabled to avoid duplicates." : "",
     "",
@@ -1050,6 +1296,14 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     ? csvDerivedSummary?.importableDrafts ?? []
     : csvDerivedSummary?.importableDrafts.slice(0, 8) ?? [];
   const csvHiddenReviewCount = Math.max(0, (csvDerivedSummary?.importableDrafts.length ?? 0) - csvReviewDrafts.length);
+  const showGlobalAssetLanding =
+    !error &&
+    !isLoading &&
+    !isProjectMode &&
+    assets.length === 0 &&
+    !assetControls.searchValue.trim() &&
+    !csvImportPreview &&
+    !csvImportProgress;
   const selectedKitLockedAssets = useMemo(
     () => selectedAssets.filter((asset) => asset.linkedKitCount > 0),
     [selectedAssets],
@@ -1399,6 +1653,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setEditorError(null);
 
       const existingCodes = new Set(assets.map((asset) => asset.code.trim().toUpperCase()).filter(Boolean));
+      const existingSerials = new Set(assets.map((asset) => asset.serialNumber.trim().toUpperCase()).filter((value) => value && value !== "—"));
       const readyRowNumbers =
         mode === "ready"
           ? new Set((csvDerivedSummary?.readyDrafts ?? []).map((draft) => draft.importRowNumber))
@@ -1407,7 +1662,9 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       let skippedDuplicateCount = 0;
       let skippedReviewCount = 0;
       let processedCount = 0;
+      const failedRows: AssetCsvImportProgress["failedRows"] = [];
       const totalRows = csvImportPreview.drafts.length;
+      const liveRefreshEveryRows = 25;
       const updateProgress = (patch: Partial<AssetCsvImportProgress>) =>
         setCsvImportProgress({
           status: "running",
@@ -1417,7 +1674,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           importedRows: importedCount,
           skippedDuplicateRows: skippedDuplicateCount,
           skippedReviewRows: skippedReviewCount,
-          failedRows: [],
+          failedRows: [...failedRows],
           ...patch,
         });
 
@@ -1426,6 +1683,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       for (const draft of csvImportPreview.drafts) {
         const { importRowNumber, importWarnings: _importWarnings, ...assetDraft } = draft;
         const normalizedCode = assetDraft.internalCode.trim().toUpperCase();
+        const normalizedSerial = assetDraft.serialNumber.trim().toUpperCase();
 
         if (readyRowNumbers && !readyRowNumbers.has(importRowNumber)) {
           skippedReviewCount += 1;
@@ -1434,48 +1692,75 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           continue;
         }
 
-        if (existingCodes.has(normalizedCode)) {
+        if (
+          existingCodes.has(normalizedCode) ||
+          (normalizedSerial && existingSerials.has(normalizedSerial))
+        ) {
           skippedDuplicateCount += 1;
           processedCount += 1;
           updateProgress({});
           continue;
         }
 
-        try {
-          await createAsset({
-            commandId: crypto.randomUUID(),
-            workspaceId: activeWorkspaceId,
-            actorType: "user",
-            sourceChannel: "desktop",
-            isActive: true,
-            ...assetDraft,
-          });
+        let draftToCreate = assetDraft;
+        let importedCode = normalizedCode;
+        let lastImportError: unknown = null;
+        let rowWasImported = false;
+
+        for (let attempt = 0; attempt <= ASSET_CSV_CODE_DECONFLICT_MAX_ATTEMPTS; attempt += 1) {
+          try {
+            await createAsset({
+              commandId: crypto.randomUUID(),
+              workspaceId: activeWorkspaceId,
+              actorType: "user",
+              sourceChannel: "desktop",
+              isActive: true,
+              ...draftToCreate,
+            });
+            rowWasImported = true;
+            break;
+          } catch (error) {
+            lastImportError = error;
+
+            if (!isAssetInternalCodeDuplicateError(error)) {
+              break;
+            }
+
+            if (attempt === ASSET_CSV_CODE_DECONFLICT_MAX_ATTEMPTS) {
+              break;
+            }
+
+            const fallbackCode = createDeconflictedAssetCsvCode(normalizedCode, existingCodes);
+            importedCode = fallbackCode;
+            draftToCreate = {
+              ...assetDraft,
+              internalCode: fallbackCode,
+              notes: joinCsvNotes([
+                assetDraft.notes,
+                `Import deconflicted code from ${assetDraft.internalCode} to ${fallbackCode} because the original code already existed locally but was not visible as an import duplicate.`,
+              ]),
+            };
+          }
+        }
+
+        if (rowWasImported) {
           importedCount += 1;
           processedCount += 1;
-          existingCodes.add(normalizedCode);
-          updateProgress({});
-        } catch (error) {
-          if (isDuplicateRegistryCodeError(error)) {
-            skippedDuplicateCount += 1;
-            processedCount += 1;
-            existingCodes.add(normalizedCode);
-            updateProgress({});
-            continue;
+          existingCodes.add(importedCode);
+          if (normalizedSerial) {
+            existingSerials.add(normalizedSerial);
           }
-
-          const message = getErrorMessage(error) || t("assets.csv.unknownImportError");
-          updateProgress({
-            status: "failed",
-            processedRows: processedCount,
-            failedRows: [{ rowNumber: importRowNumber, message }],
-          });
-          throw new Error(
-            t("assets.csv.rowImportFailed", {
-              row: importRowNumber,
-              message,
-            }),
-          );
+          updateProgress({});
+          if (importedCount % liveRefreshEveryRows === 0) {
+            reload();
+          }
+          continue;
         }
+
+        const message = getErrorMessage(lastImportError) || t("assets.csv.unknownImportError");
+        failedRows.push({ rowNumber: importRowNumber, message });
+        processedCount += 1;
+        updateProgress({});
       }
 
       updateProgress({
@@ -1510,6 +1795,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             : "",
           skippedDuplicateCount ? t("assets.csv.skippedExisting", { count: skippedDuplicateCount }) : "",
           skippedReviewCount ? t("assets.csv.leftForReview", { count: skippedReviewCount }) : "",
+          failedRows.length ? t("assets.csv.skippedFailed", { count: failedRows.length }) : "",
         ].filter(Boolean).join(" "),
       );
     } catch (error) {
@@ -1730,6 +2016,15 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         </div>
       ) : null}
       {editorError && !editorMode ? <div className="action-feedback action-feedback-error">{editorError}</div> : null}
+      {!isProjectMode ? (
+        <input
+          ref={fileInputRef}
+          accept=".csv,text/csv"
+          hidden
+          onChange={(event) => void handleImportCsvFile(event.target.files?.[0] ?? null)}
+          type="file"
+        />
+      ) : null}
       {selectedKitLockSummary ? (
         <div className="action-feedback action-feedback-warning">
           {t("assets.selection.kitLocked", { summary: selectedKitLockSummary })}
@@ -1817,7 +2112,50 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         </section>
       ) : null}
 
-      {!error && !isLoading && assets.length === 0 && !assetControls.searchValue.trim() ? (
+      {showGlobalAssetLanding ? (
+        <section className="asset-empty-landing" aria-label={t("assets.empty.globalTitle")}>
+          <div className="asset-empty-landing-copy">
+            <span className="asset-empty-landing-kicker">{t("assets.empty.globalKicker")}</span>
+            <h2>{t("assets.empty.globalTitle")}</h2>
+            <p>{t("assets.empty.globalBody")}</p>
+          </div>
+          <div className="asset-empty-landing-steps">
+            {assetEmptyTips("assets.empty.tipsGlobal").map((tip, index) => (
+              <span key={tip}>
+                <strong>{index + 1}</strong>
+                {tip}
+              </span>
+            ))}
+          </div>
+          <div className="asset-empty-landing-actions">
+            <button
+              className="asset-create-button action-row-button"
+              onClick={() => {
+                setEditorMode("create");
+                setEditorError(null);
+              }}
+              type="button"
+            >
+              <Plus size={14} />
+              <span>{t("assets.empty.globalAction")}</span>
+            </button>
+            <button
+              className="ghost-control action-row-button"
+              disabled={isImportingAssets}
+              onClick={() => fileInputRef.current?.click()}
+              type="button"
+            >
+              <Import size={14} />
+              <span>{isImportingAssets ? t("assets.importing") : t("assets.importCsv")}</span>
+            </button>
+            <button className="ghost-control action-row-button" onClick={() => navigate("/catalog")} type="button">
+              {t("assets.empty.openCatalog")}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {!showGlobalAssetLanding && !error && !isLoading && assets.length === 0 && !assetControls.searchValue.trim() && isProjectMode ? (
         <GuidedEmptyState
           title={isProjectMode ? t("assets.empty.projectTitle") : t("assets.empty.globalTitle")}
           body={isProjectMode ? t("assets.empty.projectBody") : t("assets.empty.globalBody")}
@@ -1906,6 +2244,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
       {!isProjectMode ? <GlobalAssetsMetrics /> : null}
 
+      {!showGlobalAssetLanding ? (
       <ResizableSideRailLayout
         className="asset-list-layout"
         defaultWidth={360}
@@ -1971,13 +2310,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     <Import size={14} />
                     <span>{isImportingAssets ? t("assets.importing") : t("assets.importCsv")}</span>
                   </button>
-                  <input
-                    ref={fileInputRef}
-                    accept=".csv,text/csv"
-                    hidden
-                    onChange={(event) => void handleImportCsvFile(event.target.files?.[0] ?? null)}
-                    type="file"
-                  />
                 </>
               )}
             </div>
@@ -2021,6 +2353,25 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                   })}
                 </span>
               </div>
+              {csvImportProgress.status !== "running" ? (
+                <button
+                  aria-label={t("common.close")}
+                  className="icon-ghost-control asset-import-progress-close"
+                  onClick={() => setCsvImportProgress(null)}
+                  type="button"
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
+              <div className="asset-import-progress-meter" aria-hidden="true">
+                <span
+                  style={{
+                    width: `${csvImportProgress.totalRows > 0
+                      ? Math.min(100, Math.round((csvImportProgress.processedRows / csvImportProgress.totalRows) * 100))
+                      : 0}%`,
+                  }}
+                />
+              </div>
               <div className="asset-import-progress-stats">
                 <span>
                   <strong>{csvImportProgress.importedRows}</strong>
@@ -2041,11 +2392,14 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               </div>
               {csvImportProgress.failedRows.length ? (
                 <div className="asset-import-progress-errors">
-                  {csvImportProgress.failedRows.map((row) => (
+                  {csvImportProgress.failedRows.slice(0, 6).map((row) => (
                     <span key={`${row.rowNumber}-${row.message}`}>
                       {t("assets.csv.rowNote", { row: row.rowNumber, message: row.message })}
                     </span>
                   ))}
+                  {csvImportProgress.failedRows.length > 6 ? (
+                    <span>{t("assets.csv.moreRowErrors", { count: csvImportProgress.failedRows.length - 6 })}</span>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -2115,6 +2469,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                   [t("assets.csv.stats.needsReview"), csvDerivedSummary?.needsReviewDrafts.length ?? 0],
                   [t("assets.csv.stats.totalUnits"), csvDerivedSummary?.importableStock ?? csvImportPreview.summary.importableStock],
                   [t("assets.csv.stats.existing"), csvDerivedSummary?.existingCount ?? csvImportPreview.summary.existingCodes],
+                  [t("assets.csv.stats.generatedCodes"), csvImportPreview.summary.generatedCodes],
                   [t("assets.csv.stats.mergedRows"), csvImportPreview.summary.duplicateRows],
                 ].map(([label, value]) => (
                   <span key={label}>
@@ -2122,8 +2477,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     {label}
                   </span>
                 ))}
-                <span className={csvImportPreview.summary.warnings.length ? "asset-import-stat-warning" : undefined}>
-                  <strong>{csvImportPreview.summary.warnings.length}</strong>
+                <span className={csvDerivedSummary?.warningCount ? "asset-import-stat-warning" : undefined}>
+                  <strong>{csvDerivedSummary?.warningCount ?? csvImportPreview.summary.warnings.length}</strong>
                   {t("assets.csv.stats.warnings")}
                 </span>
                 <span className={csvImportPreview.errors.length ? "asset-import-stat-error" : undefined}>
@@ -2598,6 +2953,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           </div>
         ) : null}
       </ResizableSideRailLayout>
+      ) : null}
     </div>
   );
 };
