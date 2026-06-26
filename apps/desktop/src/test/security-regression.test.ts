@@ -511,7 +511,10 @@ describe("security regression checks", () => {
     expect(projectReadSource).toContain('costEstimate: includeFinancials ? deps.formatCurrency(row.cost_estimate) : "—"');
     expect(projectReadSource).toContain("includeFinancials ? (hasBudgetEntries ? \"Finance hooks linked\" : \"No finance entries yet\") : \"Restricted\"");
     expect(projectPageSource).toContain('option.value !== "exposure"');
-    expect(projectDetailPanelSource).toContain("canAccessFinance ? (");
+    // Exposure (a finance field) is only rendered inside the budget quick action,
+    // which is gated behind canAccessFinance.
+    expect(projectDetailPanelSource).toContain("...(canAccessFinance");
+    expect(projectDetailPanelSource).toContain("exposure: project.exposure");
   });
 
   it("keeps cached workspace users idempotent when a local user already owns the same email", () => {
