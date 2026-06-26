@@ -170,6 +170,15 @@ export const useAssetSnapshotPull = () => {
             appApi: appApi!,
             workspaceId: activeWorkspaceId,
             dependencies: {
+              // assets.category_id (NOT NULL) and the location FKs are hard apply
+              // dependencies: a missing one defers the asset row forever and wedges
+              // the cursor. Fetch them by id (cursor-independent) so a category or
+              // location the delta pull skipped can't silently block inventory sync.
+              asset_categories: assets.map((asset) => asset.category_id),
+              locations: [
+                ...assets.map((asset) => asset.default_location_id),
+                ...states.map((state) => state.current_location_id),
+              ],
               departments: states.map((state) => state.current_department_id),
             },
           });
@@ -242,6 +251,15 @@ export const useAssetSnapshotPull = () => {
             appApi: appApi!,
             workspaceId: activeWorkspaceId,
             dependencies: {
+              // assets.category_id (NOT NULL) and the location FKs are hard apply
+              // dependencies: a missing one defers the asset row forever and wedges
+              // the cursor. Fetch them by id (cursor-independent) so a category or
+              // location the delta pull skipped can't silently block inventory sync.
+              asset_categories: assets.map((asset) => asset.category_id),
+              locations: [
+                ...assets.map((asset) => asset.default_location_id),
+                ...states.map((state) => state.current_location_id),
+              ],
               departments: states.map((state) => state.current_department_id),
             },
           });

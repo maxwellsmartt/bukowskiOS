@@ -104,6 +104,10 @@ export const catalogDependenciesFromOperationalSnapshots = (
     departments.push(
       ...records(snapshot.snapshot_json.projectDepartments).map((row) => idFrom(row, "department_id")),
       ...records(snapshot.snapshot_json.unitDepartments).map((row) => idFrom(row, "department_id")),
+      // A crew assignment can reference a department outside the project/unit
+      // matrices; hydrate those too so the assignment keeps its real department
+      // instead of being nulled by the apply-side foreign-key guard.
+      ...records(snapshot.snapshot_json.crewAssignments).map((row) => idFrom(row, "department_id")),
     );
   }
 

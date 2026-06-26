@@ -94,6 +94,21 @@ const INBOUND_COVERAGE = [
   "sync_tombstones",
 ] as const;
 
+// The operational-snapshot pull keys its cursor by the singular entity_type
+// ("project", "packing_slip", "incident", "rma_case"), while the coverage tiles
+// and their i18n labels use the plural family name. Without bridging the two,
+// an inbound error on those entities (e.g. a project snapshot foreign-key
+// failure) is silently invisible in this page even though it shows in the
+// header sync popover.
+const COVERAGE_KEY_BY_CURSOR_ENTITY: Record<string, string> = {
+  project: "projects",
+  packing_slip: "packing_slips",
+  incident: "incidents",
+  rma_case: "rma_cases",
+};
+
+const coverageKeyForCursor = (entityType: string) => COVERAGE_KEY_BY_CURSOR_ENTITY[entityType] ?? entityType;
+
 /** Friendly icon per outbox entity family. Falls back to the upload glyph. */
 const entityIcon = (entityType: string): LucideIcon => {
   if (entityType.startsWith("asset")) return Boxes;
@@ -248,7 +263,11 @@ export const SyncOutboxPage = () => {
     [workspacePullCursors],
   );
   const pullCursorByEntity = useMemo(
-    () => new Map(workspacePullCursors.map((cursor) => [cursor.entityType, cursor])),
+    () => new Map(workspacePullCursors.map((cursor) => [coverageKeyForCursor(cursor.entityType), cursor])),
+    [workspacePullCursors],
+  );
+  const inboundErrorCursors = useMemo(
+    () => workspacePullCursors.filter((cursor) => cursor.lastError),
     [workspacePullCursors],
   );
 
@@ -552,6 +571,36 @@ export const SyncOutboxPage = () => {
         ) : null}
 
         <SurfaceCard className="sync-transfers-card" title={t("settings.sync.transfers.title")}>
+          {inboundErrorCursors.length > 0 ? (
+            <div className="sync-inbound-attention" role="alert">
+              <p className="sync-inbound-attention-head">
+                <AlertTriangle size={15} aria-hidden="true" />
+                <span>
+                  {t("settings.sync.inboundErrors.title", {
+                    defaultValue: "Descargas con error · {{count}}",
+                    count: inboundErrorCursors.length,
+                  })}
+                </span>
+              </p>
+              <div className="sync-coverage-grid">
+                {inboundErrorCursors.map((cursor) => {
+                  const coverageKey = coverageKeyForCursor(cursor.entityType);
+                  const label = t(`settings.sync.coverage.${coverageKey}.label`, {
+                    defaultValue: formatEntityLabel(cursor.entityType),
+                  });
+                  return (
+                    <div className="sync-coverage-item is-error" key={cursor.entityType}>
+                      <span className="sync-coverage-icon is-error"><AlertTriangle size={14} /></span>
+                      <div>
+                        <strong>{label}</strong>
+                        <small>{cursor.lastError}</small>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
           <div className="sync-xfer-toggle" role="tablist" aria-label={t("settings.sync.transfers.title")}>
             <button
               type="button"

@@ -9692,6 +9692,34 @@ button.project-budget-command-metric {
   gap: 10px;
 }
 
+.sync-inbound-attention {
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid rgba(255, 116, 116, 0.28);
+  border-radius: 16px;
+  background: rgba(255, 116, 116, 0.06);
+}
+
+.sync-inbound-attention-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sync-inbound-attention-head svg {
+  flex: none;
+  color: rgba(255, 173, 173, 0.96);
+}
+
+.sync-coverage-item.is-error {
+  border-color: rgba(255, 116, 116, 0.28);
+  background: rgba(255, 116, 116, 0.05);
+}
+
 .sync-coverage-item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

@@ -12,6 +12,9 @@ describe("catalog dependency hydration", () => {
         project: { client_id: "client-1", production_company_id: "company-1" },
         projectDepartments: [{ department_id: "department-1" }],
         unitDepartments: [{ department_id: "department-1" }, { department_id: "department-2" }],
+        // A crew assignment can reference a department outside the matrices — it
+        // must still be hydrated, otherwise the assignment loses its department.
+        crewAssignments: [{ department_id: "department-3" }],
       },
     }]);
 
@@ -21,6 +24,7 @@ describe("catalog dependency hydration", () => {
       "department-1",
       "department-1",
       "department-2",
+      "department-3",
     ]);
   });
 
