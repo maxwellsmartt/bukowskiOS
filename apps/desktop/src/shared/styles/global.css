@@ -3488,6 +3488,76 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   color: var(--status-danger-fg);
 }
 
+.sync-popover-errors {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 116, 116, 0.26);
+  border-radius: 12px;
+  background: rgba(255, 116, 116, 0.06);
+}
+
+.sync-popover-errors-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.sync-popover-errors-head > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 173, 173, 0.96);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sync-popover-errors-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.sync-popover-errors-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.sync-popover-error-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sync-popover-error-item:first-of-type {
+  border-top: none;
+}
+
+.sync-popover-error-item strong {
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.sync-popover-error-item span {
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
 .sync-popover-actions {
   display: flex;
   align-items: center;
@@ -9902,16 +9972,71 @@ button.project-budget-command-metric {
 .sync-inbound-attention-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   margin: 0 0 10px;
+}
+
+.sync-inbound-attention-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
 }
 
-.sync-inbound-attention-head svg {
+.sync-inbound-attention-title svg {
   flex: none;
   color: rgba(255, 173, 173, 0.96);
+}
+
+.sync-inbound-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.sync-inbound-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.sync-inbound-collapsed {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.sync-inbound-show {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 116, 116, 0.28);
+  background: rgba(255, 116, 116, 0.06);
+  color: rgba(255, 173, 173, 0.96);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.sync-inbound-show svg {
+  flex: none;
+}
+
+.sync-inbound-show:hover {
+  background: rgba(255, 116, 116, 0.12);
 }
 
 .sync-coverage-item.is-error {
@@ -9954,10 +10079,47 @@ button.project-budget-command-metric {
 /* ── Sync mission control ─────────────────────────────────────────────── */
 .sync-mc-topbar {
   display: flex;
+  justify-content: flex-end;
+}
+
+.sync-mc-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  min-width: 0;
+}
+
+.sync-mc-status-row {
+  display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 8px;
   flex-wrap: wrap;
+}
+
+.sync-supabase-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.sync-supabase-link:hover {
+  border-color: var(--border-strong, rgba(255, 255, 255, 0.16));
+  background: var(--hairline-faint, rgba(255, 255, 255, 0.04));
+  color: var(--text-primary);
+}
+
+.sync-supabase-link svg {
+  flex: none;
 }
 
 .sync-conn-pill {
@@ -9969,6 +10131,18 @@ button.project-budget-command-metric {
   border: 1px solid var(--border-subtle);
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+/* Subtle, compact variant for the right-aligned mission-control header. */
+.sync-conn-pill.is-compact {
+  gap: 6px;
+  padding: 3px 9px;
+  font-size: 10px;
+}
+
+.sync-conn-pill.is-compact .sync-conn-dot {
+  width: 6px;
+  height: 6px;
 }
 
 .sync-conn-dot {

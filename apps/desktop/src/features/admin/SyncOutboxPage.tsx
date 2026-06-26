@@ -15,6 +15,7 @@ import {
   Search,
   Wifi,
   Wrench,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import type {
@@ -40,9 +41,41 @@ import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import { useSyncConnectionState } from "@shared/hooks/useSyncConnectionState";
 import { requestImmediatePull } from "@shared/hooks/useWorkspaceDataRefresh";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { coverageKeyForCursor, inboundCursorLabel } from "@shared/lib/syncInbound";
 import { getSyncOutboxStatusLabel } from "@shared/labels/statusLabels";
 
 import { SettingsLayout } from "./SettingsLayout";
+
+// Direct link to this workspace's Supabase project, derived from the configured
+// project URL so admins don't have to remember the dashboard URL. null when the
+// env isn't a recognizable Supabase host.
+const SUPABASE_DASHBOARD_URL = (() => {
+  try {
+    const raw = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
+    if (!raw) return null;
+    const host = new URL(raw).hostname;
+    const ref = host.split(".")[0];
+    return host.endsWith(".supabase.co") && ref ? `https://supabase.com/dashboard/project/${ref}` : null;
+  } catch {
+    return null;
+  }
+})();
+
+const INBOUND_COLLAPSE_KEY = "bukowski:sync-inbound-errors-collapsed";
+
+const SupabaseGlyph = () => (
+  <svg width="13" height="13" viewBox="0 0 109 113" fill="none" aria-hidden="true">
+    <path
+      d="M63.708 110.284c-2.86 3.601-8.658 1.628-8.727-2.97l-1.007-67.251h45.22c8.19 0 12.758 9.46 7.665 15.874l-43.151 54.347Z"
+      fill="#3ECF8E"
+    />
+    <path
+      d="M45.317 2.71c2.86-3.602 8.657-1.629 8.726 2.97l.442 67.251H9.83c-8.19 0-12.759-9.46-7.665-15.875L45.317 2.71Z"
+      fill="#3ECF8E"
+      fillOpacity="0.55"
+    />
+  </svg>
+);
 
 const emptyDiagnostics: AppDiagnosticsSnapshot = {
   databaseSizeBytes: 0,
@@ -93,21 +126,6 @@ const INBOUND_COVERAGE = [
   "workspace_files",
   "sync_tombstones",
 ] as const;
-
-// The operational-snapshot pull keys its cursor by the singular entity_type
-// ("project", "packing_slip", "incident", "rma_case"), while the coverage tiles
-// and their i18n labels use the plural family name. Without bridging the two,
-// an inbound error on those entities (e.g. a project snapshot foreign-key
-// failure) is silently invisible in this page even though it shows in the
-// header sync popover.
-const COVERAGE_KEY_BY_CURSOR_ENTITY: Record<string, string> = {
-  project: "projects",
-  packing_slip: "packing_slips",
-  incident: "incidents",
-  rma_case: "rma_cases",
-};
-
-const coverageKeyForCursor = (entityType: string) => COVERAGE_KEY_BY_CURSOR_ENTITY[entityType] ?? entityType;
 
 /** Friendly icon per outbox entity family. Falls back to the upload glyph. */
 const entityIcon = (entityType: string): LucideIcon => {
@@ -184,8 +202,9 @@ const transferFillPercent = (status: AppSyncOutboxRow["status"]) => {
 
 export const SyncOutboxPage = () => {
   const navigate = useNavigate();
-  const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { activeMembership, activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const { status: sessionStatus, isLocalFallback } = useSession();
+  const isAdmin = activeMembership?.roleKey === "admin";
   const toast = useToast();
   const { t } = useTranslation();
   const { formatDateTime } = useLocale();
@@ -209,6 +228,26 @@ export const SyncOutboxPage = () => {
   const [search, setSearch] = useState("");
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
   const [expandedConflictId, setExpandedConflictId] = useState<string | null>(null);
+  const [inboundErrorsCollapsed, setInboundErrorsCollapsed] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(INBOUND_COLLAPSE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setInboundErrorsCollapsedPersisted = (collapsed: boolean) => {
+    setInboundErrorsCollapsed(collapsed);
+    try {
+      window.localStorage.setItem(INBOUND_COLLAPSE_KEY, collapsed ? "1" : "0");
+    } catch {
+      /* storage unavailable — collapse state simply won't persist */
+    }
+  };
+  const openSupabaseProject = () => {
+    if (SUPABASE_DASHBOARD_URL) {
+      void window.bukowskiApp?.openExternal?.(SUPABASE_DASHBOARD_URL);
+    }
+  };
   const [retryingRowId, setRetryingRowId] = useState<string | null>(null);
   const [resolvingConflictId, setResolvingConflictId] = useState<string | null>(null);
   const [isRunningLocalSync, setIsRunningLocalSync] = useState(false);
@@ -463,12 +502,27 @@ export const SyncOutboxPage = () => {
 
       <SettingsLayout>
         <div className="sync-mc-topbar">
-          <span className={`sync-conn-pill sync-conn-${pillTone}`}>
-            <span className="sync-conn-dot" aria-hidden="true" />
-            <ConnectionIcon size={14} />
-            <span>{connectionLabel}</span>
-          </span>
-          <small className="sync-mc-lastpass">{t("settings.sync.outbound.lastPass", { value: formatDateLabel(diagnostics.lastSyncRunAt) })}</small>
+          <div className="sync-mc-status">
+            <div className="sync-mc-status-row">
+              {isAdmin && SUPABASE_DASHBOARD_URL ? (
+                <button
+                  type="button"
+                  className="sync-supabase-link"
+                  onClick={openSupabaseProject}
+                  title={t("settings.sync.supabaseProject", { defaultValue: "Abrir el proyecto en Supabase" })}
+                >
+                  <SupabaseGlyph />
+                  <span>{t("settings.sync.supabaseProjectShort", { defaultValue: "Supabase" })}</span>
+                </button>
+              ) : null}
+              <span className={`sync-conn-pill sync-conn-${pillTone} is-compact`}>
+                <span className="sync-conn-dot" aria-hidden="true" />
+                <ConnectionIcon size={12} />
+                <span>{connectionLabel}</span>
+              </span>
+            </div>
+            <small className="sync-mc-lastpass">{t("settings.sync.outbound.lastPass", { value: formatDateLabel(diagnostics.lastSyncRunAt) })}</small>
+          </div>
         </div>
 
         <div className={`sync-health-banner sync-health-${health.tone}`}>
@@ -572,34 +626,56 @@ export const SyncOutboxPage = () => {
 
         <SurfaceCard className="sync-transfers-card" title={t("settings.sync.transfers.title")}>
           {inboundErrorCursors.length > 0 ? (
-            <div className="sync-inbound-attention" role="alert">
-              <p className="sync-inbound-attention-head">
-                <AlertTriangle size={15} aria-hidden="true" />
-                <span>
-                  {t("settings.sync.inboundErrors.title", {
-                    defaultValue: "Descargas con error · {{count}}",
-                    count: inboundErrorCursors.length,
-                  })}
-                </span>
-              </p>
-              <div className="sync-coverage-grid">
-                {inboundErrorCursors.map((cursor) => {
-                  const coverageKey = coverageKeyForCursor(cursor.entityType);
-                  const label = t(`settings.sync.coverage.${coverageKey}.label`, {
-                    defaultValue: formatEntityLabel(cursor.entityType),
-                  });
-                  return (
+            inboundErrorsCollapsed ? (
+              <div className="sync-inbound-collapsed">
+                <button
+                  type="button"
+                  className="sync-inbound-show"
+                  onClick={() => setInboundErrorsCollapsedPersisted(false)}
+                >
+                  <AlertTriangle size={13} aria-hidden="true" />
+                  <span>
+                    {t("settings.sync.inboundErrors.show", {
+                      defaultValue: "Mostrar errores · {{count}}",
+                      count: inboundErrorCursors.length,
+                    })}
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <div className="sync-inbound-attention" role="alert">
+                <div className="sync-inbound-attention-head">
+                  <span className="sync-inbound-attention-title">
+                    <AlertTriangle size={15} aria-hidden="true" />
+                    <span>
+                      {t("settings.sync.inboundErrors.title", {
+                        defaultValue: "Descargas con error · {{count}}",
+                        count: inboundErrorCursors.length,
+                      })}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="sync-inbound-close"
+                    aria-label={t("common.close", { defaultValue: "Cerrar" })}
+                    onClick={() => setInboundErrorsCollapsedPersisted(true)}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="sync-coverage-grid">
+                  {inboundErrorCursors.map((cursor) => (
                     <div className="sync-coverage-item is-error" key={cursor.entityType}>
                       <span className="sync-coverage-icon is-error"><AlertTriangle size={14} /></span>
                       <div>
-                        <strong>{label}</strong>
+                        <strong>{inboundCursorLabel(t, cursor.entityType)}</strong>
                         <small>{cursor.lastError}</small>
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
+            )
           ) : null}
           <div className="sync-xfer-toggle" role="tablist" aria-label={t("settings.sync.transfers.title")}>
             <button

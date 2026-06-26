@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, CloudCog, CloudOff, RefreshCw, Search, Wifi, WifiOff } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CloudCog, CloudOff, RefreshCw, Search, Wifi, WifiOff, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -19,6 +19,7 @@ import {
 import { useLocale } from "@shared/hooks/useLocale";
 import { resolveProjectColor } from "@shared/lib/projectColors";
 import { parseSyncTimestamp } from "@shared/lib/syncHealth";
+import { inboundCursorLabel } from "@shared/lib/syncInbound";
 import type { AppDiagnosticsSnapshot, AppSyncPullCursorRow, AppSyncStatusSnapshot } from "@contracts";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { NotificationsButton } from "./NotificationsTray";
@@ -28,6 +29,7 @@ type TopContextBarProps = {
 };
 
 const syncButtonReleaseMs = 5_000;
+const INBOUND_POPOVER_DISMISS_KEY = "bukowski:sync-popover-inbound-dismissed";
 const realtimeFreshWindowMs = 10 * 60 * 1_000;
 const syncFreshWindowMs = 3 * 60 * 1_000;
 
@@ -185,8 +187,29 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const workspacePullCursors = pullCursors.filter(
     (cursor) => !activeWorkspaceId || cursor.workspaceId === activeWorkspaceId,
   );
-  const inboundFailedCount = workspacePullCursors.filter((cursor) => cursor.lastError).length;
+  const erroredPullCursors = workspacePullCursors.filter((cursor) => cursor.lastError);
+  const inboundFailedCount = erroredPullCursors.length;
   const latestInboundCheck = workspacePullCursors[0]?.updatedAt ?? null;
+  const inboundErrorSignature = erroredPullCursors.map((cursor) => `${cursor.entityType}:${cursor.lastError}`).join("|");
+  const [dismissedInboundSignature, setDismissedInboundSignature] = useState<string | null>(() => {
+    try {
+      return window.localStorage.getItem(INBOUND_POPOVER_DISMISS_KEY);
+    } catch {
+      return null;
+    }
+  });
+  // Dismissal only sticks while the SAME set of errors persists; if a new error
+  // appears or one clears, the signature changes and the list resurfaces so it
+  // never hides a fresh problem.
+  const inboundErrorsDismissed = inboundErrorSignature.length > 0 && dismissedInboundSignature === inboundErrorSignature;
+  const dismissInboundErrors = () => {
+    setDismissedInboundSignature(inboundErrorSignature);
+    try {
+      window.localStorage.setItem(INBOUND_POPOVER_DISMISS_KEY, inboundErrorSignature);
+    } catch {
+      /* storage unavailable */
+    }
+  };
   const latestSyncActivity = diagnostics?.lastSyncRunAt ?? latestInboundCheck;
   const outboundFailedCount = diagnostics?.syncOutboxFailedCount ?? 0;
   const hasRetryableOutboundFailures = outboundFailedCount > 0;
@@ -476,6 +499,31 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
                 <span>{t("shell.topBar.syncPopover.lastRun", { defaultValue: "Última pasada" })}</span>
                 <strong>{renderLastRun()}</strong>
               </div>
+
+              {erroredPullCursors.length > 0 && !inboundErrorsDismissed ? (
+                <div className="sync-popover-errors">
+                  <div className="sync-popover-errors-head">
+                    <span>
+                      <AlertTriangle size={12} aria-hidden="true" />
+                      {t("shell.topBar.syncPopover.inboundErrorsTitle", { defaultValue: "Descargas con error" })}
+                    </span>
+                    <button
+                      type="button"
+                      className="sync-popover-errors-close"
+                      aria-label={t("common.close", { defaultValue: "Cerrar" })}
+                      onClick={dismissInboundErrors}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                  {erroredPullCursors.map((cursor) => (
+                    <div className="sync-popover-error-item" key={cursor.entityType}>
+                      <strong>{inboundCursorLabel(t, cursor.entityType)}</strong>
+                      <span>{cursor.lastError}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
 
               {diagnostics?.lastSyncSummary ? <p className="sync-popover-summary">{diagnostics.lastSyncSummary}</p> : null}
               {syncActionNotice ? <p className="sync-popover-success">{syncActionNotice}</p> : null}
