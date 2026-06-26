@@ -170,6 +170,46 @@ export type ArchiveAssetCommand = {
   sourceChannel: CommandSourceChannel;
 };
 
+export type ArchiveAssetsCommand = {
+  commandId: string;
+  workspaceId: string;
+  assetIds: string[];
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+};
+
+export type ArchiveAssetsResult = {
+  commandId: string;
+  archivedCount: number;
+  blockedCount: number;
+  assetIds: string[];
+  repeated: boolean;
+  summary: string;
+};
+
+export type ReconcileAssetQuantityInput = {
+  assetId: string;
+  totalQuantity: number;
+  reason?: string;
+};
+
+export type ReconcileAssetQuantitiesCommand = {
+  commandId: string;
+  workspaceId: string;
+  sourceLabel: string;
+  rows: ReconcileAssetQuantityInput[];
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+};
+
+export type ReconcileAssetQuantitiesResult = {
+  commandId: string;
+  reconciledCount: number;
+  skippedCount: number;
+  repeated: boolean;
+  summary: string;
+};
+
 export type AssetEditorMutationResult = {
   commandId: string;
   assetId: string;

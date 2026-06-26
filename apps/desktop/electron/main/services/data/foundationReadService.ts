@@ -689,6 +689,8 @@ const mapEventTitle = (eventType: string) => {
       return "Maintenance started";
     case "maintenance_completed":
       return "Maintenance completed";
+    case "inventory_reconciled":
+      return "Inventory reconciled";
     default:
       return "Status updated";
   }

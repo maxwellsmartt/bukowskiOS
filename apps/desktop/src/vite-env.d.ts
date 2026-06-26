@@ -148,6 +148,10 @@ import type {
   UnassignCrewFromProjectUnitInput,
   UpdateAgentCommand,
   UpdateAssetCommand,
+  ArchiveAssetsCommand,
+  ArchiveAssetsResult,
+  ReconcileAssetQuantitiesCommand,
+  ReconcileAssetQuantitiesResult,
   RenameAssistantThreadCommand,
   UpdateAssistantThreadPreferencesCommand,
   UpdateCatalogEntityInput,
@@ -357,6 +361,8 @@ declare global {
       create: (input: CreateAssetCommand) => Promise<AssetEditorMutationResult>;
       update: (input: UpdateAssetCommand) => Promise<AssetEditorMutationResult>;
       archive: (input: ArchiveAssetCommand) => Promise<AssetEditorMutationResult>;
+      archiveMany: (input: ArchiveAssetsCommand) => Promise<ArchiveAssetsResult>;
+      reconcileQuantities: (input: ReconcileAssetQuantitiesCommand) => Promise<ReconcileAssetQuantitiesResult>;
     };
     bukowskiPacking?: {
       getList: (query?: PackingSlipListQuery) => Promise<PackingSlipRow[]>;

@@ -747,6 +747,7 @@
       "createRmaMultiTip": "Select one asset to prepare an RMA",
       "createPackingSlip": "Create packing slip",
       "assignMove": "Assign / move",
+      "deleteSelected": "Delete",
       "return": "Return",
       "unitMeta": "Unit · {{unit}}",
       "returnAvailableTip": "Open project packing slips to process returns",
@@ -878,6 +879,30 @@
       "reviewEditsTitle": "Review row edits",
       "moreRowIssues_one": "{{count}} more row issue.",
       "moreRowIssues_other": "{{count}} more row issues."
+    },
+    "reconciliation": {
+      "apply": "Reconcile quantities",
+      "working": "Reconciling…",
+      "stat": "reconcilable",
+      "previewTitle": "Different quantity on existing assets",
+      "dialogTitle": "Reconcile inventory quantities?",
+      "dialogBody": "This updates existing asset quantities from {{fileName}} without creating duplicate assets.",
+      "confirm": "Apply reconciliation",
+      "doneTitle": "Inventory reconciled",
+      "failedTitle": "Could not reconcile inventory",
+      "failedBody": "Review active assignments and try again."
+    },
+    "deleteDialog": {
+      "singleTitle": "Delete asset?",
+      "singleBody": "This removes it from active inventory but keeps its history and audit trail.",
+      "batchTitle": "Delete selected assets?",
+      "batchBody": "This removes them from active inventory but keeps their history and audit trail.",
+      "confirm": "Delete asset",
+      "confirmBatch": "Delete selected",
+      "blockedTitle": "Some assets cannot be deleted yet",
+      "blockedBody": "Return assigned assets, resolve incidents, and wrap active projects before deleting.",
+      "failedTitle": "Could not delete assets",
+      "failedBody": "Review assignments and try again."
     },
     "toasts": {
       "doneTitle": "Done",

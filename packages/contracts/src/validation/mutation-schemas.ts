@@ -407,6 +407,38 @@ export const archiveAssetSchema = z
   })
   .strict();
 
+export const archiveAssetsSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    assetIds: z.array(nonEmptyString).min(1).max(500),
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
+export const reconcileAssetQuantitiesSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    sourceLabel: nonEmptyString.max(180),
+    rows: z
+      .array(
+        z
+          .object({
+            assetId: nonEmptyString,
+            totalQuantity: z.number().int().positive().max(100_000),
+            reason: optionalTrimmedString,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(1_000),
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
 export const assignMoveAssetsSchema = z
   .object({
     commandId: nonEmptyString,

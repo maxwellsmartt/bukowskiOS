@@ -695,4 +695,104 @@ describe("asset mutation service", () => {
 
     cleanup();
   });
+
+  it("blocks batch asset delete while an asset is assigned to an active project", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-delete-guard");
+    const mutations = createAssetMutationService(database);
+
+    const createdAsset = mutations.createAsset({
+      commandId: "cmd-test-delete-guard-create",
+      workspaceId: "workspace-metadata",
+      name: "Delete guard camera",
+      internalCode: "DEL-GUARD-001",
+      categoryId: "cat-lighting",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Good",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    mutations.assignMoveAssets({
+      commandId: "cmd-test-delete-guard-assign",
+      workspaceId: "workspace-metadata",
+      assetIds: [createdAsset.assetId],
+      mode: "assign",
+      projectId: "project-aurora",
+      assignedToUserId: "user-paola",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(() =>
+      mutations.archiveAssets({
+        commandId: "cmd-test-delete-guard-archive",
+        workspaceId: "workspace-metadata",
+        assetIds: [createdAsset.assetId],
+        actorType: "user",
+        sourceChannel: "desktop",
+      }),
+    ).toThrow(/project|assigned/i);
+
+    cleanup();
+  });
+
+  it("reconciles asset quantities without overwriting assigned units", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-reconcile-quantity");
+    const reads = createFoundationReadService(database);
+    const mutations = createAssetMutationService(database);
+
+    const createdAsset = mutations.createAsset({
+      commandId: "cmd-test-reconcile-create",
+      workspaceId: "workspace-metadata",
+      name: "Reconcile HDMI cable",
+      internalCode: "REC-HDMI-001",
+      categoryId: "cat-lighting",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Good",
+      totalQuantity: 2,
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    mutations.assignMoveAssets({
+      commandId: "cmd-test-reconcile-assign",
+      workspaceId: "workspace-metadata",
+      assetIds: [createdAsset.assetId],
+      assetSelections: [{ assetId: createdAsset.assetId, quantity: 1 }],
+      mode: "assign",
+      projectId: "project-aurora",
+      assignedToUserId: "user-paola",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    const result = mutations.reconcileAssetQuantities({
+      commandId: "cmd-test-reconcile-apply",
+      workspaceId: "workspace-metadata",
+      sourceLabel: "inventory.csv",
+      rows: [{ assetId: createdAsset.assetId, totalQuantity: 5 }],
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(result.reconciledCount).toBe(1);
+    const state = database
+      .prepare("SELECT total_quantity, available_quantity, assigned_quantity FROM asset_current_state WHERE asset_id = ?")
+      .get(createdAsset.assetId) as { total_quantity: number; available_quantity: number; assigned_quantity: number };
+    expect(state).toEqual({ total_quantity: 5, available_quantity: 4, assigned_quantity: 1 });
+    expect(reads.getAssetDetail(createdAsset.assetId).timeline[0]?.title).toBe("Inventory reconciled");
+
+    expect(() =>
+      mutations.reconcileAssetQuantities({
+        commandId: "cmd-test-reconcile-too-low",
+        workspaceId: "workspace-metadata",
+        sourceLabel: "inventory.csv",
+        rows: [{ assetId: createdAsset.assetId, totalQuantity: 0 }],
+        actorType: "user",
+        sourceChannel: "desktop",
+      }),
+    ).toThrow("Select at least one asset quantity to reconcile.");
+
+    cleanup();
+  });
 });

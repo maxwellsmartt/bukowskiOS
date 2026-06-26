@@ -18,6 +18,8 @@ import type {
   AddDepartmentToProjectUnitInput,
   AssignAgentModelCommand,
   ArchiveAssetCommand,
+  ArchiveAssetsCommand,
+  ArchiveAssetsResult,
   ArchiveProjectInput,
   AssetListQuery,
   AssetWorkspaceQuery,
@@ -140,6 +142,8 @@ import type {
   ProjectDeletePreview,
   ProjectDetailSnapshot,
   ProjectListQuery,
+  ReconcileAssetQuantitiesCommand,
+  ReconcileAssetQuantitiesResult,
   RevokeTelegramLinkCommand,
   ReportIncidentCommand,
   ReportIncidentResult,
@@ -505,6 +509,10 @@ const bukowskiAssets = {
     ipcRenderer.invoke(ipcChannels.assets.update, input) as Promise<AssetEditorMutationResult>,
   archive: (input: ArchiveAssetCommand) =>
     ipcRenderer.invoke(ipcChannels.assets.archive, input) as Promise<AssetEditorMutationResult>,
+  archiveMany: (input: ArchiveAssetsCommand) =>
+    ipcRenderer.invoke(ipcChannels.assets.archiveMany, input) as Promise<ArchiveAssetsResult>,
+  reconcileQuantities: (input: ReconcileAssetQuantitiesCommand) =>
+    ipcRenderer.invoke(ipcChannels.assets.reconcileQuantities, input) as Promise<ReconcileAssetQuantitiesResult>,
 };
 
 const bukowskiPacking = {

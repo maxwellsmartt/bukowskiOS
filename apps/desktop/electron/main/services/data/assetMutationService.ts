@@ -2,10 +2,14 @@ import type { DatabaseSync } from "node:sqlite";
 
 import type {
   ArchiveAssetCommand,
+  ArchiveAssetsCommand,
+  ArchiveAssetsResult,
   AssetEditorMutationResult,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   CreateAssetCommand,
+  ReconcileAssetQuantitiesCommand,
+  ReconcileAssetQuantitiesResult,
   UpdateAssetCommand,
 } from "@contracts";
 
@@ -360,6 +364,80 @@ const ensureAssetEditableReferences = (
 const normalizeOptionalText = (value?: string) => {
   const trimmedValue = value?.trim();
   return trimmedValue ? trimmedValue : null;
+};
+
+type ArchivableAssetRow = {
+  id: string;
+  name: string;
+  is_active: number;
+  version: number;
+  current_location_id: string | null;
+  current_project_id: string | null;
+  current_project_name: string | null;
+  current_project_status: string | null;
+  current_department_id: string | null;
+  current_responsible_user_id: string | null;
+  active_assignment_id: string | null;
+  custody_status: string;
+  assigned_quantity: number;
+  checked_out_quantity: number;
+  open_incident_count: number;
+};
+
+const loadArchivableAssets = (db: DatabaseSync, workspaceId: string, assetIds: string[]) => {
+  if (!assetIds.length) return [];
+  return db
+    .prepare(
+      `
+        SELECT
+          assets.id,
+          assets.name,
+          assets.is_active,
+          asset_current_state.version,
+          asset_current_state.current_location_id,
+          asset_current_state.current_project_id,
+          projects.name AS current_project_name,
+          projects.status AS current_project_status,
+          asset_current_state.current_department_id,
+          asset_current_state.current_responsible_user_id,
+          asset_current_state.active_assignment_id,
+          asset_current_state.custody_status,
+          asset_current_state.assigned_quantity,
+          asset_current_state.checked_out_quantity,
+          (
+            SELECT COUNT(*)
+            FROM incidents
+            WHERE incidents.asset_id = assets.id
+              AND incidents.status IN ('Open', 'In review')
+          ) AS open_incident_count
+        FROM assets
+        JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+        LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
+        WHERE assets.workspace_id = ?
+          AND assets.id IN (${createPlaceholders(assetIds)})
+      `,
+    )
+    .all(workspaceId, ...assetIds) as ArchivableAssetRow[];
+};
+
+const explainArchiveBlocker = (row: ArchivableAssetRow) => {
+  if (!row.is_active) return null;
+  if (row.current_project_id && row.current_project_status !== "Wrapped") {
+    return `${row.name} is assigned to ${row.current_project_name ?? "an active project"} (${row.current_project_status ?? "active"}). Close or wrap the project before deleting it.`;
+  }
+  if (row.active_assignment_id || row.custody_status !== "available" || row.assigned_quantity > 0 || row.checked_out_quantity > 0) {
+    return `${row.name} is still assigned, reserved, or checked out. Return it to available inventory before deleting it.`;
+  }
+  if (row.open_incident_count > 0) {
+    return `${row.name} still has open incidents. Resolve them before deleting it.`;
+  }
+  return null;
+};
+
+const summarizeBlockers = (blockers: string[]) => {
+  const preview = blockers.slice(0, 5).join(" ");
+  const remaining = blockers.length > 5 ? ` +${blockers.length - 5} more blocked assets.` : "";
+  return `${preview}${remaining}`;
 };
 
 export const createAssetMutationService = (db: DatabaseSync) => ({
@@ -1693,12 +1771,17 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             asset_current_state.version,
             asset_current_state.current_location_id,
             asset_current_state.current_project_id,
+            projects.name AS current_project_name,
+            projects.status AS current_project_status,
             asset_current_state.current_department_id,
             asset_current_state.current_responsible_user_id,
             asset_current_state.active_assignment_id,
-            asset_current_state.custody_status
+            asset_current_state.custody_status,
+            asset_current_state.assigned_quantity,
+            asset_current_state.checked_out_quantity
           FROM assets
           JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+          LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
           WHERE assets.id = ?
           LIMIT 1
         `,
@@ -1711,10 +1794,14 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
           version: number;
           current_location_id: string | null;
           current_project_id: string | null;
+          current_project_name: string | null;
+          current_project_status: string | null;
           current_department_id: string | null;
           current_responsible_user_id: string | null;
           active_assignment_id: string | null;
           custody_status: string;
+          assigned_quantity: number;
+          checked_out_quantity: number;
         }
       | undefined;
 
@@ -1731,8 +1818,19 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
       };
     }
 
-    if (assetRow.active_assignment_id || assetRow.custody_status !== "available") {
-      throw new Error("This asset is still operationally assigned or checked out and cannot be archived.");
+    if (assetRow.current_project_id && assetRow.current_project_status !== "Wrapped") {
+      throw new Error(
+        `This asset is assigned to ${assetRow.current_project_name ?? "an active project"} and cannot be deleted until the project is wrapped or closed.`,
+      );
+    }
+
+    if (
+      assetRow.active_assignment_id ||
+      assetRow.custody_status !== "available" ||
+      assetRow.assigned_quantity > 0 ||
+      assetRow.checked_out_quantity > 0
+    ) {
+      throw new Error("This asset is still assigned, reserved, or checked out and cannot be deleted.");
     }
 
     const openIncidentCount = (db
@@ -1880,6 +1978,424 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         input.sourceChannel,
         now,
         error instanceof Error ? error.message : "Unknown asset archive error",
+      );
+      throw error;
+    }
+  },
+
+  archiveAssets(input: ArchiveAssetsCommand): ArchiveAssetsResult {
+    const existingReceipt = db
+      .prepare("SELECT outcome_status FROM command_receipts WHERE command_id = ? LIMIT 1")
+      .get(input.commandId) as { outcome_status: string; error_message: string | null } | undefined;
+
+    const assetIds = Array.from(new Set(input.assetIds.map((assetId) => assetId.trim()).filter(Boolean)));
+    if (!assetIds.length) {
+      throw new Error("Select at least one asset to delete.");
+    }
+
+    if (existingReceipt?.outcome_status === "success") {
+      return {
+        commandId: input.commandId,
+        archivedCount: 0,
+        blockedCount: 0,
+        assetIds,
+        repeated: true,
+        summary: "This asset delete command was already applied.",
+      };
+    }
+
+    if (existingReceipt?.outcome_status === "failed") {
+      throw new Error(buildFailedCommandMessage("asset batch archive", existingReceipt.error_message));
+    }
+
+    const now = new Date().toISOString();
+    const rows = loadArchivableAssets(db, input.workspaceId, assetIds);
+    const rowsById = new Map(rows.map((row) => [row.id, row]));
+    const missingIds = assetIds.filter((assetId) => !rowsById.has(assetId));
+    if (missingIds.length) {
+      throw new Error(`${missingIds.length} selected asset${missingIds.length === 1 ? "" : "s"} could not be found.`);
+    }
+
+    const blockers = rows.map(explainArchiveBlocker).filter((message): message is string => Boolean(message));
+    if (blockers.length) {
+      throw new Error(summarizeBlockers(blockers));
+    }
+
+    db.exec("BEGIN");
+    try {
+      for (const row of rows) {
+        const eventId = `event-${input.commandId}-${row.id}`;
+        const metadataJson = JSON.stringify({
+          kind: "asset_archived",
+          mode: "batch",
+          batchCommandId: input.commandId,
+        });
+
+        db.prepare("UPDATE assets SET is_active = 0, updated_at = ? WHERE id = ?").run(now, row.id);
+        db.prepare(
+          `
+            INSERT INTO asset_events (
+              id,
+              workspace_id,
+              asset_id,
+              assignment_id,
+              project_id,
+              department_id,
+              performed_by_user_id,
+              event_type,
+              location_id,
+              from_location_id,
+              to_location_id,
+              event_timestamp,
+              command_id,
+              actor_type,
+              source_channel,
+              notes,
+              metadata_json,
+              created_at
+            )
+            VALUES (?, ?, ?, NULL, ?, ?, ?, 'status_changed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+        ).run(
+          eventId,
+          input.workspaceId,
+          row.id,
+          row.current_project_id,
+          row.current_department_id,
+          defaultActorUserId,
+          row.current_location_id,
+          row.current_location_id,
+          row.current_location_id,
+          now,
+          input.commandId,
+          input.actorType,
+          input.sourceChannel,
+          `Deleted ${row.name} from the active registry.`,
+          metadataJson,
+          now,
+        );
+
+        db.prepare(
+          `
+            UPDATE asset_current_state
+            SET last_event_id = ?, version = ?, updated_at = ?
+            WHERE asset_id = ?
+          `,
+        ).run(eventId, row.version + 1, now, row.id);
+
+        db.prepare(
+          `
+            INSERT INTO sync_outbox (
+              id,
+              workspace_id,
+              entity_type,
+              entity_id,
+              event_id,
+              operation_type,
+              payload_json,
+              status,
+              attempt_count,
+              last_error,
+              next_retry_at,
+              created_at,
+              updated_at
+            )
+            VALUES (?, ?, 'asset_event', ?, ?, 'upsert', ?, 'pending', 0, NULL, NULL, ?, ?)
+          `,
+        ).run(`outbox-${eventId}`, input.workspaceId, row.id, eventId, metadataJson, now, now);
+      }
+
+      db.prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'success', NULL)
+        `,
+      ).run(input.commandId, input.workspaceId, defaultActorUserId, input.actorType, input.sourceChannel, now);
+
+      db.exec("COMMIT");
+      return {
+        commandId: input.commandId,
+        archivedCount: rows.length,
+        blockedCount: 0,
+        assetIds,
+        repeated: false,
+        summary: `${rows.length} asset${rows.length === 1 ? "" : "s"} deleted from the active registry.`,
+      };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      db.prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'failed', ?)
+        `,
+      ).run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        error instanceof Error ? error.message : "Unknown asset batch archive error",
+      );
+      throw error;
+    }
+  },
+
+  reconcileAssetQuantities(input: ReconcileAssetQuantitiesCommand): ReconcileAssetQuantitiesResult {
+    const existingReceipt = db
+      .prepare("SELECT outcome_status FROM command_receipts WHERE command_id = ? LIMIT 1")
+      .get(input.commandId) as { outcome_status: string; error_message: string | null } | undefined;
+
+    if (existingReceipt?.outcome_status === "success") {
+      return {
+        commandId: input.commandId,
+        reconciledCount: 0,
+        skippedCount: 0,
+        repeated: true,
+        summary: "This reconciliation command was already applied.",
+      };
+    }
+
+    if (existingReceipt?.outcome_status === "failed") {
+      throw new Error(buildFailedCommandMessage("asset quantity reconciliation", existingReceipt.error_message));
+    }
+
+    const normalizedRows = input.rows
+      .map((row) => ({
+        assetId: row.assetId.trim(),
+        totalQuantity: Math.trunc(row.totalQuantity),
+        reason: normalizeOptionalText(row.reason),
+      }))
+      .filter((row) => row.assetId && row.totalQuantity > 0);
+    if (!normalizedRows.length) {
+      throw new Error("Select at least one asset quantity to reconcile.");
+    }
+
+    const assetIds = Array.from(new Set(normalizedRows.map((row) => row.assetId)));
+    const stateRows = db
+      .prepare(
+        `
+          SELECT
+            assets.id,
+            assets.name,
+            asset_current_state.version,
+            asset_current_state.current_location_id,
+            asset_current_state.current_project_id,
+            asset_current_state.current_department_id,
+            asset_current_state.current_responsible_user_id,
+            asset_current_state.total_quantity,
+            asset_current_state.available_quantity,
+            asset_current_state.assigned_quantity,
+            asset_current_state.checked_out_quantity
+          FROM assets
+          JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+          WHERE assets.workspace_id = ?
+            AND assets.id IN (${createPlaceholders(assetIds)})
+            AND assets.is_active = 1
+        `,
+      )
+      .all(input.workspaceId, ...assetIds) as Array<{
+      id: string;
+      name: string;
+      version: number;
+      current_location_id: string | null;
+      current_project_id: string | null;
+      current_department_id: string | null;
+      current_responsible_user_id: string | null;
+      total_quantity: number;
+      available_quantity: number;
+      assigned_quantity: number;
+      checked_out_quantity: number;
+    }>;
+    const stateById = new Map(stateRows.map((row) => [row.id, row]));
+    const missingCount = assetIds.filter((assetId) => !stateById.has(assetId)).length;
+    const blockers: string[] = [];
+    for (const row of normalizedRows) {
+      const state = stateById.get(row.assetId);
+      if (!state) continue;
+      const minimumTotal = state.assigned_quantity + state.checked_out_quantity;
+      if (row.totalQuantity < minimumTotal) {
+        blockers.push(`${state.name} cannot be reconciled to ${row.totalQuantity}; ${minimumTotal} units are already assigned or checked out.`);
+      }
+    }
+    if (blockers.length) {
+      throw new Error(summarizeBlockers(blockers));
+    }
+
+    const now = new Date().toISOString();
+    let reconciledCount = 0;
+    let skippedCount = missingCount;
+
+    db.exec("BEGIN");
+    try {
+      for (const row of normalizedRows) {
+        const state = stateById.get(row.assetId);
+        if (!state) {
+          continue;
+        }
+        if (state.total_quantity === row.totalQuantity) {
+          skippedCount += 1;
+          continue;
+        }
+        const reservedQuantity = state.assigned_quantity + state.checked_out_quantity;
+        const nextAvailableQuantity = Math.max(0, row.totalQuantity - reservedQuantity);
+        const eventId = `event-${input.commandId}-${row.assetId}`;
+        const metadataJson = JSON.stringify({
+          kind: "inventory_reconciled",
+          sourceLabel: input.sourceLabel,
+          previousTotalQuantity: state.total_quantity,
+          nextTotalQuantity: row.totalQuantity,
+          previousAvailableQuantity: state.available_quantity,
+          nextAvailableQuantity,
+          reason: row.reason,
+        });
+
+        db.prepare(
+          `
+            INSERT INTO asset_events (
+              id,
+              workspace_id,
+              asset_id,
+              assignment_id,
+              project_id,
+              department_id,
+              performed_by_user_id,
+              event_type,
+              location_id,
+              from_location_id,
+              to_location_id,
+              event_timestamp,
+              command_id,
+              actor_type,
+              source_channel,
+              notes,
+              metadata_json,
+              created_at
+            )
+            VALUES (?, ?, ?, NULL, ?, ?, ?, 'inventory_reconciled', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+        ).run(
+          eventId,
+          input.workspaceId,
+          row.assetId,
+          state.current_project_id,
+          state.current_department_id,
+          defaultActorUserId,
+          state.current_location_id,
+          state.current_location_id,
+          state.current_location_id,
+          now,
+          input.commandId,
+          input.actorType,
+          input.sourceChannel,
+          `Reconciled ${state.name} quantity from ${state.total_quantity} to ${row.totalQuantity}.`,
+          metadataJson,
+          now,
+        );
+
+        db.prepare(
+          `
+            UPDATE asset_current_state
+            SET
+              total_quantity = ?,
+              available_quantity = ?,
+              last_event_id = ?,
+              version = ?,
+              updated_at = ?
+            WHERE asset_id = ?
+          `,
+        ).run(row.totalQuantity, nextAvailableQuantity, eventId, state.version + 1, now, row.assetId);
+
+        db.prepare("UPDATE assets SET updated_at = ? WHERE id = ?").run(now, row.assetId);
+        db.prepare(
+          `
+            INSERT INTO sync_outbox (
+              id,
+              workspace_id,
+              entity_type,
+              entity_id,
+              event_id,
+              operation_type,
+              payload_json,
+              status,
+              attempt_count,
+              last_error,
+              next_retry_at,
+              created_at,
+              updated_at
+            )
+            VALUES (?, ?, 'asset_event', ?, ?, 'upsert', ?, 'pending', 0, NULL, NULL, ?, ?)
+          `,
+        ).run(`outbox-${eventId}`, input.workspaceId, row.assetId, eventId, metadataJson, now, now);
+        reconciledCount += 1;
+      }
+
+      db.prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'success', NULL)
+        `,
+      ).run(input.commandId, input.workspaceId, defaultActorUserId, input.actorType, input.sourceChannel, now);
+
+      db.exec("COMMIT");
+      return {
+        commandId: input.commandId,
+        reconciledCount,
+        skippedCount,
+        repeated: false,
+        summary: `${reconciledCount} asset${reconciledCount === 1 ? "" : "s"} reconciled from ${input.sourceLabel}.`,
+      };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      db.prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'failed', ?)
+        `,
+      ).run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        error instanceof Error ? error.message : "Unknown asset quantity reconciliation error",
       );
       throw error;
     }

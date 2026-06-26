@@ -749,6 +749,7 @@
       "createRmaMultiTip": "Selecciona un equipo para preparar un RMA",
       "createPackingSlip": "Crear packing slip",
       "assignMove": "Asignar / mover",
+      "deleteSelected": "Eliminar",
       "return": "Devolver",
       "unitMeta": "Unidad · {{unit}}",
       "returnAvailableTip": "Abre los packing slips del proyecto para procesar devoluciones",
@@ -880,6 +881,30 @@
       "reviewEditsTitle": "Revisar ediciones de filas",
       "moreRowIssues_one": "{{count}} problema de fila más.",
       "moreRowIssues_other": "{{count}} problemas de fila más."
+    },
+    "reconciliation": {
+      "apply": "Conciliar cantidades",
+      "working": "Conciliando…",
+      "stat": "conciliables",
+      "previewTitle": "Cantidad distinta en equipos existentes",
+      "dialogTitle": "¿Conciliar cantidades de inventario?",
+      "dialogBody": "Esto actualiza cantidades de equipos existentes desde {{fileName}} sin crear duplicados.",
+      "confirm": "Aplicar conciliación",
+      "doneTitle": "Inventario conciliado",
+      "failedTitle": "No se pudo conciliar el inventario",
+      "failedBody": "Revisa asignaciones activas e inténtalo de nuevo."
+    },
+    "deleteDialog": {
+      "singleTitle": "¿Eliminar equipo?",
+      "singleBody": "Se quitará del inventario activo, pero se conservará su historial y auditoría.",
+      "batchTitle": "¿Eliminar equipos seleccionados?",
+      "batchBody": "Se quitarán del inventario activo, pero se conservará su historial y auditoría.",
+      "confirm": "Eliminar equipo",
+      "confirmBatch": "Eliminar seleccionados",
+      "blockedTitle": "Hay equipos que aún no se pueden eliminar",
+      "blockedBody": "Devuelve equipos asignados, resuelve incidencias y cierra proyectos activos antes de eliminar.",
+      "failedTitle": "No se pudieron eliminar los equipos",
+      "failedBody": "Revisa asignaciones e inténtalo de nuevo."
     },
     "toasts": {
       "doneTitle": "Listo",

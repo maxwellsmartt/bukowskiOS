@@ -19,6 +19,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { resolveAssetAvailability, summarizeUnavailableAssets, translateAssetAvailabilityLabel, translateAssetAvailabilityReason } from "@shared/lib/assetAvailability";
 import { formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
@@ -34,9 +35,11 @@ import { ModalShell } from "@shared/components/ModalShell";
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
 import {
   archiveAsset,
+  archiveAssets,
   assignMoveAssets,
   createAsset,
   openAssetFile,
+  reconcileAssetQuantities,
   updateAsset,
   uploadAssetImages,
   useAssetDetail,
@@ -258,10 +261,12 @@ type AssetCsvPreview = {
   fileName: string;
   drafts: AssetCsvDraft[];
   existingMatches: Array<{
+    assetId: string;
     code: string;
     csvName: string;
     existingName: string;
     existingStock: number;
+    csvStock: number;
     category: string;
     location: string;
   }>;
@@ -410,6 +415,7 @@ type AssetOperationCartProps = {
   onClear: () => void;
   onCreatePackingSlip: () => void;
   onCreateRma: () => void;
+  onDeleteSelected: () => void;
   onOpenAssignMove: () => void;
   onOpenAssetDetail: (assetId: string) => void;
   onOpenProjectReturns?: () => void;
@@ -423,6 +429,7 @@ const AssetOperationCart = ({
   onClear,
   onCreatePackingSlip,
   onCreateRma,
+  onDeleteSelected,
   onOpenAssignMove,
   onOpenAssetDetail,
   onOpenProjectReturns,
@@ -503,6 +510,13 @@ const AssetOperationCart = ({
             {t("assets.cart.return")}
           </button>
         ) : null}
+        <button
+          className="ghost-control action-row-button is-danger"
+          onClick={onDeleteSelected}
+          type="button"
+        >
+          {t("assets.cart.deleteSelected", { defaultValue: "Eliminar" })}
+        </button>
       </div>
 
       {lockedItems.length || unavailableItems.length ? (
@@ -997,10 +1011,12 @@ const buildAssetCsvPreview = ({
       }
 
       return {
+        assetId: existingAsset.id,
         code: draft.internalCode,
         csvName: draft.name,
         existingName: existingAsset.name,
         existingStock: existingAsset.totalQuantity,
+        csvStock: draft.totalQuantity,
         category: existingAsset.category,
         location: existingAsset.location,
       };
@@ -1137,6 +1153,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const { activeWorkspaceId } = useWorkspace();
   const { projects, refreshProjects } = useShellContext();
   const { addItems, clear: clearCompareTray, replaceItems } = useCompareTray();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const isProjectMode = Boolean(projectId);
   const translatedSortOptions = useMemo(
     () => assetSortOptions.map((option) => ({ ...option, label: t(option.label) })),
@@ -1191,6 +1208,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [isUploadingPreviewImages, setIsUploadingPreviewImages] = useState(false);
   const [openingPreviewImageId, setOpeningPreviewImageId] = useState<string | null>(null);
   const [isImportingAssets, setIsImportingAssets] = useState(false);
+  const [isReconcilingAssets, setIsReconcilingAssets] = useState(false);
   const [csvImportPreview, setCsvImportPreview] = useState<AssetCsvPreview | null>(null);
   const [csvImportProgress, setCsvImportProgress] = useState<AssetCsvImportProgress | null>(null);
   const [csvShowAllRows, setCsvShowAllRows] = useState(false);
@@ -1205,6 +1223,14 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const activeAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedAssetId) ?? null,
     [assets, selectedAssetId],
+  );
+  const projectStatusById = useMemo(() => new Map(projects.map((project) => [project.id, project.status])), [projects]);
+  const csvReconciliationCandidates = useMemo(
+    () =>
+      (csvImportPreview?.existingMatches ?? []).filter(
+        (match) => match.csvStock > 0 && match.csvStock !== match.existingStock,
+      ),
+    [csvImportPreview],
   );
   const activeAssetImages = useMemo(
     () =>
@@ -1598,6 +1624,19 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       return;
     }
 
+    const ok = await confirm({
+      title: t("assets.deleteDialog.singleTitle", { defaultValue: "Delete asset?" }),
+      body: t("assets.deleteDialog.singleBody", {
+        defaultValue: "This removes the asset from active inventory but keeps its audit history.",
+      }),
+      confirmLabel: t("assets.deleteDialog.confirm", { defaultValue: "Delete asset" }),
+      cancelLabel: t("common.cancel"),
+      tone: "danger",
+    });
+    if (!ok) {
+      return;
+    }
+
     try {
       setIsArchivingAsset(true);
       const result = await archiveAsset({
@@ -1617,6 +1656,213 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setEditorError(getUserFacingErrorMessage(nextError, t("assets.toasts.unableArchive")));
     } finally {
       setIsArchivingAsset(false);
+    }
+  };
+
+  const handleDeleteSelectedAssets = async () => {
+    if (!selectedRowIds.length) {
+      return;
+    }
+
+    const blockedByUi = selectedAssets.filter(
+      (asset) =>
+        Boolean(asset.projectId && projectStatusById.get(asset.projectId) !== "Wrapped") ||
+        asset.assignedQuantity > 0 ||
+        asset.checkedOutQuantity > 0 ||
+        asset.custody !== "available" ||
+        asset.incidentsOpen > 0,
+    );
+    if (blockedByUi.length) {
+      toast.error(
+        t("assets.deleteDialog.blockedTitle", { defaultValue: "Some assets cannot be deleted yet" }),
+        [
+          t("assets.deleteDialog.blockedBody", {
+            defaultValue: "Return assigned assets, resolve incidents, and wrap active projects before deleting.",
+          }),
+          blockedByUi.slice(0, 3).map((asset) => asset.code || asset.name).join(", "),
+          blockedByUi.length > 3 ? `+${blockedByUi.length - 3}` : "",
+        ].filter(Boolean).join(" "),
+      );
+      return;
+    }
+
+    const ok = await confirm({
+      title: t("assets.deleteDialog.batchTitle", {
+        count: selectedRowIds.length,
+        defaultValue: "Delete selected assets?",
+      }),
+      body: t("assets.deleteDialog.batchBody", {
+        count: selectedRowIds.length,
+        defaultValue: "This removes the selected assets from active inventory but keeps their audit history.",
+      }),
+      details: (
+        <ul className="confirm-dialog-list">
+          {selectedAssets.slice(0, 6).map((asset) => (
+            <li key={asset.id}>{asset.code ? `${asset.code} · ${asset.name}` : asset.name}</li>
+          ))}
+          {selectedAssets.length > 6 ? <li>+{selectedAssets.length - 6}</li> : null}
+        </ul>
+      ),
+      confirmLabel: t("assets.deleteDialog.confirmBatch", { defaultValue: "Delete selected" }),
+      cancelLabel: t("common.cancel"),
+      tone: "danger",
+    });
+    if (!ok) {
+      return;
+    }
+
+    try {
+      setIsArchivingAsset(true);
+      const result = await archiveAssets({
+        commandId: crypto.randomUUID(),
+        workspaceId: activeWorkspaceId,
+        assetIds: selectedRowIds,
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+      await Promise.all([reload(), refreshProjects()]);
+      clearOperationCart();
+      setSelectedAssetId(null);
+      toast.success(t("assets.toasts.doneTitle"), result.summary);
+    } catch (nextError) {
+      toast.error(
+        t("assets.deleteDialog.failedTitle", { defaultValue: "Could not delete assets" }),
+        getUserFacingErrorMessage(nextError, t("assets.deleteDialog.failedBody", { defaultValue: "Review assignments and try again." })),
+      );
+    } finally {
+      setIsArchivingAsset(false);
+    }
+  };
+
+  const handleDeleteAssetRow = async (asset: AssetListRow) => {
+    const projectStatus = asset.projectId ? projectStatusById.get(asset.projectId) : null;
+    const isBlocked =
+      Boolean(asset.projectId && projectStatus !== "Wrapped") ||
+      asset.assignedQuantity > 0 ||
+      asset.checkedOutQuantity > 0 ||
+      asset.custody !== "available" ||
+      asset.incidentsOpen > 0;
+    if (isBlocked) {
+      toast.error(
+        t("assets.deleteDialog.blockedTitle", { defaultValue: "Asset cannot be deleted yet" }),
+        t("assets.deleteDialog.blockedBody", {
+          defaultValue: "Return assigned assets, resolve incidents, and wrap active projects before deleting.",
+        }),
+      );
+      return;
+    }
+
+    const ok = await confirm({
+      title: t("assets.deleteDialog.singleTitle", { defaultValue: "Delete asset?" }),
+      body: t("assets.deleteDialog.singleBody", {
+        defaultValue: "This removes the asset from active inventory but keeps its audit history.",
+      }),
+      details: (
+        <ul className="confirm-dialog-list">
+          <li>{asset.code ? `${asset.code} · ${asset.name}` : asset.name}</li>
+        </ul>
+      ),
+      confirmLabel: t("assets.deleteDialog.confirm", { defaultValue: "Delete asset" }),
+      cancelLabel: t("common.cancel"),
+      tone: "danger",
+    });
+    if (!ok) {
+      return;
+    }
+
+    try {
+      setIsArchivingAsset(true);
+      const result = await archiveAssets({
+        commandId: crypto.randomUUID(),
+        workspaceId: activeWorkspaceId,
+        assetIds: [asset.id],
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+      await Promise.all([reload(), refreshProjects()]);
+      if (selectedAssetId === asset.id) {
+        setSelectedAssetId(null);
+      }
+      removeFromCart(asset.id);
+      toast.success(t("assets.toasts.doneTitle"), result.summary);
+    } catch (nextError) {
+      toast.error(
+        t("assets.deleteDialog.failedTitle", { defaultValue: "Could not delete asset" }),
+        getUserFacingErrorMessage(nextError, t("assets.deleteDialog.failedBody", { defaultValue: "Review assignments and try again." })),
+      );
+    } finally {
+      setIsArchivingAsset(false);
+    }
+  };
+
+  const handleReconcileCsvQuantities = async () => {
+    if (!csvImportPreview || !csvReconciliationCandidates.length) {
+      return;
+    }
+
+    const ok = await confirm({
+      title: t("assets.reconciliation.dialogTitle", {
+        count: csvReconciliationCandidates.length,
+        defaultValue: "Reconcile inventory quantities?",
+      }),
+      body: t("assets.reconciliation.dialogBody", {
+        count: csvReconciliationCandidates.length,
+        fileName: csvImportPreview.fileName,
+        defaultValue: "This updates existing asset quantities from the CSV without creating duplicate assets.",
+      }),
+      details: (
+        <ul className="confirm-dialog-list">
+          {csvReconciliationCandidates.slice(0, 6).map((match) => (
+            <li key={match.assetId}>
+              {match.code}: {match.existingStock} → {match.csvStock}
+            </li>
+          ))}
+          {csvReconciliationCandidates.length > 6 ? <li>+{csvReconciliationCandidates.length - 6}</li> : null}
+        </ul>
+      ),
+      confirmLabel: t("assets.reconciliation.confirm", { defaultValue: "Apply reconciliation" }),
+      cancelLabel: t("common.cancel"),
+      tone: "default",
+    });
+    if (!ok) {
+      return;
+    }
+
+    try {
+      setIsReconcilingAssets(true);
+      const result = await reconcileAssetQuantities({
+        commandId: crypto.randomUUID(),
+        workspaceId: activeWorkspaceId,
+        sourceLabel: csvImportPreview.fileName,
+        rows: csvReconciliationCandidates.map((match) => ({
+          assetId: match.assetId,
+          totalQuantity: match.csvStock,
+          reason: `CSV ${csvImportPreview.fileName}: ${match.existingStock} -> ${match.csvStock}`,
+        })),
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+      await Promise.all([reload(), refreshProjects()]);
+      setCsvImportPreview((current) =>
+        current
+          ? {
+              ...current,
+              existingMatches: current.existingMatches.map((match) =>
+                csvReconciliationCandidates.some((candidate) => candidate.assetId === match.assetId)
+                  ? { ...match, existingStock: match.csvStock }
+                  : match,
+              ),
+            }
+          : current,
+      );
+      toast.success(t("assets.reconciliation.doneTitle", { defaultValue: "Inventory reconciled" }), result.summary);
+    } catch (nextError) {
+      toast.error(
+        t("assets.reconciliation.failedTitle", { defaultValue: "Could not reconcile inventory" }),
+        getUserFacingErrorMessage(nextError, t("assets.reconciliation.failedBody", { defaultValue: "Review active assignments and try again." })),
+      );
+    } finally {
+      setIsReconcilingAssets(false);
     }
   };
 
@@ -2449,6 +2695,21 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                       {t("assets.csv.importReadyRows")}
                     </button>
                   ) : null}
+                  {csvReconciliationCandidates.length ? (
+                    <button
+                      className="ghost-control action-row-button"
+                      disabled={isReconcilingAssets}
+                      onClick={() => void handleReconcileCsvQuantities()}
+                      type="button"
+                    >
+                      {isReconcilingAssets
+                        ? t("assets.reconciliation.working", { defaultValue: "Conciliando…" })
+                        : t("assets.reconciliation.apply", {
+                            count: csvReconciliationCandidates.length,
+                            defaultValue: "Conciliar cantidades",
+                          })}
+                    </button>
+                  ) : null}
                   <button
                     className="asset-create-button action-row-button"
                     disabled={isImportingAssets || !csvDerivedSummary?.canImport}
@@ -2469,6 +2730,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                   [t("assets.csv.stats.needsReview"), csvDerivedSummary?.needsReviewDrafts.length ?? 0],
                   [t("assets.csv.stats.totalUnits"), csvDerivedSummary?.importableStock ?? csvImportPreview.summary.importableStock],
                   [t("assets.csv.stats.existing"), csvDerivedSummary?.existingCount ?? csvImportPreview.summary.existingCodes],
+                  [t("assets.reconciliation.stat", { defaultValue: "conciliables" }), csvReconciliationCandidates.length],
                   [t("assets.csv.stats.generatedCodes"), csvImportPreview.summary.generatedCodes],
                   [t("assets.csv.stats.mergedRows"), csvImportPreview.summary.duplicateRows],
                 ].map(([label, value]) => (
@@ -2644,6 +2906,33 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     </div>
                   ) : null}
 
+                  {csvReconciliationCandidates.length ? (
+                    <div className="asset-import-preview-issue-card info">
+                      <strong>
+                        {t("assets.reconciliation.previewTitle", {
+                          count: csvReconciliationCandidates.length,
+                          defaultValue: "Cantidad distinta en equipos existentes",
+                        })}
+                      </strong>
+                      {csvReconciliationCandidates.slice(0, 5).map((match) => (
+                        <span key={match.assetId}>
+                          {match.code}: {match.existingStock} → {match.csvStock}
+                        </span>
+                      ))}
+                      {csvReconciliationCandidates.length > 5 ? (
+                        <span>{t("assets.csv.moreMatches", { count: csvReconciliationCandidates.length - 5 })}</span>
+                      ) : null}
+                      <button
+                        className="ghost-control action-row-button"
+                        disabled={isReconcilingAssets}
+                        onClick={() => void handleReconcileCsvQuantities()}
+                        type="button"
+                      >
+                        {t("assets.reconciliation.apply", { defaultValue: "Conciliar cantidades" })}
+                      </button>
+                    </div>
+                  ) : null}
+
                   {csvImportPreview.summary.warnings.length ? (
                     <div className="asset-import-preview-issue-card warning">
                       <strong>{t("assets.csv.reviewBeforeImporting")}</strong>
@@ -2719,10 +3008,16 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 },
               },
               {
+                key: "delete",
+                label: t("assets.cart.deleteSelected", { defaultValue: "Eliminar" }),
+                icon: <Trash2 size={14} />,
+                separatorBefore: true,
+                onSelect: (target) => void handleDeleteAssetRow(target),
+              },
+              {
                 key: "add-to-compare",
                 label: t("assets.cart.addToCompare"),
                 icon: <GitCompareArrows size={14} />,
-                separatorBefore: true,
                 onSelect: (target) => addAssetToCompare(target),
               },
               {
@@ -2822,6 +3117,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
               }}
               onCreateRma={() => navigate("/incidents")}
+              onDeleteSelected={handleDeleteSelectedAssets}
               onOpenAssignMove={() => {
                 setActionPanelOpen(true);
                 setPackingPanelOpen(false);
@@ -2954,6 +3250,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         ) : null}
       </ResizableSideRailLayout>
       ) : null}
+      {confirmDialog}
     </div>
   );
 };

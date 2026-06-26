@@ -141,6 +141,8 @@ export const ipcChannels = {
     create: "bukowskiAssets:create",
     update: "bukowskiAssets:update",
     archive: "bukowskiAssets:archive",
+    archiveMany: "bukowskiAssets:archiveMany",
+    reconcileQuantities: "bukowskiAssets:reconcileQuantities",
   },
   packing: {
     getList: "bukowskiPacking:getList",

@@ -1,5 +1,7 @@
 import type {
   ArchiveAssetCommand,
+  ArchiveAssetsCommand,
+  ArchiveAssetsResult,
   AssetDetailSnapshot,
   AssetEditorMutationResult,
   AssetListQuery,
@@ -10,6 +12,8 @@ import type {
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   CreateAssetCommand,
+  ReconcileAssetQuantitiesCommand,
+  ReconcileAssetQuantitiesResult,
   UpdateAssetCommand,
 } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
@@ -169,6 +173,24 @@ export const archiveAsset = async (input: ArchiveAssetCommand): Promise<AssetEdi
   }
 
   return window.bukowskiAssets.archive(input);
+};
+
+export const archiveAssets = async (input: ArchiveAssetsCommand): Promise<ArchiveAssetsResult> => {
+  if (!window.bukowskiAssets) {
+    throw new Error("Assets bridge unavailable");
+  }
+
+  return window.bukowskiAssets.archiveMany(input);
+};
+
+export const reconcileAssetQuantities = async (
+  input: ReconcileAssetQuantitiesCommand,
+): Promise<ReconcileAssetQuantitiesResult> => {
+  if (!window.bukowskiAssets) {
+    throw new Error("Assets bridge unavailable");
+  }
+
+  return window.bukowskiAssets.reconcileQuantities(input);
 };
 
 export const uploadAssetFiles = async (assetId: string) => {

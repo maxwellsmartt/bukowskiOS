@@ -7,6 +7,7 @@ import {
   addDepartmentToProjectUnitSchema,
   archiveProjectSchema,
   archiveAssetSchema,
+  archiveAssetsSchema,
   assignAgentModelSchema,
   agentWorkspaceReadArgsSchema,
   assignCrewToProjectUnitSchema,
@@ -68,6 +69,7 @@ import {
   updateInvoiceExtractionSchema,
   bulkLinkInvoiceExtractionsSchema,
   retryInvoiceExtractionsSchema,
+  reconcileAssetQuantitiesSchema,
   upsertSoftwareLicenseSchema,
   archiveSoftwareLicenseSchema,
   setLicenseSeatsSchema,
@@ -182,6 +184,8 @@ import type {
   DeleteAssistantThreadCommand,
   CreateAgentCommand,
   ArchiveAssetCommand,
+  ArchiveAssetsCommand,
+  ReconcileAssetQuantitiesCommand,
   ArchiveProjectInput,
   CreateDraftRunFromChatCommand,
   CreateConnectorLinkTokenCommand,
@@ -312,6 +316,8 @@ type RegisterFoundationIpcOptions = {
     createAsset: (input: CreateAssetCommand) => unknown;
     updateAsset: (input: UpdateAssetCommand) => unknown;
     archiveAsset: (input: ArchiveAssetCommand) => unknown;
+    archiveAssets: (input: ArchiveAssetsCommand) => unknown;
+    reconcileAssetQuantities: (input: ReconcileAssetQuantitiesCommand) => unknown;
   };
   workspaceAccess: WorkspaceAccessGuard;
   fileUploads: {
@@ -1251,6 +1257,26 @@ export const registerFoundationIpc = ({
     });
 
     return assetMutations.archiveAsset(input);
+  });
+  safeHandle(ipcChannels.assets.archiveMany, archiveAssetsSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "delete assets",
+      accessLevel: "write",
+      requiredPermission: "assets.manage",
+    });
+
+    return assetMutations.archiveAssets(input);
+  });
+  safeHandle(ipcChannels.assets.reconcileQuantities, reconcileAssetQuantitiesSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "reconcile asset inventory",
+      accessLevel: "write",
+      requiredPermission: "assets.manage",
+    });
+
+    return assetMutations.reconcileAssetQuantities(input);
   });
   safeHandleReadWithSchema(
     ipcChannels.assets.uploadFiles,
