@@ -406,6 +406,118 @@ describe("operational snapshot service", () => {
     }
   });
 
+  it("applies a project snapshot when a crew member's primary department is unresolved", () => {
+    // Regression: the snapshot's crew row carries primary_department_id pointing
+    // at a department that hasn't synced here. The catalog pull omits that FK
+    // column; the operational snapshot must too, or the deferred foreign key
+    // rolls back the whole project at commit (the project-ptr wedge).
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-crew-primary-dept");
+
+    try {
+      const service = createOperationalSnapshotService(database);
+      const projectId = "project-crew-primary-dept";
+      const unitId = "unit-crew-primary-dept-main";
+      const crewId = "crew-primary-dept-rosa";
+      const timestamp = "2026-05-06T13:30:00.000Z";
+
+      const result = service.applyRemoteSnapshots("workspace-metadata", "project", [
+        {
+          workspace_id: "workspace-metadata",
+          entity_type: "project",
+          entity_id: projectId,
+          updated_at: timestamp,
+          deleted_at: null,
+          snapshot_json: {
+            project: {
+              id: projectId,
+              workspace_id: "workspace-metadata",
+              code: "CPD",
+              name: "Crew Primary Dept",
+              client_name: null,
+              client_id: null,
+              status: "Prep",
+              start_date: "2026-06-01",
+              end_date: "2026-06-10",
+              description: null,
+              color_key: null,
+              production_company_id: null,
+              production_company_name: null,
+              has_preproduction: 0,
+              preproduction_start_date: null,
+              preproduction_end_date: null,
+              archived_at: null,
+              created_at: timestamp,
+              updated_at: timestamp,
+            },
+            units: [
+              {
+                id: unitId,
+                workspace_id: "workspace-metadata",
+                project_id: projectId,
+                code: "MAIN",
+                name: "Main Unit",
+                sort_order: 0,
+                status: "planned",
+                status_source: "derived",
+                color_key: null,
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                notes: null,
+                created_at: timestamp,
+                updated_at: timestamp,
+              },
+            ],
+            unitWindows: [],
+            projectDepartments: [],
+            unitDepartments: [],
+            departments: [],
+            crewMembers: [
+              {
+                id: crewId,
+                workspace_id: "workspace-metadata",
+                full_name: "Rosa Gaffer",
+                role_label: "Gaffer",
+                email: null,
+                phone: null,
+                notes: null,
+                is_active: 1,
+                primary_department_id: "dept-ghost-9000",
+                created_at: timestamp,
+                updated_at: timestamp,
+              },
+            ],
+            crewAssignments: [
+              {
+                id: "assignment-crew-primary-dept",
+                workspace_id: "workspace-metadata",
+                project_unit_id: unitId,
+                department_id: null,
+                crew_member_id: crewId,
+                role_label: "Gaffer",
+                start_date: "2026-06-01",
+                end_date: "2026-06-10",
+                notes: null,
+                created_at: timestamp,
+                updated_at: timestamp,
+              },
+            ],
+          },
+        },
+      ]);
+
+      expect(result.errors).toEqual([]);
+      expect(result.appliedCount).toBe(1);
+      const crew = database
+        .prepare("SELECT full_name, primary_department_id FROM crew_members WHERE id = ?")
+        .get(crewId) as { full_name: string; primary_department_id: string | null } | undefined;
+      expect(crew?.full_name).toBe("Rosa Gaffer");
+      // The unresolved primary department is nulled, not fatal.
+      expect(crew?.primary_department_id).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
   it("adopts equivalent local catalog ids before applying a project snapshot", () => {
     const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-project-catalog-rekey");
 
