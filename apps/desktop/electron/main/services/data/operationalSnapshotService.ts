@@ -266,6 +266,42 @@ const nullMissingReferences = (
   return safe;
 };
 
+const isSafeTableName = (value: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
+
+/**
+ * Turns SQLite's opaque "FOREIGN KEY constraint failed" into the exact child
+ * column → parent table that broke, e.g. "incidents.reported_by_user_id →
+ * users". Must run while the offending rows are still present (i.e. before the
+ * savepoint is rolled back), which is why the apply transaction defers foreign
+ * keys so every violation surfaces together at release time.
+ */
+const describeForeignKeyViolations = (db: DatabaseSync): string | null => {
+  try {
+    const violations = db.prepare("PRAGMA foreign_key_check").all() as Array<{
+      table?: string;
+      parent?: string;
+      fkid?: number;
+    }>;
+    if (!violations.length) return null;
+    const described = violations.slice(0, 8).map((violation) => {
+      const child = typeof violation.table === "string" ? violation.table : "?";
+      let column = "";
+      if (isSafeTableName(child)) {
+        try {
+          const fks = db.prepare(`PRAGMA foreign_key_list("${child}")`).all() as Array<{ id: number; from: string }>;
+          column = fks.find((fk) => fk.id === violation.fkid)?.from ?? "";
+        } catch {
+          /* best effort — the table name still helps */
+        }
+      }
+      return `${child}${column ? `.${column}` : ""} → ${violation.parent ?? "?"}`;
+    });
+    return Array.from(new Set(described)).join("; ");
+  } catch {
+    return null;
+  }
+};
+
 const findEquivalentCrewAssignmentId = (db: DatabaseSync, row: Record<string, unknown>) => {
   if (!row.id || !row.project_unit_id || !row.crew_member_id) return null;
   const existing = db
@@ -1221,6 +1257,10 @@ export const createOperationalSnapshotService = (db: DatabaseSync) => ({
     };
 
     db.exec("BEGIN");
+    // Defer foreign keys so a snapshot's child rows can be applied in any order
+    // and so every violation surfaces together at savepoint release, where we can
+    // name them precisely instead of failing on the first out-of-order insert.
+    db.exec("PRAGMA defer_foreign_keys = ON");
     try {
       for (const row of rows) {
         if (row.workspace_id !== workspaceId || row.entity_type !== entityType) continue;
@@ -1278,9 +1318,15 @@ export const createOperationalSnapshotService = (db: DatabaseSync) => ({
           result.appliedCount += 1;
           result.cursorAfter = row.updated_at;
         } catch (error) {
+          let message = error instanceof Error ? error.message : "Unknown operational snapshot error.";
+          // Capture which foreign key broke BEFORE unwinding the savepoint — once
+          // rolled back the offending rows are gone and can't be inspected.
+          if (/foreign key/i.test(message)) {
+            const detail = describeForeignKeyViolations(db);
+            if (detail) message = `${message}: ${detail}`;
+          }
           db.exec("ROLLBACK TO SAVEPOINT operational_snapshot_row");
           db.exec("RELEASE SAVEPOINT operational_snapshot_row");
-          const message = error instanceof Error ? error.message : "Unknown operational snapshot error.";
           result.errors.push(`${row.entity_id}: ${message}`);
           logger.warn("Operational snapshot row failed.", { entityType, id: row.entity_id, error: message });
         }
