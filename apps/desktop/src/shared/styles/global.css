@@ -26919,75 +26919,145 @@ input[type="number"] {
   line-height: 1.45;
 }
 
-.inventory-reset-summary {
+.inventory-reset-impact {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
 }
 
-.inventory-reset-stat {
+.inventory-reset-impact-count {
   display: grid;
-  gap: 3px;
-  padding: 12px;
+  gap: 2px;
+  align-content: center;
+  padding: 14px 18px;
+  border: 1px solid rgba(255, 116, 116, 0.26);
+  border-radius: 12px;
+  background: rgba(255, 116, 116, 0.06);
+}
+
+.inventory-reset-impact-count strong {
+  color: var(--text-primary);
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.inventory-reset-impact-count span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.inventory-reset-impact-use {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 12px;
-  background: rgba(7, 10, 12, 0.22);
 }
 
-.inventory-reset-stat span {
-  color: var(--text-muted);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.inventory-reset-impact-use svg {
+  flex: none;
 }
 
-.inventory-reset-stat strong {
+.inventory-reset-impact-use strong {
+  display: block;
   color: var(--text-primary);
-  font-size: 22px;
-  font-weight: 500;
+  font-size: 14px;
 }
 
-.inventory-reset-stat.is-warning {
-  border-color: rgba(212, 170, 83, 0.28);
+.inventory-reset-impact-use span {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.inventory-reset-impact-use.is-safe {
+  border-color: rgba(114, 196, 146, 0.24);
+  background: rgba(114, 196, 146, 0.06);
+}
+
+.inventory-reset-impact-use.is-safe svg {
+  color: rgba(120, 220, 160, 0.95);
+}
+
+.inventory-reset-impact-use.is-warning {
+  border-color: rgba(212, 170, 83, 0.3);
   background: rgba(212, 170, 83, 0.07);
 }
 
-.inventory-reset-deps {
+.inventory-reset-impact-use.is-warning svg {
+  color: rgba(232, 190, 110, 0.96);
+}
+
+.inventory-reset-group {
   display: grid;
-  gap: 4px;
-  max-height: 180px;
-  overflow-y: auto;
+  gap: 2px;
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.02);
 }
 
-.inventory-reset-deps-label {
+.inventory-reset-group.is-kept {
+  border-color: rgba(114, 196, 146, 0.18);
+  background: rgba(114, 196, 146, 0.04);
+}
+
+.inventory-reset-group-label {
+  margin-bottom: 4px;
   color: var(--text-muted);
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.inventory-reset-dep {
+.inventory-reset-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 12px;
+  padding: 3px 0;
+  font-size: 13px;
   color: var(--text-secondary);
 }
 
+.inventory-reset-row-count {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
 .inventory-reset-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
   margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.inventory-reset-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.inventory-reset-confirm {
+  display: grid;
+  gap: 6px;
+}
+
+.inventory-reset-confirm label {
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.45;
 }
 
 .inventory-reset-confirm-input {
   width: 100%;
+}
+
+.inventory-reset-dialog .action-panel-actions {
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .inventory-reset-done p {

@@ -1,4 +1,4 @@
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -9,6 +9,28 @@ import { ModalShell } from "@shared/components/ModalShell";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 const CONFIRM_WORD = "RESET";
+
+// Friendly, human labels for the technical tables shown in the impact preview —
+// a non-technical operator should never see raw column/table names.
+const FRIENDLY_TABLE_LABELS: Record<string, string> = {
+  asset_current_state: "Estado actual",
+  asset_events: "Historial de eventos",
+  asset_assignments: "Asignaciones",
+  asset_files: "Archivos adjuntos",
+  kit_assets: "Pertenencia a kits",
+  scannable_codes: "Códigos QR / barras",
+  incidents: "Incidencias",
+  financial_entries: "Asientos financieros",
+  packing_slip_items: "Ítems de packing",
+  rma_case_assets: "Equipos en RMA",
+};
+
+const friendlyTableLabel = (table: string): string =>
+  FRIENDLY_TABLE_LABELS[table] ??
+  table
+    .split("_")
+    .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1) : part))
+    .join(" ");
 
 /**
  * Admin-only maintenance action to wipe the entire equipment inventory of the
@@ -74,7 +96,24 @@ export const InventoryResetDialog = () => {
     }
   };
 
-  const dependentRows = (preview?.references ?? []).filter((reference) => reference.rowCount > 0);
+  const removedItems = preview
+    ? [
+        ...preview.references
+          .filter((reference) => reference.rowCount > 0 && reference.action === "delete")
+          .map((reference) => ({ label: friendlyTableLabel(reference.table), count: reference.rowCount })),
+        ...(preview.legacyItems > 0
+          ? [{ label: t("assets.reset.legacyRecords", { defaultValue: "Registros de import Rentman" }), count: preview.legacyItems }]
+          : []),
+        ...(preview.scannableCodes > 0
+          ? [{ label: t("assets.reset.codes", { defaultValue: "Códigos QR / barras" }), count: preview.scannableCodes }]
+          : []),
+      ]
+    : [];
+  const preservedItems = preview
+    ? preview.references
+        .filter((reference) => reference.rowCount > 0 && reference.action === "null")
+        .map((reference) => ({ label: friendlyTableLabel(reference.table), count: reference.rowCount }))
+    : [];
   const confirmReady = confirmText.trim().toUpperCase() === CONFIRM_WORD;
 
   return (
@@ -115,50 +154,72 @@ export const InventoryResetDialog = () => {
               <div className="empty-state">{t("assets.reset.loading", { defaultValue: "Calculando el alcance…" })}</div>
             ) : (
               <>
-                <div className="inventory-reset-summary">
-                  <div className="inventory-reset-stat">
-                    <span>{t("assets.reset.assets", { defaultValue: "Equipos a eliminar" })}</span>
-                    <strong>{preview.assetCount}</strong>
+                <div className="inventory-reset-impact">
+                  <div className="inventory-reset-impact-count">
+                    <strong>{preview.assetCount.toLocaleString()}</strong>
+                    <span>{t("assets.reset.assetsToDelete", { defaultValue: "equipos se eliminarán" })}</span>
                   </div>
-                  <div className={`inventory-reset-stat${preview.inUseCount > 0 ? " is-warning" : ""}`}>
-                    <span>{t("assets.reset.inUse", { defaultValue: "En uso" })}</span>
-                    <strong>{preview.inUseCount}</strong>
+                  <div className={`inventory-reset-impact-use${preview.inUseCount > 0 ? " is-warning" : " is-safe"}`}>
+                    {preview.inUseCount > 0 ? <AlertTriangle size={15} aria-hidden="true" /> : <CheckCircle2 size={15} aria-hidden="true" />}
+                    <div>
+                      <strong>{t("assets.reset.inUseCount", { defaultValue: "{{count}} en uso", count: preview.inUseCount })}</strong>
+                      <span>
+                        {preview.inUseCount > 0
+                          ? t("assets.reset.inUseKept", { defaultValue: "se conservan sus vínculos" })
+                          : t("assets.reset.inUseSafe", { defaultValue: "nada asignado ni en proyectos" })}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {dependentRows.length ? (
-                  <div className="inventory-reset-deps">
-                    <span className="inventory-reset-deps-label">
-                      {t("assets.reset.dependents", { defaultValue: "Registros dependientes" })}
-                    </span>
-                    {dependentRows.map((reference) => (
-                      <div key={`${reference.table}.${reference.column}`} className="inventory-reset-dep">
-                        <span>{reference.table}</span>
-                        <span>
-                          {reference.rowCount} ·{" "}
-                          {reference.action === "null"
-                            ? t("assets.reset.unlink", { defaultValue: "se desvincula" })
-                            : t("assets.reset.delete", { defaultValue: "se borra" })}
-                        </span>
+                {removedItems.length ? (
+                  <div className="inventory-reset-group">
+                    <span className="inventory-reset-group-label">{t("assets.reset.alsoRemoved", { defaultValue: "También se elimina" })}</span>
+                    {removedItems.map((item) => (
+                      <div key={item.label} className="inventory-reset-row">
+                        <span>{item.label}</span>
+                        <span className="inventory-reset-row-count">{item.count.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {preservedItems.length ? (
+                  <div className="inventory-reset-group is-kept">
+                    <span className="inventory-reset-group-label">{t("assets.reset.kept", { defaultValue: "Se conserva (solo se quita el vínculo al equipo)" })}</span>
+                    {preservedItems.map((item) => (
+                      <div key={item.label} className="inventory-reset-row">
+                        <span>{item.label}</span>
+                        <span className="inventory-reset-row-count">{item.count.toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
                 ) : null}
 
                 <p className="inventory-reset-note">
-                  {t("assets.reset.note", {
-                    defaultValue: "Acción coordinada: primero vacía la nube, luego corre esto en cada máquina, luego re-importa. Escribe RESET para confirmar.",
-                  })}
+                  <Info size={13} aria-hidden="true" />
+                  <span>
+                    {t("assets.reset.coordinated", {
+                      defaultValue: "Acción coordinada: primero vacía la nube, luego corre esto en cada máquina, luego re-importa.",
+                    })}
+                  </span>
                 </p>
-                <input
-                  className="inventory-reset-confirm-input"
-                  value={confirmText}
-                  onChange={(event) => setConfirmText(event.target.value)}
-                  placeholder={CONFIRM_WORD}
-                  aria-label={t("assets.reset.confirmAria", { defaultValue: "Escribe RESET para confirmar" })}
-                />
 
-                <div className="action-panel-actions action-panel-actions-start">
+                <div className="inventory-reset-confirm">
+                  <label htmlFor="inventory-reset-confirm-input">
+                    {t("assets.reset.confirmLabel", { defaultValue: "Para confirmar, escribe RESET" })}
+                  </label>
+                  <input
+                    id="inventory-reset-confirm-input"
+                    className="inventory-reset-confirm-input"
+                    value={confirmText}
+                    onChange={(event) => setConfirmText(event.target.value)}
+                    placeholder={CONFIRM_WORD}
+                    autoComplete="off"
+                  />
+                </div>
+
+                <div className="action-panel-actions action-panel-actions-end">
                   <button type="button" className="ghost-control" onClick={close} disabled={isResetting}>
                     {t("common.cancel", { defaultValue: "Cancelar" })}
                   </button>
