@@ -26877,3 +26877,122 @@ input[type="number"] {
   font-size: 12px;
   font-weight: 600;
 }
+
+/* ── Inventory reset (admin maintenance) ──────────────────────────────── */
+.inventory-reset {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.inventory-reset-trigger {
+  font-size: 11px;
+}
+
+.inventory-reset-dialog {
+  display: grid;
+  gap: 14px;
+  width: min(520px, 92vw);
+  padding: 4px 2px;
+}
+
+.inventory-reset-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.inventory-reset-head-icon {
+  flex: none;
+  color: rgba(255, 173, 173, 0.96);
+}
+
+.inventory-reset-head strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.inventory-reset-head p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.inventory-reset-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.inventory-reset-stat {
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  background: rgba(7, 10, 12, 0.22);
+}
+
+.inventory-reset-stat span {
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.inventory-reset-stat strong {
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.inventory-reset-stat.is-warning {
+  border-color: rgba(212, 170, 83, 0.28);
+  background: rgba(212, 170, 83, 0.07);
+}
+
+.inventory-reset-deps {
+  display: grid;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.inventory-reset-deps-label {
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.inventory-reset-dep {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.inventory-reset-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.inventory-reset-confirm-input {
+  width: 100%;
+}
+
+.inventory-reset-done p {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}

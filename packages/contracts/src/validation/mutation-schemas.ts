@@ -417,6 +417,12 @@ export const archiveAssetsSchema = z
   })
   .strict();
 
+export const inventoryResetSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+  })
+  .strict();
+
 export const reconcileAssetQuantitiesSchema = z
   .object({
     commandId: nonEmptyString,

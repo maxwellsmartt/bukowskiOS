@@ -1,5 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import type { InventoryResetReport } from "@contracts";
+
 import { getDesktopLogger } from "../logger";
 
 const logger = getDesktopLogger("inventory-reset-service");
@@ -95,20 +97,6 @@ const readExternalNullableReferences = (
     }
   }
   return refs;
-};
-
-export type InventoryResetReport = {
-  workspaceId: string;
-  dryRun: boolean;
-  assetCount: number;
-  inUseCount: number;
-  // Rows that reference an asset, per table. `action` is what the reset does:
-  // delete the row when the asset link is required, or null it when optional.
-  references: Array<{ table: string; column: string; rowCount: number; action: "delete" | "null" }>;
-  legacyImports: number;
-  legacyItems: number;
-  scannableCodes: number;
-  clearedOutbox: number;
 };
 
 const workspaceAssetFilter = (column: string) =>
@@ -260,3 +248,12 @@ export const resetWorkspaceInventory = (
 
   return report;
 };
+
+export type InventoryResetService = ReturnType<typeof createInventoryResetService>;
+
+export const createInventoryResetService = (db: DatabaseSync) => ({
+  previewInventoryReset: (workspaceId: string): InventoryResetReport =>
+    resetWorkspaceInventory(db, { workspaceId, dryRun: true }),
+  resetInventory: (workspaceId: string): InventoryResetReport =>
+    resetWorkspaceInventory(db, { workspaceId, dryRun: false }),
+});

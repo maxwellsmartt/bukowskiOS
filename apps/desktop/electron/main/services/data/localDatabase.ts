@@ -44,6 +44,7 @@ import { createFoundationReadService, type FoundationReadService } from "./found
 import { applyAssetQuantityFoundationMigration } from "./assetQuantityFoundationBootstrap";
 import { applyAssetValuationFoundationMigration } from "./assetValuationFoundationBootstrap";
 import { createAssetMutationService } from "./assetMutationService";
+import { createInventoryResetService, type InventoryResetService } from "./inventoryResetService";
 import { createAssetSnapshotPullService } from "./assetSnapshotPullService";
 import { applyOperationalSnapshotLocally, createOperationalSnapshotService } from "./operationalSnapshotService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
@@ -166,6 +167,7 @@ type LocalDatabaseRuntime = {
   projectMutations: ProjectMutationService;
   catalogMutations: CatalogMutationService;
   assetMutations: AssetMutationService;
+  inventoryReset: InventoryResetService;
   incidentMutations: IncidentMutationService;
   financeMutations: FinanceMutationService;
   collaboratorFeeMutations: CollaboratorFeeMutationService;
@@ -2006,6 +2008,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   });
   const catalogMutations = createCatalogMutationService(database);
   const assetMutations = createAssetMutationService(database);
+  const inventoryReset = createInventoryResetService(database);
   const incidentMutations = createIncidentMutationService(database);
   const financeMutations = createFinanceMutationService(database);
   const collaboratorFeeMutations = createCollaboratorFeeMutationService(database);
@@ -2502,6 +2505,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     projectMutations,
     catalogMutations,
     assetMutations,
+    inventoryReset,
     workspaceAccess,
     incidentMutations,
     financeMutations,

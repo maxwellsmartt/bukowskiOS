@@ -15,6 +15,7 @@ import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListSortMenuButton, ListToolbar } from "@shared/components/ListToolbar";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
+import { InventoryResetDialog } from "./InventoryResetDialog";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
@@ -2218,6 +2219,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       <SectionHeader
         title={isProjectMode ? t("assets.titleProject") : t("assets.title")}
       />
+
+      {!isProjectMode ? <InventoryResetDialog /> : null}
 
       {error ? <div className="empty-state">{t("assets.unavailable", { message: error })}</div> : null}
       {!error && isLoading ? (
