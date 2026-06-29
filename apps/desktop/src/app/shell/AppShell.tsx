@@ -375,10 +375,10 @@ export const AppShell = () => {
             transitionKey={location.pathname}
           >
             {!isScopeReady ? (
-              <AppStartupGate detail="Opening your last view..." />
+              <SectionTransitionLoader detail="Opening your last view..." />
             ) : (
               <ShellErrorBoundary>
-                <Suspense fallback={<AppStartupGate detail="Preparing this view..." />}>
+                <Suspense fallback={<SectionTransitionLoader detail="Preparing this view..." />}>
                   <AppRoutes />
                 </Suspense>
               </ShellErrorBoundary>
@@ -427,3 +427,23 @@ const RouteTransitionMain = ({ className, transitionKey, children }: RouteTransi
     </main>
   );
 };
+
+type SectionTransitionLoaderProps = {
+  detail: string;
+};
+
+const SectionTransitionLoader = ({ detail }: SectionTransitionLoaderProps) => (
+  <div aria-live="polite" className="shell-transition-loader" role="status">
+    <div aria-hidden="true" className="shell-transition-loader-aura">
+      <span className="shell-transition-loader-orb shell-transition-loader-orb-primary" />
+      <span className="shell-transition-loader-orb shell-transition-loader-orb-secondary" />
+      <span className="shell-transition-loader-orb shell-transition-loader-orb-tertiary" />
+      <span className="shell-transition-loader-core" />
+    </div>
+    <div className="shell-transition-loader-copy">
+      <span className="shell-transition-loader-title">Preparing section</span>
+      <span className="shell-transition-loader-detail">{detail}</span>
+    </div>
+    <span className="sr-only">{detail}</span>
+  </div>
+);

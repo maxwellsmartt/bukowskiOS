@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import pdfWorkerUrl from "pdfjs-dist/legacy/build/pdf.worker.mjs?url";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
 
 type DocumentPreviewModalProps = {
   open: boolean;
@@ -44,7 +44,7 @@ const PdfCanvasPreview = ({ dataUrl, title }: { dataUrl: string; title: string }
     container.replaceChildren();
     setStatus("loading");
 
-    void import("pdfjs-dist/legacy/build/pdf.mjs")
+    void import("pdfjs-dist/build/pdf.mjs")
       .then(async (pdfjs) => {
         if (cancelled) return;
         pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;

@@ -458,8 +458,15 @@ const AssetOperationCart = ({
           <strong>{t(items.length === 1 ? "assets.cart.oneSelected" : "assets.cart.manySelected", { count: items.length })}</strong>
           <span>{t(totalUnits === 1 ? "assets.cart.oneUnit" : "assets.cart.manyUnits", { count: totalUnits })}</span>
         </div>
-        <button aria-label={t("assets.cart.clearAria")} className="icon-ghost-control is-danger" data-tooltip={t("assets.cart.clearTooltip")} onClick={onClear} type="button">
-          <Trash2 size={14} />
+        <button
+          aria-label={t("assets.cart.clearAria", { defaultValue: "Vaciar selección" })}
+          className="ghost-control asset-operation-cart-clear"
+          data-tooltip={t("assets.cart.clearTooltip", { defaultValue: "Quitar todos de la selección" })}
+          onClick={onClear}
+          type="button"
+        >
+          <X size={13} />
+          <span>{t("assets.cart.clear", { defaultValue: "Limpiar" })}</span>
         </button>
       </div>
       <div className="asset-operation-cart-actions">
@@ -512,11 +519,14 @@ const AssetOperationCart = ({
           </button>
         ) : null}
         <button
-          className="ghost-control action-row-button is-danger"
+          className="ghost-control action-row-button is-danger asset-operation-cart-delete"
           onClick={onDeleteSelected}
           type="button"
         >
-          {t("assets.cart.deleteSelected", { defaultValue: "Eliminar" })}
+          {t(items.length === 1 ? "assets.cart.deleteSelectedOne" : "assets.cart.deleteSelectedMany", {
+            count: items.length,
+            defaultValue: items.length === 1 ? "Eliminar equipo" : "Eliminar equipos",
+          })}
         </button>
       </div>
 
@@ -1401,6 +1411,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   }, [assets]);
 
   const handleCartSelectionChange = (nextSelectedRowIds: string[]) => {
+    // Emptying the selection (e.g. the table context menu "Limpiar selección" or
+    // unchecking the last row) also clears the side rail so no stale detail stays.
+    if (nextSelectedRowIds.length === 0) {
+      setSelectedAssetId(null);
+    }
     const visibleAssetById = new Map(assets.map((asset) => [asset.id, asset] as const));
     const nextSelected = new Set(nextSelectedRowIds);
 
@@ -1463,6 +1478,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const clearOperationCart = () => {
     setCartItemsById({});
     setAssignNextStep(null);
+    // Clearing the selection also empties the side rail so no stale detail lingers.
+    setSelectedAssetId(null);
   };
 
   useEffect(() => {
@@ -3011,16 +3028,10 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 },
               },
               {
-                key: "delete",
-                label: t("assets.cart.deleteSelected", { defaultValue: "Eliminar" }),
-                icon: <Trash2 size={14} />,
-                separatorBefore: true,
-                onSelect: (target) => void handleDeleteAssetRow(target),
-              },
-              {
                 key: "add-to-compare",
                 label: t("assets.cart.addToCompare"),
                 icon: <GitCompareArrows size={14} />,
+                separatorBefore: true,
                 onSelect: (target) => addAssetToCompare(target),
               },
               {
@@ -3041,8 +3052,15 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 key: "report-issue",
                 label: t("assets.cart.reportIssue"),
                 icon: <Siren size={14} />,
-                separatorBefore: true,
                 onSelect: (target) => navigate(`/assets/${target.id}?report=incident`),
+              },
+              {
+                key: "delete",
+                label: t("assets.cart.deleteSelectedOne", { defaultValue: "Eliminar equipo" }),
+                icon: <Trash2 size={14} />,
+                tone: "danger",
+                separatorBefore: true,
+                onSelect: (target) => void handleDeleteAssetRow(target),
               },
             ]}
             defaultVisibleColumnKeys={isProjectMode ? projectAssetDefaultColumnKeys : assetDefaultColumnKeys}
