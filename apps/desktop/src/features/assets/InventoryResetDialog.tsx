@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Info, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -124,20 +124,35 @@ export const InventoryResetDialog = () => {
       </button>
 
       {open ? (
-        <ModalShell onClose={close}>
+        <ModalShell onClose={close} width={620}>
           <div className="inventory-reset-dialog">
             <div className="inventory-reset-head">
-              <span className="inventory-reset-head-icon"><AlertTriangle size={18} aria-hidden="true" /></span>
-              <div>
-                <strong>{t("assets.reset.title", { defaultValue: "Vaciar todo el inventario" })}</strong>
-                <p>{t("assets.reset.subtitle", { defaultValue: "Borra todos los equipos de este workspace para re-importar desde cero (limpieza coordinada)." })}</p>
+              <div className="inventory-reset-head-copy">
+                <div className="inventory-reset-headline">
+                  <span className="inventory-reset-head-icon"><AlertTriangle size={18} aria-hidden="true" /></span>
+                  <div>
+                    <strong>{t("assets.reset.title", { defaultValue: "Vaciar todo el inventario" })}</strong>
+                  </div>
+                </div>
               </div>
+              <button
+                type="button"
+                className="icon-ghost-control inventory-reset-close"
+                aria-label={t("common.close", { defaultValue: "Cerrar" })}
+                onClick={close}
+                disabled={isResetting}
+              >
+                <X size={16} />
+              </button>
             </div>
 
             {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 
             {done ? (
               <div className="inventory-reset-done">
+                <div className="inventory-reset-done-icon">
+                  <CheckCircle2 size={18} aria-hidden="true" />
+                </div>
                 <p>
                   {t("assets.reset.doneDetail", {
                     defaultValue: "Se eliminaron {{count}} equipos. Ahora re-importa los CSV (Rentman + DLC) y sincroniza.",
@@ -156,12 +171,16 @@ export const InventoryResetDialog = () => {
               <>
                 <div className="inventory-reset-impact">
                   <div className="inventory-reset-impact-count">
+                    <span className="inventory-reset-impact-label">{t("assets.reset.impactLabel", { defaultValue: "Se elimina ahora" })}</span>
                     <strong>{preview.assetCount.toLocaleString()}</strong>
                     <span>{t("assets.reset.assetsToDelete", { defaultValue: "equipos se eliminarán" })}</span>
                   </div>
                   <div className={`inventory-reset-impact-use${preview.inUseCount > 0 ? " is-warning" : " is-safe"}`}>
-                    {preview.inUseCount > 0 ? <AlertTriangle size={15} aria-hidden="true" /> : <CheckCircle2 size={15} aria-hidden="true" />}
-                    <div>
+                    <span className="inventory-reset-impact-icon">
+                      {preview.inUseCount > 0 ? <AlertTriangle size={15} aria-hidden="true" /> : <CheckCircle2 size={15} aria-hidden="true" />}
+                    </span>
+                    <div className="inventory-reset-impact-copy">
+                      <span className="inventory-reset-impact-label">{t("assets.reset.usageLabel", { defaultValue: "Estado de uso" })}</span>
                       <strong>{t("assets.reset.inUseCount", { defaultValue: "{{count}} en uso", count: preview.inUseCount })}</strong>
                       <span>
                         {preview.inUseCount > 0
@@ -172,51 +191,55 @@ export const InventoryResetDialog = () => {
                   </div>
                 </div>
 
-                {removedItems.length ? (
-                  <div className="inventory-reset-group">
-                    <span className="inventory-reset-group-label">{t("assets.reset.alsoRemoved", { defaultValue: "También se elimina" })}</span>
-                    {removedItems.map((item) => (
-                      <div key={item.label} className="inventory-reset-row">
-                        <span>{item.label}</span>
-                        <span className="inventory-reset-row-count">{item.count.toLocaleString()}</span>
-                      </div>
-                    ))}
+                <div className={`inventory-reset-groups${preservedItems.length ? " has-kept" : ""}`}>
+                  {removedItems.length ? (
+                    <div className="inventory-reset-group">
+                      <span className="inventory-reset-group-label">{t("assets.reset.alsoRemoved", { defaultValue: "También se elimina" })}</span>
+                      {removedItems.map((item) => (
+                        <div key={item.label} className="inventory-reset-row">
+                          <span>{item.label}</span>
+                          <span className="inventory-reset-row-count">{item.count.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {preservedItems.length ? (
+                    <div className="inventory-reset-group is-kept">
+                      <span className="inventory-reset-group-label">{t("assets.reset.kept", { defaultValue: "Se conserva (solo se quita el vínculo al equipo)" })}</span>
+                      {preservedItems.map((item) => (
+                        <div key={item.label} className="inventory-reset-row">
+                          <span>{item.label}</span>
+                          <span className="inventory-reset-row-count">{item.count.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="inventory-reset-confirm-panel">
+                  <p className="inventory-reset-note">
+                    <Info size={13} aria-hidden="true" />
+                    <span>
+                      {t("assets.reset.coordinated", {
+                        defaultValue: "Acción coordinada: primero vacía la nube, luego corre esto en cada máquina, luego re-importa.",
+                      })}
+                    </span>
+                  </p>
+
+                  <div className="inventory-reset-confirm">
+                    <label htmlFor="inventory-reset-confirm-input">
+                      {t("assets.reset.confirmLabel", { defaultValue: "Para confirmar, escribe RESET" })}
+                    </label>
+                    <input
+                      id="inventory-reset-confirm-input"
+                      className="inventory-reset-confirm-input"
+                      value={confirmText}
+                      onChange={(event) => setConfirmText(event.target.value)}
+                      placeholder={CONFIRM_WORD}
+                      autoComplete="off"
+                    />
                   </div>
-                ) : null}
-
-                {preservedItems.length ? (
-                  <div className="inventory-reset-group is-kept">
-                    <span className="inventory-reset-group-label">{t("assets.reset.kept", { defaultValue: "Se conserva (solo se quita el vínculo al equipo)" })}</span>
-                    {preservedItems.map((item) => (
-                      <div key={item.label} className="inventory-reset-row">
-                        <span>{item.label}</span>
-                        <span className="inventory-reset-row-count">{item.count.toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-
-                <p className="inventory-reset-note">
-                  <Info size={13} aria-hidden="true" />
-                  <span>
-                    {t("assets.reset.coordinated", {
-                      defaultValue: "Acción coordinada: primero vacía la nube, luego corre esto en cada máquina, luego re-importa.",
-                    })}
-                  </span>
-                </p>
-
-                <div className="inventory-reset-confirm">
-                  <label htmlFor="inventory-reset-confirm-input">
-                    {t("assets.reset.confirmLabel", { defaultValue: "Para confirmar, escribe RESET" })}
-                  </label>
-                  <input
-                    id="inventory-reset-confirm-input"
-                    className="inventory-reset-confirm-input"
-                    value={confirmText}
-                    onChange={(event) => setConfirmText(event.target.value)}
-                    placeholder={CONFIRM_WORD}
-                    autoComplete="off"
-                  />
                 </div>
 
                 <div className="action-panel-actions action-panel-actions-end">
