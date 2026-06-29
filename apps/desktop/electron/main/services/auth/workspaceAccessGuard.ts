@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
 
 type WorkspaceAccessLevel = "read" | "write";
 
@@ -265,6 +266,16 @@ export const createWorkspaceAccessGuard = ({
     // evade membership/permission checks.
     if (!isConfigured(supabaseUrl, anonKey)) {
       return;
+    }
+
+    // Supabase is configured, so the user operates inside a real cloud workspace.
+    // The local fallback/offline workspace has no cloud membership and never syncs
+    // upstream, so a WRITE that resolves to it is always a stray/misrouted call
+    // (e.g. a handler that defaulted a missing workspaceId). Reject it immediately
+    // and loudly instead of letting user data silently land in the invisible
+    // local-only workspace. Reads are left untouched: they simply return nothing.
+    if (accessLevel === "write" && workspaceId === LOCAL_FALLBACK_WORKSPACE_ID) {
+      throw new Error("That workspace is not available on this device.");
     }
 
     const { accessToken } = await getTokens();

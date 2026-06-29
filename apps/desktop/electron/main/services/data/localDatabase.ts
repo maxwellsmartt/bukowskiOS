@@ -85,7 +85,7 @@ import { createIncidentMutationService } from "./incidentMutationService";
 import { createPackingMutationService } from "./packingMutationService";
 import { cleanupPerformanceFoundationData, seedPerformanceFoundationData } from "./performanceFoundationSeed";
 import { cleanupFoundationDemoData, seedFoundationData } from "./foundationSeed";
-import { bootstrapLegacyRentmanDemo } from "./legacyRentmanDemo";
+import { bootstrapLegacyRentmanDemo, cleanupLegacyRentmanDemo } from "./legacyRentmanDemo";
 import {
   applyProjectArchiveFoundationMigration,
   applyProjectCreationWizardFoundationMigration,
@@ -743,21 +743,22 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   runStartupStep("seed foundation permissions", () => seedFoundationData(database, { includeDemoData: demoDataEnabled }));
   runStartupStep("bootstrap AI gateway foundation", () => bootstrapAIGatewayFoundation(database));
   runStartupStep("bootstrap connector foundation", () => bootstrapConnectorFoundation(database));
-  // The legacy Rentman inventory is REAL reference data (the team's 2021
-  // import), not demo — it was mis-gated behind the demo flag. Always seed it
-  // (idempotent: the bootstrap skips when the full import is already present)
-  // and NEVER sweep it. This also restores it on machines where the earlier
-  // demo cleanup wrongly deleted it.
-  runStartupStep("bootstrap legacy Rentman inventory", () => bootstrapLegacyRentmanDemo(database));
+  // The legacy Rentman sample catalog (the team's 2021 import) is seed data, not
+  // live inventory: the real equipment is maintained in the cloud workspace and
+  // re-imported from CSV. Gate it behind the demo flag like every other sample so
+  // production installs never accumulate it in the local fallback workspace.
   if (demoDataEnabled) {
+    runStartupStep("bootstrap legacy Rentman inventory", () => bootstrapLegacyRentmanDemo(database));
     runStartupStep("ensure local project shell defaults", () => ensureProjectShellDefaults(database));
   } else {
-    // Demo data is off: sweep out the fictional foundation demo (Aurora project,
-    // teradek/cine7 assets, paola/luis/miguel crew) by its known fixed ids. The
-    // Rentman inventory is intentionally excluded — it is real data. Best-effort;
+    // Demo data is off (the production default): sweep out every seeded sample so
+    // the local fallback workspace never shows phantom inventory. Covers the
+    // fictional foundation demo (Aurora project, teradek/cine7 assets,
+    // paola/luis/miguel crew) and the legacy Rentman sample catalog. Best-effort;
     // never abort startup.
     try {
       runStartupStep("cleanup foundation demo data", () => cleanupFoundationDemoData(database));
+      runStartupStep("cleanup legacy Rentman inventory", () => cleanupLegacyRentmanDemo(database));
     } catch (error) {
       logger.warn("Demo data cleanup skipped after error.", {
         message: error instanceof Error ? error.message : String(error),
