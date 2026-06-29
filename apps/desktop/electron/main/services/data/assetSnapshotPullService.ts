@@ -107,6 +107,45 @@ const requireReference = (db: DatabaseSync, table: string, id: string | null | u
   return existing;
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// asset_categories, locations and departments are UUID-keyed in the cloud. A
+// non-UUID id on those columns is a legacy (Rentman 2021 import) ghost the
+// UUID-keyed cloud can never deliver — it must not wedge the asset pull forever.
+// A UUID that's merely late still defers and retries.
+const isLegacyGhostId = (id: string) => !UUID_RE.test(id);
+
+// Materialize a recognizable placeholder for a ghost category so the asset still
+// lands (the column is NOT NULL) and the pull cursor advances. The code is the
+// id itself to satisfy UNIQUE(workspace_id, code); the name surfaces the legacy
+// code so the team can see and reconcile it later.
+const ensureCategoryPlaceholder = (db: DatabaseSync, workspaceId: string, categoryId: string) => {
+  const code = /^category-([a-z0-9]+)-/i.exec(categoryId)?.[1]?.toUpperCase() ?? "RENTMAN";
+  const now = new Date().toISOString();
+  db
+    .prepare(
+      `INSERT OR IGNORE INTO asset_categories (id, workspace_id, parent_category_id, code, name, description, created_at, updated_at)
+       VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
+    )
+    .run(categoryId, workspaceId, categoryId, `${code} (Rentman)`, "Categoría del import Rentman pendiente de reconciliar.", now, now);
+  return categoryId;
+};
+
+const resolveCategoryReference = (db: DatabaseSync, workspaceId: string, id: string) => {
+  if (existsById(db, "asset_categories", id)) return id;
+  if (!isLegacyGhostId(id)) throw new Error(`Category ${id} is not available locally yet; snapshot deferred.`);
+  return ensureCategoryPlaceholder(db, workspaceId, id);
+};
+
+// For an optional UUID-keyed reference: keep it if present, defer if a real UUID
+// hasn't synced yet, and drop a legacy ghost id rather than wedge the pull.
+const resolveUuidKeyedReference = (db: DatabaseSync, table: string, id: string | null | undefined, label: string) => {
+  if (!id) return null;
+  if (existsById(db, table, id)) return id;
+  if (!isLegacyGhostId(id)) throw new Error(`${label} ${id} is not available locally yet; snapshot deferred.`);
+  return null;
+};
+
 const ensureHydrationEvent = (db: DatabaseSync, workspaceId: string, assetId: string, stateUpdatedAt: string) => {
   const eventId = `remote-hydration-${assetId}`;
   db
@@ -140,8 +179,8 @@ const ensureHydrationEvent = (db: DatabaseSync, workspaceId: string, assetId: st
 };
 
 const upsertAsset = (db: DatabaseSync, asset: RemoteAssetSnapshotRow) => {
-  const categoryId = requireReference(db, "asset_categories", asset.category_id, "Category");
-  const defaultLocationId = requireReference(db, "locations", asset.default_location_id, "Default location");
+  const categoryId = resolveCategoryReference(db, asset.workspace_id, asset.category_id);
+  const defaultLocationId = resolveUuidKeyedReference(db, "locations", asset.default_location_id, "Default location");
 
   db
     .prepare(
@@ -205,9 +244,12 @@ const upsertAsset = (db: DatabaseSync, asset: RemoteAssetSnapshotRow) => {
 const upsertState = (db: DatabaseSync, state: RemoteAssetCurrentStateRow) => {
   // Validate every relationship before writing anything. Missing parents are a
   // retryable ordering condition, never a reason to erase a business link.
-  const currentLocationId = requireReference(db, "locations", state.current_location_id, "Current location");
+  // Locations and departments are UUID-keyed in the cloud — drop a legacy ghost
+  // id instead of wedging. Projects, units and users keep deferring (their ids
+  // are text-keyed and do still sync, so a missing one is a real ordering wait).
+  const currentLocationId = resolveUuidKeyedReference(db, "locations", state.current_location_id, "Current location");
   const currentProjectId = requireReference(db, "projects", state.current_project_id, "Current project");
-  const currentDepartmentId = requireReference(db, "departments", state.current_department_id, "Current department");
+  const currentDepartmentId = resolveUuidKeyedReference(db, "departments", state.current_department_id, "Current department");
   const currentResponsibleUserId = requireReference(db, "users", state.current_responsible_user_id, "Responsible user");
   const projectUnitId = requireReference(db, "project_units", state.project_unit_id, "Project unit");
   const hydrationEventId = ensureHydrationEvent(db, state.workspace_id, state.asset_id, state.updated_at);

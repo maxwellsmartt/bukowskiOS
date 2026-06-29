@@ -234,3 +234,26 @@ export type AssetEditorMutationResult = {
   repeated: boolean;
   summary: string;
 };
+
+export type InventoryResetReference = {
+  table: string;
+  column: string;
+  rowCount: number;
+  action: "delete" | "null";
+};
+
+export type InventoryResetReport = {
+  workspaceId: string;
+  dryRun: boolean;
+  assetCount: number;
+  inUseCount: number;
+  references: InventoryResetReference[];
+  legacyImports: number;
+  legacyItems: number;
+  scannableCodes: number;
+  clearedOutbox: number;
+};
+
+export type InventoryResetCommand = {
+  workspaceId: string;
+};

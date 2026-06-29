@@ -87,7 +87,35 @@ const insertCachedWorkspaceMembership = (
 };
 
 describe("workspace access guard", () => {
-  it("still validates the default workspace when Supabase is configured (no spoof bypass)", async () => {
+  it("rejects writes to the local fallback workspace when Supabase is configured", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-workspace-access-fallback-write");
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
+    const guard = createWorkspaceAccessGuard({
+      database,
+      supabaseUrl: "https://example.supabase.co",
+      anonKey: "anon-key",
+      // A valid token proves the rejection is the fallback guard itself, not the
+      // downstream sign-in check.
+      getTokens: async () => ({ accessToken: createJwt({ sub: "user-remote", exp: 9_999_999_999 }) }),
+      fetchImpl,
+      now: () => 1_000,
+    });
+
+    await expect(
+      guard.assertWorkspaceAccess({
+        workspaceId: "workspace-metadata",
+        action: "import statements",
+        accessLevel: "write",
+      }),
+    ).rejects.toThrow(/not available on this device/i);
+
+    // Rejected immediately — never reaches the Supabase membership round-trip.
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    cleanup();
+  });
+
+  it("still validates the default workspace for reads when Supabase is configured (no spoof bypass)", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-workspace-access-default");
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
     const guard = createWorkspaceAccessGuard({
@@ -102,8 +130,8 @@ describe("workspace access guard", () => {
     await expect(
       guard.assertWorkspaceAccess({
         workspaceId: "workspace-metadata",
-        action: "import statements",
-        accessLevel: "write",
+        action: "load assets",
+        accessLevel: "read",
       }),
     ).rejects.toThrow(/Sign in again/);
 

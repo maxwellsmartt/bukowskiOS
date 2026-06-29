@@ -266,6 +266,69 @@ const nullMissingReferences = (
   return safe;
 };
 
+// A snapshot's crew row can carry a primary department (or linked user) that
+// hasn't synced to this machine. The catalog pull deliberately omits these FK
+// columns; mirror that here so an unresolved one can't fail the deferred foreign
+// key at commit and roll back the entire project snapshot.
+const sanitizeSnapshotCrew = (db: DatabaseSync, row: Record<string, unknown>) =>
+  nullMissingReferences(
+    db,
+    row,
+    [
+      { column: "primary_department_id", table: "departments" },
+      { column: "linked_user_id", table: "users" },
+    ],
+    { id: row.id, kind: "crew member" },
+  );
+
+const isSafeTableName = (value: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
+
+/**
+ * Turns SQLite's opaque "FOREIGN KEY constraint failed" into the exact child
+ * column → parent table that broke, e.g. "incidents.reported_by_user_id →
+ * users". Must run while the offending rows are still present (i.e. before the
+ * savepoint is rolled back), which is why the apply transaction defers foreign
+ * keys so every violation surfaces together at release time.
+ */
+type ForeignKeyViolation = { table?: string; rowid?: number; parent?: string; fkid?: number };
+
+const readForeignKeyViolations = (db: DatabaseSync): ForeignKeyViolation[] => {
+  try {
+    return db.prepare("PRAGMA foreign_key_check").all() as ForeignKeyViolation[];
+  } catch {
+    return [];
+  }
+};
+
+const fingerprintViolation = (violation: ForeignKeyViolation) =>
+  `${violation.table ?? "?"}:${violation.rowid ?? "?"}:${violation.fkid ?? "?"}`;
+
+// Fingerprints of any foreign-key breakage already present before the apply, so
+// per-row validation never blames a row for unrelated pre-existing damage.
+const foreignKeyViolationFingerprints = (db: DatabaseSync): Set<string> =>
+  new Set(readForeignKeyViolations(db).map(fingerprintViolation));
+
+const describeForeignKeyViolations = (db: DatabaseSync, exclude?: Set<string>): string | null => {
+  const violations = readForeignKeyViolations(db).filter(
+    (violation) => !exclude || !exclude.has(fingerprintViolation(violation)),
+  );
+  if (!violations.length) return null;
+  const described = violations.slice(0, 8).map((violation) => {
+    const child = typeof violation.table === "string" ? violation.table : "?";
+    let column = "";
+    if (isSafeTableName(child)) {
+      try {
+        const fks = db.prepare(`PRAGMA foreign_key_list("${child}")`).all() as Array<{ id: number; from: string }>;
+        column = fks.find((fk) => fk.id === violation.fkid)?.from ?? "";
+      } catch {
+        /* best effort — the table name still helps */
+      }
+    }
+    return `${child}${column ? `.${column}` : ""} → ${violation.parent ?? "?"}`;
+  });
+  return Array.from(new Set(described)).join("; ");
+};
+
 const findEquivalentCrewAssignmentId = (db: DatabaseSync, row: Record<string, unknown>) => {
   if (!row.id || !row.project_unit_id || !row.crew_member_id) return null;
   const existing = db
@@ -917,7 +980,7 @@ const applyProjectSnapshot = (
   for (const row of units) upsertRow(db, "project_units", row);
   for (const row of unitWindows) upsertRow(db, "project_unit_windows", row);
   for (const row of departments) upsertRow(db, "departments", row);
-  for (const row of crewMembers) upsertRow(db, "crew_members", row);
+  for (const row of crewMembers) upsertRow(db, "crew_members", sanitizeSnapshotCrew(db, row));
   for (const row of projectDepartments) {
     if (!adoptLegacyDepartmentReference(db, context.workspaceId, row.department_id)) {
       throw new Error(`Project department ${String(row.department_id)} is unavailable; snapshot deferred.`);
@@ -968,7 +1031,7 @@ const applyProjectSnapshot = (
         // workspace with its real name/role so it lands correctly even if the
         // catalog pull never runs, and so any earlier "Remote crew" placeholder
         // is overwritten.
-        upsertRow(db, "crew_members", { ...snapshotCrew, workspace_id: context.workspaceId });
+        upsertRow(db, "crew_members", sanitizeSnapshotCrew(db, { ...snapshotCrew, workspace_id: context.workspaceId }));
       } else if (!rowExists(db, "crew_members", crewId)) {
         // No crew data anywhere yet — last-resort placeholder. Epoch updated_at
         // so the last-write-wins catalog pull can still hydrate the real name.
@@ -1221,6 +1284,13 @@ export const createOperationalSnapshotService = (db: DatabaseSync) => ({
     };
 
     db.exec("BEGIN");
+    // Defer foreign keys so a snapshot's child rows can be applied in any order.
+    // Deferred FKs are only validated at COMMIT, so we validate each row's own
+    // work explicitly at release time (below) — that names the precise broken FK
+    // and isolates it to its row instead of rolling back the whole batch with a
+    // bare "FOREIGN KEY constraint failed" at commit.
+    db.exec("PRAGMA defer_foreign_keys = ON");
+    const preExistingForeignKeyViolations = foreignKeyViolationFingerprints(db);
     try {
       for (const row of rows) {
         if (row.workspace_id !== workspaceId || row.entity_type !== entityType) continue;
@@ -1274,13 +1344,25 @@ export const createOperationalSnapshotService = (db: DatabaseSync) => ({
             if (entityType === "rma_case") applyRmaSnapshot(db, row.snapshot_json);
           }
 
+          // Deferred FKs aren't validated at RELEASE; check this row's work now so
+          // a violation is named and isolated here rather than failing the whole
+          // batch at COMMIT.
+          const foreignKeyDetail = describeForeignKeyViolations(db, preExistingForeignKeyViolations);
+          if (foreignKeyDetail) throw new Error(`FOREIGN KEY constraint failed: ${foreignKeyDetail}`);
+
           db.exec("RELEASE SAVEPOINT operational_snapshot_row");
           result.appliedCount += 1;
           result.cursorAfter = row.updated_at;
         } catch (error) {
+          let message = error instanceof Error ? error.message : "Unknown operational snapshot error.";
+          // Name any foreign-key breakage not already captured above, before the
+          // rollback removes the offending rows.
+          if (/foreign key/i.test(message) && !message.includes("→")) {
+            const detail = describeForeignKeyViolations(db, preExistingForeignKeyViolations);
+            if (detail) message = `${message}: ${detail}`;
+          }
           db.exec("ROLLBACK TO SAVEPOINT operational_snapshot_row");
           db.exec("RELEASE SAVEPOINT operational_snapshot_row");
-          const message = error instanceof Error ? error.message : "Unknown operational snapshot error.";
           result.errors.push(`${row.entity_id}: ${message}`);
           logger.warn("Operational snapshot row failed.", { entityType, id: row.entity_id, error: message });
         }
@@ -1289,10 +1371,29 @@ export const createOperationalSnapshotService = (db: DatabaseSync) => ({
       updateCursor(db, workspaceId, entityType, result.cursorAfter, result.appliedCount, result.errors[0] ?? null);
       db.exec("COMMIT");
     } catch (error) {
+      let message = error instanceof Error ? error.message : "Unknown operational snapshot pull error.";
+      // A foreign-key failure can only reach COMMIT from pre-existing breakage;
+      // name it before the rollback removes the offending rows.
+      if (/foreign key/i.test(message) && !message.includes("→")) {
+        const detail = describeForeignKeyViolations(db);
+        if (detail) message = `${message}: ${detail}`;
+      }
       db.exec("ROLLBACK");
-      const message = error instanceof Error ? error.message : "Unknown operational snapshot pull error.";
       result.errors.push(message);
       logger.error("Operational snapshot pull transaction rolled back.", { entityType, error: message });
+      // The rolled-back transaction reverted updateCursor too, so persist just the
+      // named error (preserving the cursor position) so it still reaches the
+      // Settings inbound-errors panel and the sync popover.
+      try {
+        db
+          .prepare(
+            `UPDATE sync_pull_cursors SET last_error = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE workspace_id = ? AND entity_type = ?`,
+          )
+          .run(message, workspaceId, entityType);
+      } catch {
+        /* best effort — the log above still captured the detail */
+      }
     }
 
     return result;

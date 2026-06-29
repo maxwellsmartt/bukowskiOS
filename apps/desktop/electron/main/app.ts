@@ -571,6 +571,7 @@ app.whenReady().then(async () => {
     projectMutations: localDatabase.projectMutations,
     catalogMutations: localDatabase.catalogMutations,
     assetMutations: localDatabase.assetMutations,
+    inventoryReset: localDatabase.inventoryReset,
     workspaceAccess: localDatabase.workspaceAccess,
     fileUploads: localDatabase.fileUploads,
     incidentMutations: localDatabase.incidentMutations,

@@ -86,4 +86,48 @@ describe("asset snapshot pull service", () => {
       .toBe(originalName);
     cleanup();
   });
+
+  it("materializes a placeholder for a legacy ghost category instead of wedging the pull", () => {
+    // A Rentman-import asset references a category by a legacy text id the
+    // UUID-keyed cloud can never deliver. It must still land (under a recognizable
+    // placeholder) so the asset cursor advances and the whole inventory keeps
+    // flowing, rather than deferring forever.
+    const { cleanup, database } = createTestDatabase("bukowski-asset-ghost-category");
+    const { asset, state } = readSeedSnapshot(database);
+    const ghostCategoryId = "category-hd-mqv6ghost";
+
+    const result = createAssetSnapshotPullService(database).applyRemoteSnapshots(
+      asset.workspace_id,
+      [{ ...asset, id: "asset-r-ghost-1", internal_code: "R-GHOST-1", category_id: ghostCategoryId, updated_at: "2026-06-26T12:00:00.000Z" }],
+      [{ ...state, asset_id: "asset-r-ghost-1", updated_at: "2026-06-26T12:00:00.000Z" }],
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(result.appliedCount).toBe(1);
+    const placeholder = database
+      .prepare("SELECT code, name FROM asset_categories WHERE id = ?")
+      .get(ghostCategoryId) as { code: string; name: string } | undefined;
+    expect(placeholder).toBeTruthy();
+    expect(placeholder?.name).toContain("HD");
+    expect((database.prepare("SELECT category_id FROM assets WHERE id = ?").get("asset-r-ghost-1") as { category_id: string }).category_id)
+      .toBe(ghostCategoryId);
+    cleanup();
+  });
+
+  it("still defers an asset whose UUID category simply has not synced yet", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-uuid-category-defer");
+    const { asset, state } = readSeedSnapshot(database);
+    const missingUuid = "11111111-2222-3333-4444-555555555555";
+
+    const result = createAssetSnapshotPullService(database).applyRemoteSnapshots(
+      asset.workspace_id,
+      [{ ...asset, id: "asset-uuid-defer-1", internal_code: "UUID-DEFER-1", category_id: missingUuid, updated_at: "2026-06-26T12:00:00.000Z" }],
+      [{ ...state, asset_id: "asset-uuid-defer-1", updated_at: "2026-06-26T12:00:00.000Z" }],
+    );
+
+    expect(result.appliedCount).toBe(0);
+    expect(result.errors.join(" ")).toContain("snapshot deferred");
+    expect(database.prepare("SELECT id FROM assets WHERE id = ?").get("asset-uuid-defer-1")).toBeUndefined();
+    cleanup();
+  });
 });

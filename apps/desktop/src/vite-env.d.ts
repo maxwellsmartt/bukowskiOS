@@ -368,6 +368,8 @@ declare global {
       archiveMany: (input: ArchiveAssetsCommand) => Promise<ArchiveAssetsResult>;
       reconcileQuantities: (input: ReconcileAssetQuantitiesCommand) => Promise<ReconcileAssetQuantitiesResult>;
       applyDuplicateAudit: (input: ApplyAssetDuplicateAuditCommand) => Promise<ApplyAssetDuplicateAuditResult>;
+      previewInventoryReset: (input: import("@contracts").InventoryResetCommand) => Promise<import("@contracts").InventoryResetReport>;
+      resetInventory: (input: import("@contracts").InventoryResetCommand) => Promise<import("@contracts").InventoryResetReport>;
     };
     bukowskiPacking?: {
       getList: (query?: PackingSlipListQuery) => Promise<PackingSlipRow[]>;

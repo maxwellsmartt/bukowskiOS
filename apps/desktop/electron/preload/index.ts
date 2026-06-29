@@ -147,6 +147,8 @@ import type {
   ProjectListQuery,
   ReconcileAssetQuantitiesCommand,
   ReconcileAssetQuantitiesResult,
+  InventoryResetCommand,
+  InventoryResetReport,
   RevokeTelegramLinkCommand,
   ReportIncidentCommand,
   ReportIncidentResult,
@@ -520,6 +522,10 @@ const bukowskiAssets = {
     ipcRenderer.invoke(ipcChannels.assets.reconcileQuantities, input) as Promise<ReconcileAssetQuantitiesResult>,
   applyDuplicateAudit: (input: ApplyAssetDuplicateAuditCommand) =>
     ipcRenderer.invoke(ipcChannels.assets.applyDuplicateAudit, input) as Promise<ApplyAssetDuplicateAuditResult>,
+  previewInventoryReset: (input: InventoryResetCommand) =>
+    ipcRenderer.invoke(ipcChannels.assets.previewInventoryReset, input) as Promise<InventoryResetReport>,
+  resetInventory: (input: InventoryResetCommand) =>
+    ipcRenderer.invoke(ipcChannels.assets.resetInventory, input) as Promise<InventoryResetReport>,
 };
 
 const bukowskiPacking = {

@@ -8,6 +8,7 @@ import {
   archiveProjectSchema,
   archiveAssetSchema,
   archiveAssetsSchema,
+  inventoryResetSchema,
   assignAgentModelSchema,
   agentWorkspaceReadArgsSchema,
   assignCrewToProjectUnitSchema,
@@ -187,6 +188,7 @@ import type {
   CreateAgentCommand,
   ArchiveAssetCommand,
   ArchiveAssetsCommand,
+  InventoryResetReport,
   ReconcileAssetQuantitiesCommand,
   ArchiveProjectInput,
   CreateDraftRunFromChatCommand,
@@ -321,6 +323,10 @@ type RegisterFoundationIpcOptions = {
     archiveAssets: (input: ArchiveAssetsCommand) => unknown;
     reconcileAssetQuantities: (input: ReconcileAssetQuantitiesCommand) => unknown;
     applyAssetDuplicateAudit: (input: ApplyAssetDuplicateAuditCommand) => unknown;
+  };
+  inventoryReset: {
+    previewInventoryReset: (workspaceId: string) => InventoryResetReport;
+    resetInventory: (workspaceId: string) => InventoryResetReport;
   };
   workspaceAccess: WorkspaceAccessGuard;
   fileUploads: {
@@ -732,6 +738,7 @@ export const registerFoundationIpc = ({
   projectMutations,
   catalogMutations,
   assetMutations,
+  inventoryReset,
   workspaceAccess,
   fileUploads,
   incidentMutations,
@@ -1307,6 +1314,26 @@ export const registerFoundationIpc = ({
     });
 
     return assetMutations.applyAssetDuplicateAudit(input);
+  });
+  safeHandle(ipcChannels.assets.previewInventoryReset, inventoryResetSchema, async (_event, input): Promise<InventoryResetReport> => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "preview the inventory reset",
+      accessLevel: "write",
+      requiredPermission: "assets.manage",
+    });
+
+    return inventoryReset.previewInventoryReset(input.workspaceId);
+  });
+  safeHandle(ipcChannels.assets.resetInventory, inventoryResetSchema, async (_event, input): Promise<InventoryResetReport> => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "reset the entire inventory",
+      accessLevel: "write",
+      requiredPermission: "assets.manage",
+    });
+
+    return inventoryReset.resetInventory(input.workspaceId);
   });
   safeHandleReadWithSchema(
     ipcChannels.assets.uploadFiles,
