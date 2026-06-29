@@ -210,6 +210,24 @@ export type ReconcileAssetQuantitiesResult = {
   summary: string;
 };
 
+export type ApplyAssetDuplicateAuditCommand = {
+  commandId: string;
+  workspaceId: string;
+  groupIds: string[];
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+};
+
+export type ApplyAssetDuplicateAuditResult = {
+  commandId: string;
+  appliedGroups: number;
+  archivedAssets: number;
+  reconciledAssets: number;
+  skippedGroups: number;
+  repeated: boolean;
+  summary: string;
+};
+
 export type AssetEditorMutationResult = {
   commandId: string;
   assetId: string;

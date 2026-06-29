@@ -795,4 +795,124 @@ describe("asset mutation service", () => {
 
     cleanup();
   });
+
+  it("audits no-serial duplicate stock and applies cleanup atomically", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-duplicate-audit");
+    const reads = createFoundationReadService(database);
+    const mutations = createAssetMutationService(database);
+
+    const base = mutations.createAsset({
+      commandId: "cmd-test-dup-base",
+      workspaceId: "workspace-metadata",
+      name: "HDMI cable 10ft",
+      internalCode: "HDMI-9001",
+      categoryId: "cat-lighting",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Good",
+      notes: "Original CSV code repeated: HDMI-9001",
+      totalQuantity: 3,
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+    const duplicate = mutations.createAsset({
+      commandId: "cmd-test-dup-copy",
+      workspaceId: "workspace-metadata",
+      name: "HDMI cable 10ft",
+      internalCode: "HDMI-9001-2",
+      categoryId: "cat-lighting",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Good",
+      notes: "Original CSV code repeated: HDMI-9001; deconflicted code from HDMI-9001 to HDMI-9001-2",
+      totalQuantity: 4,
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    const preview = reads.getAssetDuplicateAudit({ workspaceId: "workspace-metadata" });
+    const group = preview.groups.find((candidate) => candidate.items.some((item) => item.id === base.assetId));
+    expect(group?.strategy).toBe("reconcile_quantity");
+    expect(group?.totalQuantityAfter).toBe(7);
+
+    const result = mutations.applyAssetDuplicateAudit({
+      commandId: "cmd-test-dup-apply",
+      workspaceId: "workspace-metadata",
+      groupIds: [group?.id ?? ""],
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(result.appliedGroups).toBe(1);
+    expect(result.archivedAssets).toBe(1);
+    expect(result.reconciledAssets).toBe(1);
+
+    const baseState = database
+      .prepare("SELECT total_quantity, available_quantity FROM asset_current_state WHERE asset_id = ?")
+      .get(base.assetId) as { total_quantity: number; available_quantity: number };
+    const duplicateRow = database
+      .prepare("SELECT is_active FROM assets WHERE id = ?")
+      .get(duplicate.assetId) as { is_active: number };
+    expect(baseState).toEqual({ total_quantity: 7, available_quantity: 7 });
+    expect(duplicateRow.is_active).toBe(0);
+
+    cleanup();
+  });
+
+  it("keeps duplicate cleanup in review when a duplicate is assigned", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-duplicate-audit-blocked");
+    const reads = createFoundationReadService(database);
+    const mutations = createAssetMutationService(database);
+
+    const base = mutations.createAsset({
+      commandId: "cmd-test-dup-block-base",
+      workspaceId: "workspace-metadata",
+      name: "Rigging clamp duplicate",
+      internalCode: "RIG-9200",
+      categoryId: "cat-lighting",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Good",
+      notes: "Original CSV code repeated: RIG-9200",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+    const duplicate = mutations.createAsset({
+      commandId: "cmd-test-dup-block-copy",
+      workspaceId: "workspace-metadata",
+      name: "Rigging clamp duplicate",
+      internalCode: "RIG-9200-2",
+      categoryId: "cat-lighting",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Good",
+      notes: "Original CSV code repeated: RIG-9200",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    mutations.assignMoveAssets({
+      commandId: "cmd-test-dup-block-assign",
+      workspaceId: "workspace-metadata",
+      assetIds: [duplicate.assetId],
+      mode: "assign",
+      projectId: "project-aurora",
+      assignedToUserId: "user-paola",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    const preview = reads.getAssetDuplicateAudit({ workspaceId: "workspace-metadata" });
+    const group = preview.groups.find((candidate) => candidate.items.some((item) => item.id === base.assetId));
+    expect(group?.strategy).toBe("review");
+    expect(group?.blockers.join(" ")).toMatch(/assigned|reservadas|fuera/i);
+
+    expect(() =>
+      mutations.applyAssetDuplicateAudit({
+        commandId: "cmd-test-dup-block-apply",
+        workspaceId: "workspace-metadata",
+        groupIds: [group?.id ?? ""],
+        actorType: "user",
+        sourceChannel: "desktop",
+      }),
+    ).toThrow("No selected duplicate groups are safe");
+
+    cleanup();
+  });
 });

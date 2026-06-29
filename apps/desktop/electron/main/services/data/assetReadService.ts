@@ -11,10 +11,12 @@ import type {
   AssetLinkedIncidentRow,
   AssetListRow,
   AssetTimelineItem,
+  AssetDuplicateAuditPreview,
   ListSortDirection,
 } from "@contracts";
 
 import { assertPathWithinRoot } from "../../security/pathSafety";
+import { buildAssetDuplicateAuditPreview } from "./assetDuplicateAuditService";
 
 type SortRows = <T>(rows: T[], comparator: (left: T, right: T) => number) => T[];
 
@@ -242,6 +244,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           timestamp: deps.formatTimelineTimestamp(row.event_timestamp),
         })),
       };
+    },
+
+    getAssetDuplicateAudit(query: AssetWorkspaceQuery = {}): AssetDuplicateAuditPreview {
+      return buildAssetDuplicateAuditPreview(db, query.workspaceId);
     },
 
     getAssets(query: AssetListQuery = deps.defaultAssetListQuery): AssetListRow[] {

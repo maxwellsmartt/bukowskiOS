@@ -445,6 +445,16 @@ export const reconcileAssetQuantitiesSchema = z
   })
   .strict();
 
+export const applyAssetDuplicateAuditSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    groupIds: z.array(nonEmptyString).min(1).max(250),
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
 export const assignMoveAssetsSchema = z
   .object({
     commandId: nonEmptyString,
