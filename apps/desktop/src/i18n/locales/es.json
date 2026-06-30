@@ -311,6 +311,7 @@
     },
     "columns": {
       "asset": "Equipo",
+      "kit": "Kit",
       "category": "Categoría",
       "stock": "Stock",
       "tracking": "Tracking",
@@ -671,6 +672,7 @@
       "thisProject": "este proyecto",
       "createSlip": "Crear packing slip para este proyecto",
       "openProjectAssets": "Abrir Equipos del proyecto",
+      "kitLockedToastTitle": "Equipo en kit activo",
       "kitLocked": "Estos equipos forman parte de kits activos y no se pueden asignar ni mover individualmente: {{summary}}. Quítalos del kit primero si necesitas operarlos por separado."
     },
     "projectInventory": {

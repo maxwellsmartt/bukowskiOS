@@ -311,6 +311,7 @@
     },
     "columns": {
       "asset": "Asset",
+      "kit": "Kit",
       "category": "Category",
       "stock": "Stock",
       "tracking": "Tracking",
@@ -669,6 +670,7 @@
       "thisProject": "this project",
       "createSlip": "Create packing slip for this project",
       "openProjectAssets": "Open Project Assets",
+      "kitLockedToastTitle": "Asset in active kit",
       "kitLocked": "These assets are part of active kits and cannot be assigned or moved individually: {{summary}}. Remove them from the kit first if you need to operate them as standalone items."
     },
     "projectInventory": {

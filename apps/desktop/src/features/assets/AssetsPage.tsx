@@ -22,7 +22,7 @@ import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
-import { resolveAssetAvailability, summarizeUnavailableAssets, translateAssetAvailabilityLabel, translateAssetAvailabilityReason } from "@shared/lib/assetAvailability";
+import { resolveAssetAvailability, translateAssetAvailabilityLabel, translateAssetAvailabilityReason } from "@shared/lib/assetAvailability";
 import { formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
 import { presentAssetCondition, presentAssetStatus } from "@shared/lib/assetStatusPresentation";
 import { cleanDisplay } from "@shared/lib/displayValue";
@@ -91,8 +91,15 @@ const getActivePackingPreferenceKey = (targetProjectId?: string | null) =>
 // Curated default: the columns that actually drive a decision. The rest (serial,
 // tracking, custody, warehouse, costs, etc.) stay one click away in the column
 // manager instead of cluttering the table with mostly-constant noise.
-const assetDefaultColumnKeys = ["asset", "category", "quantity", "location", "project", "status"];
+const assetDefaultColumnKeys = ["asset", "kit", "category", "quantity", "location", "project", "status"];
 const projectAssetDefaultColumnKeys = ["asset", "projectUnit", "quantity", "responsible", "status", "condition", "incidents"];
+
+const formatAssetKitMembership = (asset: Pick<AssetListRow, "linkedKitCodes" | "linkedKitNames">) => {
+  const kitNames = asset.linkedKitNames.filter(Boolean);
+  const kitCodes = asset.linkedKitCodes.filter(Boolean);
+
+  return kitNames.length ? kitNames.join(" · ") : kitCodes.join(" · ");
+};
 
 const normalizeCsvHeader = (value: string) =>
   value
@@ -417,6 +424,7 @@ const buildOperationCartItem = (asset: AssetListRow, quantity?: number): AssetOp
 
 type AssetOperationCartProps = {
   items: AssetOperationCartItem[];
+  kitLockTooltip?: string | null;
   onAddToCompare: () => void;
   onClear: () => void;
   onCreatePackingSlip: () => void;
@@ -432,6 +440,7 @@ type AssetOperationCartProps = {
 
 const AssetOperationCart = ({
   items,
+  kitLockTooltip,
   onAddToCompare,
   onClear,
   onCreatePackingSlip,
@@ -453,6 +462,7 @@ const AssetOperationCart = ({
   const lockedItems = items.filter((asset) => asset.linkedKitCount > 0);
   const unavailableItems = items.filter((asset) => asset.linkedKitCount <= 0 && !resolveAssetAvailability(asset).isAvailable);
   const totalUnits = items.reduce((total, asset) => total + asset.requestedQuantity, 0);
+  const hasBulkKitLock = lockedItems.length > 0 && items.length > 1;
   const issueActionsDisabled = lockedItems.length > 0 || unavailableItems.length > 0;
   const singleAsset = items.length === 1 ? items[0] : null;
   const checkedOutUnits = items.reduce((total, asset) => total + asset.checkedOutQuantity, 0);
@@ -465,16 +475,28 @@ const AssetOperationCart = ({
           <strong>{t(items.length === 1 ? "assets.cart.oneSelected" : "assets.cart.manySelected", { count: items.length })}</strong>
           <span>{t(totalUnits === 1 ? "assets.cart.oneUnit" : "assets.cart.manyUnits", { count: totalUnits })}</span>
         </div>
-        <button
-          aria-label={t("assets.cart.clearAria", { defaultValue: "Vaciar selección" })}
-          className="ghost-control asset-operation-cart-clear"
-          data-tooltip={t("assets.cart.clearTooltip", { defaultValue: "Quitar todos de la selección" })}
-          onClick={onClear}
-          type="button"
-        >
-          <X size={13} />
-          <span>{t("assets.cart.clear", { defaultValue: "Limpiar" })}</span>
-        </button>
+        <div className="asset-operation-cart-header-actions">
+          {lockedItems.length ? (
+            <span
+              aria-label={kitLockTooltip ?? t("assets.cart.lockedSummary", { count: lockedItems.length })}
+              className="asset-operation-cart-kit-lock"
+              data-tooltip={kitLockTooltip ?? t("assets.cart.lockedSummary", { count: lockedItems.length })}
+              role="img"
+            >
+              <Boxes size={14} strokeWidth={2} />
+            </span>
+          ) : null}
+          <button
+            aria-label={t("assets.cart.clearAria", { defaultValue: "Vaciar selección" })}
+            className="ghost-control asset-operation-cart-clear"
+            data-tooltip={t("assets.cart.clearTooltip", { defaultValue: "Quitar todos de la selección" })}
+            onClick={onClear}
+            type="button"
+          >
+            <X size={13} />
+            <span>{t("assets.cart.clear", { defaultValue: "Limpiar" })}</span>
+          </button>
+        </div>
       </div>
       <div className="asset-operation-cart-actions">
         <button className="ghost-control action-row-button" onClick={onAddToCompare} type="button">
@@ -508,7 +530,8 @@ const AssetOperationCart = ({
         </button>
         <button
           className="action-primary-button action-row-button"
-          disabled={lockedItems.length > 0}
+          data-tooltip={lockedItems.length ? kitLockTooltip ?? t("assets.cart.kitLockedTip", { defaultValue: "Ya pertenecen a un kit" }) : undefined}
+          disabled={hasBulkKitLock}
           onClick={onOpenAssignMove}
           type="button"
         >
@@ -516,7 +539,7 @@ const AssetOperationCart = ({
         </button>
         <button
           className="ghost-control action-row-button"
-          disabled={lockedItems.length > 0}
+          disabled={hasBulkKitLock}
           data-tooltip={lockedItems.length > 0 ? t("assets.cart.kitLockedTip", { defaultValue: "Ya pertenecen a un kit" }) : undefined}
           onClick={onOpenAssignToKit}
           type="button"
@@ -545,14 +568,6 @@ const AssetOperationCart = ({
           })}
         </button>
       </div>
-
-      {lockedItems.length || unavailableItems.length ? (
-        <div className="asset-operation-cart-warning">
-          {lockedItems.length ? t("assets.cart.lockedSummary", { count: lockedItems.length }) : null}
-          {lockedItems.length && unavailableItems.length ? " " : ""}
-          {unavailableItems.length ? summarizeUnavailableAssets(unavailableItems, t) : null}
-        </div>
-      ) : null}
 
       <div className="asset-operation-cart-list">
         {items.map((asset) => {
@@ -1385,9 +1400,24 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     }
 
     return selectedKitLockedAssets
-      .map((asset) => `${asset.code} (${asset.linkedKitCodes.join(", ")})`)
+      .map((asset) => {
+        const kitLabel = formatAssetKitMembership(asset);
+        return kitLabel ? `${asset.code} (${kitLabel})` : asset.code;
+      })
       .join(", ");
   }, [selectedKitLockedAssets]);
+  const selectedKitLockTooltip = selectedKitLockSummary
+    ? t("assets.selection.kitLocked", { summary: selectedKitLockSummary })
+    : null;
+
+  const showIndividualKitLockedToast = (asset: AssetListRow | AssetOperationCartItem) => {
+    const kitLabel = formatAssetKitMembership(asset);
+    const summary = kitLabel ? `${asset.code} (${kitLabel})` : asset.code;
+    toast.warning(
+      t("assets.selection.kitLockedToastTitle", { defaultValue: "Equipo en kit activo" }),
+      t("assets.selection.kitLocked", { summary }),
+    );
+  };
 
   const buildAssetCompareItem = (asset: AssetListRow) => ({
     id: asset.id,
@@ -1531,6 +1561,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   };
 
   const openAssignMoveForAsset = (asset: AssetListRow) => {
+    if (asset.linkedKitCount > 0) {
+      showIndividualKitLockedToast(asset);
+      return;
+    }
+
     replaceOperationCartWithAssets([asset]);
     setSelectedAssetId(asset.id);
     setActionPanelOpen(true);
@@ -1548,7 +1583,15 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   };
 
   const openAssignKitForAsset = (asset: AssetListRow) => {
-    replaceOperationCartWithAssets([asset]);
+    if (asset.linkedKitCount > 0) {
+      showIndividualKitLockedToast(asset);
+      return;
+    }
+
+    const shouldUseCurrentSelection = selectedRowIds.length > 1 && selectedRowIds.includes(asset.id);
+    if (!shouldUseCurrentSelection) {
+      replaceOperationCartWithAssets([asset]);
+    }
     setSelectedAssetId(asset.id);
     setKitPanelOpen(true);
     setActionPanelOpen(false);
@@ -1557,10 +1600,27 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   };
 
   const openAssignKitForSelection = () => {
+    if (selectedAssets.length === 1 && selectedKitLockedAssets.length === 1) {
+      showIndividualKitLockedToast(selectedAssets[0]);
+      return;
+    }
+
     setKitPanelOpen(true);
     setActionPanelOpen(false);
     setPackingPanelOpen(false);
     setKitError(null);
+  };
+
+  const openAssignMoveForSelection = () => {
+    if (selectedAssets.length === 1 && selectedKitLockedAssets.length === 1) {
+      showIndividualKitLockedToast(selectedAssets[0]);
+      return;
+    }
+
+    setActionPanelOpen(true);
+    setPackingPanelOpen(false);
+    setKitPanelOpen(false);
+    setAssignNextStep(null);
   };
 
   const addAssetToCompare = (asset: AssetListRow) =>
@@ -2356,15 +2416,36 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         minWidth: 220,
         render: (row: (typeof assets)[number]) => (
           <div className="identity-cell">
-            <span className="identity-title">{row.name}</span>
+            <span className="identity-title">
+              <span className="identity-title-text">{row.name}</span>
+              {row.linkedKitCount ? (
+                <span
+                  aria-label={t("assets.inKit", { codes: formatAssetKitMembership(row) })}
+                  className="asset-kit-inline-indicator"
+                  data-tooltip={t("assets.inKit", { codes: formatAssetKitMembership(row) })}
+                >
+                  <Boxes size={12} strokeWidth={2} />
+                </span>
+              ) : null}
+            </span>
             <span className="identity-meta">{row.code}</span>
-            {row.linkedKitCount ? (
-              <span className="identity-meta asset-kit-membership-inline">
-                {t("assets.inKit", { codes: row.linkedKitCodes.join(", ") })}
-              </span>
-            ) : null}
           </div>
         ),
+      },
+      {
+        key: "kit",
+        label: t("assets.columns.kit"),
+        width: 170,
+        minWidth: 140,
+        render: (row: (typeof assets)[number]) =>
+          row.linkedKitCount ? (
+            <span className="asset-kit-cell" data-tooltip={formatAssetKitMembership(row)}>
+              <Boxes size={13} strokeWidth={2} />
+              <span>{formatAssetKitMembership(row)}</span>
+            </span>
+          ) : (
+            <span className="identity-meta">—</span>
+          ),
       },
       { key: "category", label: t("assets.columns.category"), width: 160, minWidth: 132, render: (row: (typeof assets)[number]) => row.category },
       {
@@ -2484,12 +2565,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           type="file"
         />
       ) : null}
-      {selectedKitLockSummary ? (
-        <div className="action-feedback action-feedback-warning">
-          {t("assets.selection.kitLocked", { summary: selectedKitLockSummary })}
-        </div>
-      ) : null}
-
       {!error && !isLoading && isProjectMode ? (
         <section className="project-assets-command-card" aria-label={t("assets.projectInventory.aria")}>
           <div className="project-assets-command-copy">
@@ -2656,23 +2731,32 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       ) : null}
 
       {kitPanelOpen && selectedRowIds.length ? (
-        <AssignToKitPanel
-          error={kitError}
-          isSubmitting={isSubmittingKit}
-          kits={catalog.kits}
+        <ModalShell
           onClose={() => {
             setKitPanelOpen(false);
             setKitError(null);
           }}
-          onSubmit={handleAssignKit}
-          selectedAssets={selectedAssets.map((asset) => ({
-            id: asset.id,
-            name: asset.name,
-            code: asset.code,
-            quantity: asset.requestedQuantity,
-          }))}
-          selectedCount={selectedRowIds.length}
-        />
+          width={760}
+          className="asset-assign-kit-modal-shell"
+        >
+          <AssignToKitPanel
+            error={kitError}
+            isSubmitting={isSubmittingKit}
+            kits={catalog.kits}
+            onClose={() => {
+              setKitPanelOpen(false);
+              setKitError(null);
+            }}
+            onSubmit={handleAssignKit}
+            selectedAssets={selectedAssets.map((asset) => ({
+              id: asset.id,
+              name: asset.name,
+              code: asset.code,
+              quantity: asset.requestedQuantity,
+            }))}
+            selectedCount={selectedRowIds.length}
+          />
+        </ModalShell>
       ) : null}
 
       {packingPanelOpen && selectedRowIds.length ? (
@@ -3399,14 +3483,16 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 key: "assign-move",
                 label: t("assets.cart.assignMove"),
                 icon: <MoveRight size={14} />,
-                disabled: row.linkedKitCount > 0,
                 onSelect: (target) => openAssignMoveForAsset(target),
               },
               {
                 key: "assign-to-kit",
                 label: t("assets.cart.assignToKit", { defaultValue: "Asignar a Kit" }),
                 icon: <Boxes size={14} />,
-                disabled: row.linkedKitCount > 0,
+                disabled:
+                  selectedRowIds.length > 1 &&
+                    selectedRowIds.includes(row.id) &&
+                    selectedAssets.some((asset) => asset.linkedKitCount > 0),
                 onSelect: (target) => openAssignKitForAsset(target),
               },
               {
@@ -3495,6 +3581,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             </div>
             <AssetOperationCart
               items={selectedAssets}
+              kitLockTooltip={selectedKitLockTooltip}
               onAddToCompare={() =>
                 replaceItems(selectedAssets.map(buildAssetCompareItem))
               }
@@ -3507,12 +3594,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               }}
               onCreateRma={() => navigate("/incidents")}
               onDeleteSelected={handleDeleteSelectedAssets}
-              onOpenAssignMove={() => {
-                setActionPanelOpen(true);
-                setPackingPanelOpen(false);
-
-                setAssignNextStep(null);
-              }}
+              onOpenAssignMove={openAssignMoveForSelection}
               onOpenAssignToKit={openAssignKitForSelection}
               onOpenAssetDetail={(assetId) => navigate(`/assets/${assetId}?report=incident`)}
               onOpenProjectReturns={isProjectMode && projectId ? () => navigate(`/projects/${projectId}/packing`) : undefined}
@@ -3587,9 +3669,16 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     )}
                   </div>
 
-                  <div className="action-panel-actions action-panel-actions-start">
+                  <div className="action-panel-actions action-panel-actions-start asset-quick-preview-actions">
                     <button
                       className="ghost-control"
+                      aria-label={
+                        isUploadingPreviewImages
+                          ? t("assets.quickPreview.adding")
+                          : activeAssetImageSlots <= 0
+                            ? t("assets.quickPreview.twoImagesMax")
+                            : t("assets.quickPreview.addImages")
+                      }
                       disabled={isUploadingPreviewImages || activeAssetImageSlots <= 0}
                       onClick={() => {
                         setActionError(null);
@@ -3620,6 +3709,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     </button>
                     <button
                       className="ghost-control"
+                      aria-label={t("assets.quickPreview.editAsset")}
                       onClick={() => {
                         setEditorMode("edit");
                         setEditorError(null);
@@ -3631,7 +3721,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     </button>
                     <button
                       className="ghost-control"
-                      disabled={activeAsset.linkedKitCount > 0}
+                      aria-label={t("assets.quickPreview.assignToKit", { defaultValue: "Asignar a Kit" })}
                       data-tooltip={activeAsset.linkedKitCount > 0 ? t("assets.quickPreview.kitLockedTip", { defaultValue: "Ya pertenece a un kit" }) : undefined}
                       onClick={() => openAssignKitForAsset(activeAsset)}
                       type="button"
@@ -3639,8 +3729,14 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                       <Boxes size={14} />
                       <span>{t("assets.quickPreview.assignToKit", { defaultValue: "Asignar a Kit" })}</span>
                     </button>
-                    <button className="action-primary-button" onClick={() => navigate(`/assets/${activeAsset.id}`)} type="button">
-                      {t("assets.quickPreview.openDetail")}
+                    <button
+                      className="action-primary-button"
+                      aria-label={t("assets.quickPreview.openDetail")}
+                      onClick={() => navigate(`/assets/${activeAsset.id}`)}
+                      type="button"
+                    >
+                      <ExternalLink size={14} />
+                      <span>{t("assets.quickPreview.openDetail")}</span>
                     </button>
                   </div>
                 </>

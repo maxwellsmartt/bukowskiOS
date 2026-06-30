@@ -4817,6 +4817,22 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   flex: 0 0 auto;
 }
 
+.asset-operation-cart-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  flex: 0 0 auto;
+}
+
+.asset-operation-cart-kit-lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: auto;
+  block-size: auto;
+  color: rgba(245, 197, 107, 0.96);
+}
+
 .asset-operation-cart-header .asset-operation-cart-clear {
   flex: 0 0 auto;
   display: inline-flex;
@@ -4866,19 +4882,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   padding-inline: 9px;
 }
 
-.asset-operation-cart-actions .action-primary-button,
 .asset-operation-cart-actions .asset-operation-cart-delete {
   grid-column: span 2;
-}
-
-.asset-operation-cart-warning {
-  padding: 8px 10px;
-  border: 1px solid rgba(201, 156, 84, 0.18);
-  border-radius: 10px;
-  background: rgba(201, 156, 84, 0.1);
-  color: var(--accent-warning);
-  font-size: 11px;
-  line-height: 1.4;
 }
 
 .asset-operation-cart-list {
@@ -8566,8 +8571,44 @@ button.project-incidents-command-metric {
   text-overflow: ellipsis;
 }
 
+.identity-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .identity-title svg {
   flex: 0 0 auto;
+}
+
+.asset-kit-inline-indicator,
+.asset-kit-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: rgba(245, 197, 107, 0.95);
+}
+
+.asset-kit-inline-indicator {
+  flex: 0 0 auto;
+  inline-size: auto;
+  block-size: auto;
+  justify-content: center;
+}
+
+.asset-kit-cell {
+  max-width: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.asset-kit-cell span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .identity-meta {
@@ -8705,6 +8746,7 @@ body.is-resizing-side-rail {
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+  height: 100%;
   /* Fill the bounded grid cell (.asset-list-layout is flex:1/min-height:0/
      overflow:hidden, align-items:stretch) and scroll internally, instead of
      sizing to content past the viewport with a magic max-height. */
@@ -8760,6 +8802,8 @@ body.is-resizing-side-rail {
 }
 
 .asset-quick-preview-card {
+  container-type: inline-size;
+  flex: 1 1 auto;
   min-width: 0;
   max-height: none;
   min-height: 0;
@@ -8807,28 +8851,84 @@ body.is-resizing-side-rail {
 }
 
 .asset-quick-preview-card .asset-preview-image-strip {
-  min-height: 0;
+  flex: 1 1 160px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-height: clamp(132px, 24vh, 260px);
+  margin-top: 6px;
 }
 
 .asset-quick-preview-card .asset-preview-image-empty {
-  min-height: 96px;
+  grid-column: 1 / -1;
+  min-height: 100%;
   padding: 14px;
 }
 
-.asset-quick-preview-card .action-panel-actions {
-  align-items: center;
-  justify-content: flex-start;
+.asset-quick-preview-card .asset-quick-preview-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  justify-content: stretch;
   gap: 6px;
-  flex-wrap: wrap;
+  width: 100%;
 }
 
-.asset-quick-preview-card .action-panel-actions > button {
-  flex: 0 1 auto;
+.asset-quick-preview-card .asset-quick-preview-actions > button {
+  justify-content: center;
   min-width: 0;
   min-height: 30px;
   padding-inline: 10px;
   border-radius: 999px;
   font-size: var(--font-xs, 11px);
+  white-space: nowrap;
+}
+
+.asset-quick-preview-card .asset-quick-preview-actions > button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@container (max-width: 390px) {
+  .asset-quick-preview-card .asset-quick-preview-actions {
+    gap: 5px;
+  }
+
+  .asset-quick-preview-card .asset-quick-preview-actions > button {
+    min-height: 34px;
+    padding-inline: 0;
+  }
+
+  .asset-quick-preview-card .asset-quick-preview-actions > button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+.asset-assign-kit-modal-shell {
+  border-color: rgba(126, 183, 178, 0.22);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(126, 183, 178, 0.16), transparent 42%),
+    radial-gradient(circle at 90% 12%, rgba(91, 141, 239, 0.12), transparent 38%),
+    rgba(14, 18, 22, 0.76);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.asset-assign-kit-modal-shell > .surface-card {
+  gap: 14px;
+  padding: 18px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.asset-assign-kit-modal-shell .surface-card-header {
+  padding-bottom: 2px;
 }
 
 .assets-page-stack {
@@ -10181,10 +10281,6 @@ button.project-budget-command-metric {
   font-size: 12px;
   line-height: 1.45;
   white-space: nowrap;
-}
-
-.asset-kit-membership-inline {
-  color: rgba(245, 197, 107, 0.9);
 }
 
 .sync-outbox-list {
