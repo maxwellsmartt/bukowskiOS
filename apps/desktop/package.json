@@ -8,6 +8,7 @@
   "main": "dist-electron/app.js",
   "scripts": {
     "dev": "vite",
+    "postinstall": "pnpm run rebuild:electron || echo 'electron-rebuild skipped or failed; if the app fails to open with a bindings error, run: pnpm --filter @bukowski/desktop rebuild:electron'",
     "clean:build": "node ./build/clean-build-output.cjs dist dist-electron",
     "clean:package": "node ./build/clean-build-output.cjs dist-packaged",
     "verify:package-env": "node ./build/verify-package-env.cjs",

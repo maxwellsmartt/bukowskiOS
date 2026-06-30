@@ -47,7 +47,7 @@ import { createAssetMutationService } from "./assetMutationService";
 import { createInventoryResetService, type InventoryResetService } from "./inventoryResetService";
 import { createAssetSnapshotPullService } from "./assetSnapshotPullService";
 import { applyOperationalSnapshotLocally, createOperationalSnapshotService } from "./operationalSnapshotService";
-import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
+import { applyAdminFoundationMigration, bootstrapAdminFoundation, getWorkspaceRoleId } from "./adminFoundationBootstrap";
 import { createCatalogMutationService } from "./catalogMutationService";
 import { createAutomationControlPlanePullService } from "./automationControlPlanePullService";
 import { createCatalogPullService } from "./catalogPullService";
@@ -1026,7 +1026,12 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
           const existingRole = findRoleByWorkspaceAndKey.get(workspace.id, roleKey) as
             | { id: string; isSystemRole: number }
             | undefined;
-          const cachedRoleId = existingRole?.id ?? `cached-role-${workspace.id}-${workspace.userId}`;
+          // Use the canonical workspace role id (the same scheme bootstrapAdminFoundation
+          // uses) so an admin/supervisor user's cached role shares one row with the
+          // foundation role instead of creating a second role with the same
+          // (workspace_id, key) — which would trip the UNIQUE(workspace_id, key)
+          // constraint on the next admin-foundation bootstrap.
+          const cachedRoleId = existingRole?.id ?? getWorkspaceRoleId(workspace.id, `role-${roleKey}`);
           const normalizedEmail = workspace.userEmail?.trim() || "";
           const emailOwner = normalizedEmail
             ? (findUserByEmail.get(normalizedEmail) as { id: string } | undefined)
@@ -1064,6 +1069,10 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       database.exec("COMMIT");
     } catch (error) {
       database.exec("ROLLBACK");
+      logger.error("Failed to cache remote workspaces in local SQLite.", {
+        message: error instanceof Error ? error.message : String(error),
+        workspaceCount: workspaces.length,
+      });
       throw error;
     }
     logger.info("Ensured remote workspaces in local SQLite cache.", { count: workspaces.length });

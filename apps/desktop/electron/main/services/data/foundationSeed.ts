@@ -582,10 +582,6 @@ export const seedFoundationData = (db: DatabaseSync, options: { includeDemoData?
     permissions,
   );
 
-  if (options.includeDemoData === false) {
-    return;
-  }
-
   const { count } = db.prepare("SELECT COUNT(*) AS count FROM workspaces").get() as { count: number };
 
   if (count > 0) {
@@ -649,6 +645,17 @@ export const seedFoundationData = (db: DatabaseSync, options: { includeDemoData?
         ["role-supervisor", "perm-treasury-transactions-read", now],
       ],
     );
+
+    // The local fallback workspace + base roles (role-admin) + their permissions
+    // above are the offline FOUNDATION, not demo content: the command actor and
+    // the fresh-database re-hydration both depend on `role-admin` existing. They
+    // must be seeded even in production with demo data off. Everything below is
+    // fictional demo content (paola/luis crew, Aurora project, sample assets…),
+    // so the demo gate lives here — after the foundation, before the fixtures.
+    if (options.includeDemoData === false) {
+      db.exec("COMMIT");
+      return;
+    }
 
     runSeedRows(
       db,
