@@ -676,6 +676,9 @@ app.whenReady().then(async () => {
           location: item.location,
           responsible: item.responsible,
           status: item.status,
+          kitId: item.kitId,
+          kitName: item.kitName,
+          kitCode: item.kitCode,
         })),
       });
 
@@ -757,6 +760,9 @@ app.whenReady().then(async () => {
           location: item.location,
           responsible: item.responsible,
           status: item.status,
+          kitId: item.kitId,
+          kitName: item.kitName,
+          kitCode: item.kitCode,
         })),
       });
 

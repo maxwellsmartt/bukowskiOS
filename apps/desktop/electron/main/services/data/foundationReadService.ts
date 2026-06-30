@@ -1801,7 +1801,10 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
             COALESCE(packing_slip_items.condition_in, '—') AS condition_in,
             packing_slip_items.returned_at,
             COALESCE(locations.name, '—') AS location,
-            COALESCE(users.full_name, '—') AS responsible
+            COALESCE(users.full_name, '—') AS responsible,
+            packing_slip_items.source_kit_id,
+            kits.name AS kit_name,
+            kits.code AS kit_code
           FROM packing_slip_items
           JOIN assets ON assets.id = packing_slip_items.asset_id
           JOIN asset_current_state ON asset_current_state.asset_id = assets.id
@@ -1809,8 +1812,9 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
           LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
           LEFT JOIN locations ON locations.id = asset_current_state.current_location_id
           LEFT JOIN users ON users.id = asset_current_state.current_responsible_user_id
+          LEFT JOIN kits ON kits.id = packing_slip_items.source_kit_id
           WHERE packing_slip_items.packing_slip_id = ?
-          ORDER BY assets.name
+          ORDER BY (packing_slip_items.source_kit_id IS NULL), kits.name, assets.name
         `,
       )
       .all(packingSlipId) as Array<{
@@ -1829,6 +1833,9 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
       returned_at: string | null;
       location: string;
       responsible: string;
+      source_kit_id: string | null;
+      kit_name: string | null;
+      kit_code: string | null;
     }>;
 
     const returnedCount = slip.returned_count ?? 0;
@@ -1858,6 +1865,9 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
         unitInsuredValue: formatCurrency(unitInsuredValue),
         insuredTotalAmount,
         insuredTotal: formatCurrency(insuredTotalAmount),
+        kitId: row.source_kit_id,
+        kitName: row.kit_name ?? "",
+        kitCode: row.kit_code ?? "",
       };
     });
     const insuredTotal = items.reduce((total, row) => {

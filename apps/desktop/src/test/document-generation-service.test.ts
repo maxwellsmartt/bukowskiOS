@@ -35,6 +35,9 @@ test("document generation service creates a packing slip pdf buffer", async () =
         location: "Warehouse A",
         responsible: "Ana Guerrero",
         status: "Returned",
+        kitId: "kit-teradek",
+        kitName: "Teradek 1500 4K Package",
+        kitCode: "TERADEK-1500-4K",
       },
       {
         code: "LGT-101",
@@ -46,6 +49,9 @@ test("document generation service creates a packing slip pdf buffer", async () =
         location: "Truck 3",
         responsible: "Carlos Pena",
         status: "Out",
+        kitId: null,
+        kitName: "",
+        kitCode: "",
       },
     ],
   });
@@ -103,6 +109,9 @@ test("document generation service creates an insurance list pdf buffer", async (
         location: "Warehouse A",
         responsible: "Ana Guerrero",
         status: "Returned",
+        kitId: "kit-teradek",
+        kitName: "Teradek 1500 4K Package",
+        kitCode: "TERADEK-1500-4K",
       },
       {
         code: "LGT-101",
@@ -118,6 +127,9 @@ test("document generation service creates an insurance list pdf buffer", async (
         location: "Truck 3",
         responsible: "Carlos Pena",
         status: "Out",
+        kitId: null,
+        kitName: "",
+        kitCode: "",
       },
     ],
   });

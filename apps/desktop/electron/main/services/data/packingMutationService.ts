@@ -603,12 +603,13 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             asset_id,
             quantity,
             source_flow,
+            source_kit_id,
             condition_out,
             condition_in,
             returned_at,
             notes
           )
-          VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
         `,
       );
       const insertAssignmentStatement = db.prepare(
@@ -794,12 +795,18 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             responsibleUserId ? ` · ${userMap.get(responsibleUserId)}` : ""
           }.`;
 
+        const itemKitId =
+          input.sourceKitId &&
+          (kitMembershipsByAssetId.get(row.asset_id) ?? []).some((membership) => membership.kit_id === input.sourceKitId)
+            ? input.sourceKitId
+            : null;
         insertPackingItemStatement.run(
           itemId,
           packingSlipId,
           row.asset_id,
           requestedQuantity,
           sourceFlow,
+          itemKitId,
           row.condition_status,
           note,
         );

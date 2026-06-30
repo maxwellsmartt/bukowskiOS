@@ -79,6 +79,9 @@ export type PackingSlipItemRow = {
   unitInsuredValue: string;
   insuredTotalAmount: number | null;
   insuredTotal: string;
+  kitId: string | null;
+  kitName: string;
+  kitCode: string;
 };
 
 export type PackingSlipDetailSnapshot = {

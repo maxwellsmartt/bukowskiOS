@@ -33,6 +33,9 @@ type PackingSlipPdfPayload = {
     location: string;
     responsible: string;
     status: string;
+    kitId: string | null;
+    kitName: string;
+    kitCode: string;
   }>;
 };
 
@@ -409,10 +412,13 @@ export const createDocumentGenerationService = () => ({
             location: string;
             quantity: number;
             serialNumbers: string[];
+            kitId: string | null;
+            kitName: string;
+            kitCode: string;
           }
         >
       >((map, item) => {
-        const key = [item.code, item.name, item.location || "—"].join("::");
+        const key = [item.kitId ?? "", item.code, item.name, item.location || "—"].join("::");
         const existing = map.get(key);
 
         if (existing) {
@@ -429,6 +435,9 @@ export const createDocumentGenerationService = () => ({
           location: item.location || "—",
           quantity: item.quantity,
           serialNumbers: item.serialNumber && item.serialNumber !== "—" ? [item.serialNumber] : [],
+          kitId: item.kitId,
+          kitName: item.kitName,
+          kitCode: item.kitCode,
         });
         return map;
       }, new Map()),
@@ -528,7 +537,28 @@ export const createDocumentGenerationService = () => ({
       });
       cursorY += 54;
     } else {
+      let currentKitId: string | null = null;
       groupedItems.forEach((item, index) => {
+        if (item.kitId !== currentKitId) {
+          currentKitId = item.kitId;
+          if (item.kitId) {
+            const kitHeadingHeight = 22;
+            if (cursorY + kitHeadingHeight + 34 > document.page.height - document.page.margins.bottom - footerReserve) {
+              document.addPage();
+              cursorY = document.page.margins.top;
+              drawTableHeader();
+            }
+            document.roundedRect(cardLeft, cursorY - 3, cardWidth, kitHeadingHeight, 7).fill(accentBackground);
+            document.font("Helvetica-Bold").fillColor("#eef2f8").fontSize(8).text(
+              `PAQUETE · ${item.kitName}${item.kitCode ? ` (${item.kitCode})` : ""}`,
+              cardLeft + tableInset,
+              cursorY + 6,
+              { width: cardWidth - tableInset * 2, lineBreak: false, ellipsis: true },
+            );
+            document.font("Helvetica");
+            cursorY += kitHeadingHeight + 5;
+          }
+        }
         const rowValues = [
           String(item.quantity),
           item.name,
@@ -556,6 +586,9 @@ export const createDocumentGenerationService = () => ({
 
         if (index % 2 === 0) {
           document.roundedRect(cardLeft, cursorY - 3, cardWidth, rowHeight, 8).fill(surfaceBackground);
+        }
+        if (item.kitId) {
+          document.rect(cardLeft, cursorY - 3, 3, rowHeight).fill("#7eb7b2");
         }
 
         let x = cardLeft + tableInset;

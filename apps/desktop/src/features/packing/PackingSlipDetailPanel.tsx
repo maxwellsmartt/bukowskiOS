@@ -335,7 +335,14 @@ export const PackingSlipDetailPanel = ({
             render: (row) => (
               <div className="identity-cell">
                 <span className="identity-title">{row.asset}</span>
-                <span className="identity-meta">{row.code}</span>
+                <span className="identity-meta">
+                  {row.code}
+                  {row.kitId ? (
+                    <span className="packing-kit-chip" data-tooltip={row.kitCode || undefined}>
+                      {t("packing.detail.kitChip", { defaultValue: "Paquete · {{kit}}", kit: row.kitName })}
+                    </span>
+                  ) : null}
+                </span>
               </div>
             ),
           },
