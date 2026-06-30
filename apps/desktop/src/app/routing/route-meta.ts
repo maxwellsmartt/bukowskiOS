@@ -22,6 +22,7 @@ export type ResolvedRouteMeta = AppRouteMeta & {
 
 export const globalRouteMeta: AppRouteMeta[] = [
   { path: "/assets", label: "Assets", scopeMode: "global", domain: "assets" },
+  { path: "/assets/kits", label: "Kits", scopeMode: "global", domain: "assets" },
   { path: "/assets/licenses", label: "Licenses", scopeMode: "global", domain: "assets" },
   { path: "/assets/:assetId", label: "Asset Detail", scopeMode: "global", domain: "assets" },
   { path: "/packing-slips", label: "Packing Slips", scopeMode: "global", domain: "assets" },

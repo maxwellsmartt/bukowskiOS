@@ -26,6 +26,7 @@
       },
       "assets": {
         "assets": "Assets",
+        "kits": "Kits",
         "licenses": "Licenses",
         "packingSlips": "Packing Slips",
         "incidents": "Incidents",

@@ -58,6 +58,7 @@ describe("foundation navigation shell", () => {
   it("preserves the full asset operations sub-navigation", () => {
     expect(assetsSubnav.map((item) => item.label)).toEqual([
       "shell.nav.assets.assets",
+      "shell.nav.assets.kits",
       "shell.nav.assets.licenses",
       "shell.nav.assets.packingSlips",
       "shell.nav.assets.incidents",

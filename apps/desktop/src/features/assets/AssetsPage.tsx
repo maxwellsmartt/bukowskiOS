@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { ClipboardList, ExternalLink, FileUp, GitCompareArrows, Import, MoveRight, Plus, Siren, SquarePen, Trash2, X } from "lucide-react";
+import { Boxes, ClipboardList, ExternalLink, FileUp, GitCompareArrows, Import, MoveRight, Plus, Siren, SquarePen, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -9,7 +9,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { PackingSlipBuilderPanel, type PackingSlipBuilderDraft } from "@features/packing/PackingSlipBuilderPanel";
 import { createPackingSlip } from "@features/packing/usePackingData";
-import { useCatalogData } from "@features/projects/useProjectsData";
+import { createCatalogEntity, updateCatalogEntity, useCatalogData } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListSortMenuButton, ListToolbar } from "@shared/components/ListToolbar";
@@ -31,6 +31,9 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 import { AssetAssignMovePanel, type AssetAssignMoveFormValue } from "./AssetAssignMovePanel";
+import { AssignToKitPanel, type AssignToKitFormValue } from "./AssignToKitPanel";
+import { mergeKitAssetSelections } from "./kitMergeSelection";
+import { notifyWorkspaceDataChanged } from "@shared/hooks/useWorkspaceDataRefresh";
 import { ModalShell } from "@shared/components/ModalShell";
 
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
@@ -420,6 +423,7 @@ type AssetOperationCartProps = {
   onCreateRma: () => void;
   onDeleteSelected: () => void;
   onOpenAssignMove: () => void;
+  onOpenAssignToKit: () => void;
   onOpenAssetDetail: (assetId: string) => void;
   onOpenProjectReturns?: () => void;
   onQuantityChange: (assetId: string, quantity: number) => void;
@@ -434,6 +438,7 @@ const AssetOperationCart = ({
   onCreateRma,
   onDeleteSelected,
   onOpenAssignMove,
+  onOpenAssignToKit,
   onOpenAssetDetail,
   onOpenProjectReturns,
   onQuantityChange,
@@ -508,6 +513,15 @@ const AssetOperationCart = ({
           type="button"
         >
           {t("assets.cart.assignMove")}
+        </button>
+        <button
+          className="ghost-control action-row-button"
+          disabled={lockedItems.length > 0}
+          data-tooltip={lockedItems.length > 0 ? t("assets.cart.kitLockedTip", { defaultValue: "Ya pertenecen a un kit" }) : undefined}
+          onClick={onOpenAssignToKit}
+          type="button"
+        >
+          {t("assets.cart.assignToKit", { defaultValue: "Asignar a Kit" })}
         </button>
         {onOpenProjectReturns ? (
           <button
@@ -1195,7 +1209,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     }),
   });
   const { data: assets, error, isLoading, reload } = useAssetsList(assetControls.query);
-  const { data: catalog, error: catalogError } = useCatalogData({
+  const { data: catalog, error: catalogError, reload: reloadCatalog } = useCatalogData({
     workspaceId: activeWorkspaceId,
     entityType: "location",
     search: "",
@@ -1208,8 +1222,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [cartItemsById, setCartItemsById] = useState<Record<string, AssetOperationCartItem>>({});
   const [actionPanelOpen, setActionPanelOpen] = useState(false);
   const [packingPanelOpen, setPackingPanelOpen] = useState(false);
+  const [kitPanelOpen, setKitPanelOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [packingError, setPackingError] = useState<string | null>(null);
+  const [kitError, setKitError] = useState<string | null>(null);
+  const [isSubmittingKit, setIsSubmittingKit] = useState(false);
   const toast = useToast();
   const [assignNextStep, setAssignNextStep] = useState<{ projectId: string; projectName: string } | null>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
@@ -1530,6 +1547,22 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     setPackingError(null);
   };
 
+  const openAssignKitForAsset = (asset: AssetListRow) => {
+    replaceOperationCartWithAssets([asset]);
+    setSelectedAssetId(asset.id);
+    setKitPanelOpen(true);
+    setActionPanelOpen(false);
+    setPackingPanelOpen(false);
+    setKitError(null);
+  };
+
+  const openAssignKitForSelection = () => {
+    setKitPanelOpen(true);
+    setActionPanelOpen(false);
+    setPackingPanelOpen(false);
+    setKitError(null);
+  };
+
   const addAssetToCompare = (asset: AssetListRow) =>
     addItems([buildAssetCompareItem(asset)]);
 
@@ -1573,6 +1606,55 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setActionError(getUserFacingErrorMessage(nextError, t("assets.toasts.unableAssignMove")));
     } finally {
       setIsSubmittingAction(false);
+    }
+  };
+
+  const handleAssignKit = async (formValue: AssignToKitFormValue) => {
+    try {
+      setIsSubmittingKit(true);
+
+      if (formValue.mode === "new") {
+        await createCatalogEntity({
+          workspaceId: activeWorkspaceId,
+          entityType: "kit",
+          code: formValue.code ?? "",
+          name: formValue.name ?? "",
+          description: formValue.description,
+          assetSelections: selectedAssetSelections,
+        });
+      } else {
+        const targetKit = catalog.kits.find((kit) => kit.id === formValue.kitId);
+        if (!targetKit) {
+          throw new Error(t("assets.assignKit.missingKit", { defaultValue: "El kit seleccionado ya no existe." }));
+        }
+        // Update REPLACES kit_assets, so resend the full merged membership plus
+        // the kit's existing scalar fields to avoid wiping them.
+        const merged = mergeKitAssetSelections(targetKit.assetSelections, selectedAssetSelections);
+        await updateCatalogEntity({
+          workspaceId: activeWorkspaceId,
+          entityType: "kit",
+          id: targetKit.id,
+          code: targetKit.code,
+          name: targetKit.name,
+          description: targetKit.description || undefined,
+          notes: targetKit.notes || undefined,
+          assetSelections: merged,
+        });
+      }
+
+      await Promise.all([reload(), reloadCatalog()]);
+      notifyWorkspaceDataChanged();
+      setKitError(null);
+      toast.success(
+        t("assets.assignKit.doneTitle", { defaultValue: "Kit actualizado" }),
+        t("assets.assignKit.doneBody", { defaultValue: "Los equipos quedaron amarrados al kit." }),
+      );
+      setKitPanelOpen(false);
+      clearOperationCart();
+    } catch (nextError) {
+      setKitError(getUserFacingErrorMessage(nextError, t("assets.assignKit.failed", { defaultValue: "No se pudo asignar a kit." })));
+    } finally {
+      setIsSubmittingKit(false);
     }
   };
 
@@ -2573,6 +2655,26 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             />
       ) : null}
 
+      {kitPanelOpen && selectedRowIds.length ? (
+        <AssignToKitPanel
+          error={kitError}
+          isSubmitting={isSubmittingKit}
+          kits={catalog.kits}
+          onClose={() => {
+            setKitPanelOpen(false);
+            setKitError(null);
+          }}
+          onSubmit={handleAssignKit}
+          selectedAssets={selectedAssets.map((asset) => ({
+            id: asset.id,
+            name: asset.name,
+            code: asset.code,
+            quantity: asset.requestedQuantity,
+          }))}
+          selectedCount={selectedRowIds.length}
+        />
+      ) : null}
+
       {packingPanelOpen && selectedRowIds.length ? (
         <PackingSlipBuilderPanel
           defaultProjectId={assignNextStep?.projectId ?? (isProjectMode ? projectId ?? null : null)}
@@ -3301,6 +3403,13 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 onSelect: (target) => openAssignMoveForAsset(target),
               },
               {
+                key: "assign-to-kit",
+                label: t("assets.cart.assignToKit", { defaultValue: "Asignar a Kit" }),
+                icon: <Boxes size={14} />,
+                disabled: row.linkedKitCount > 0,
+                onSelect: (target) => openAssignKitForAsset(target),
+              },
+              {
                 key: "create-packing-slip",
                 label: t("assets.cart.createPackingSlip"),
                 icon: <ClipboardList size={14} />,
@@ -3404,6 +3513,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
                 setAssignNextStep(null);
               }}
+              onOpenAssignToKit={openAssignKitForSelection}
               onOpenAssetDetail={(assetId) => navigate(`/assets/${assetId}?report=incident`)}
               onOpenProjectReturns={isProjectMode && projectId ? () => navigate(`/projects/${projectId}/packing`) : undefined}
               onQuantityChange={updateCartQuantity}
@@ -3518,6 +3628,16 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     >
                       <SquarePen size={14} />
                       <span>{t("assets.quickPreview.editAsset")}</span>
+                    </button>
+                    <button
+                      className="ghost-control"
+                      disabled={activeAsset.linkedKitCount > 0}
+                      data-tooltip={activeAsset.linkedKitCount > 0 ? t("assets.quickPreview.kitLockedTip", { defaultValue: "Ya pertenece a un kit" }) : undefined}
+                      onClick={() => openAssignKitForAsset(activeAsset)}
+                      type="button"
+                    >
+                      <Boxes size={14} />
+                      <span>{t("assets.quickPreview.assignToKit", { defaultValue: "Asignar a Kit" })}</span>
                     </button>
                     <button className="action-primary-button" onClick={() => navigate(`/assets/${activeAsset.id}`)} type="button">
                       {t("assets.quickPreview.openDetail")}
