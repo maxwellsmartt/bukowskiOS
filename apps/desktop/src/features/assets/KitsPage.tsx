@@ -1,17 +1,22 @@
-import { Boxes, Trash2 } from "lucide-react";
-import { useMemo } from "react";
+import { Boxes, MoveRight, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { CatalogAssetOptionRow } from "@contracts";
+import type { CatalogAssetOptionRow, CatalogKitRow } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { deleteCatalogEntity, useCatalogData } from "@features/projects/useProjectsData";
+import { createPackingSlip } from "@features/packing/usePackingData";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
+import { useShellContext } from "@shared/hooks/useShellContext";
 import { notifyWorkspaceDataChanged } from "@shared/hooks/useWorkspaceDataRefresh";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+
+import { assignMoveAssets } from "./useAssetsData";
+import { KitCheckoutPanel, type KitCheckoutFormValue } from "./KitCheckoutPanel";
 
 export const KitsPage = () => {
   const { t } = useTranslation();
@@ -25,6 +30,10 @@ export const KitsPage = () => {
     sortBy: "name",
     sortDirection: "asc",
   });
+  const { projects, refreshProjects } = useShellContext();
+  const [checkoutKit, setCheckoutKit] = useState<CatalogKitRow | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [isSubmittingCheckout, setIsSubmittingCheckout] = useState(false);
 
   const assetById = useMemo(() => {
     const map = new Map<string, CatalogAssetOptionRow>();
@@ -65,6 +74,61 @@ export const KitsPage = () => {
     }
   };
 
+  const handleKitCheckout = async (formValue: KitCheckoutFormValue) => {
+    if (!checkoutKit) {
+      return;
+    }
+
+    const assetSelections = checkoutKit.assetSelections;
+    const assetIds = assetSelections.map((selection) => selection.assetId);
+    const expectedReturnAt = formValue.returnDueAt ? new Date(formValue.returnDueAt).toISOString() : undefined;
+
+    try {
+      setIsSubmittingCheckout(true);
+      const result =
+        formValue.mode === "pack"
+          ? await createPackingSlip({
+              commandId: crypto.randomUUID(),
+              workspaceId: activeWorkspaceId,
+              assetIds,
+              assetSelections,
+              sourceKitId: checkoutKit.id,
+              projectId: formValue.projectId,
+              departmentId: formValue.departmentId,
+              responsibleUserId: formValue.responsibleUserId,
+              returnDueAt: expectedReturnAt,
+              notes: formValue.notes,
+              actorType: "user",
+              sourceChannel: "desktop",
+            })
+          : await assignMoveAssets({
+              commandId: crypto.randomUUID(),
+              workspaceId: activeWorkspaceId,
+              assetIds,
+              assetSelections,
+              mode: "assign",
+              sourceKitId: checkoutKit.id,
+              projectId: formValue.projectId,
+              departmentId: formValue.departmentId,
+              assignedToUserId: formValue.responsibleUserId,
+              expectedReturnAt,
+              notes: formValue.notes,
+              actorType: "user",
+              sourceChannel: "desktop",
+            });
+
+      await Promise.all([reload(), refreshProjects()]);
+      notifyWorkspaceDataChanged();
+      setCheckoutError(null);
+      toast.success(t("assets.kits.checkout.doneTitle", { defaultValue: "Kit movido" }), result.summary);
+      setCheckoutKit(null);
+    } catch (error) {
+      setCheckoutError(getUserFacingErrorMessage(error, t("assets.kits.checkout.failed", { defaultValue: "No se pudo mover el kit." })));
+    } finally {
+      setIsSubmittingCheckout(false);
+    }
+  };
+
   return (
     <div className="page-stack page-stack--fill kits-page-stack">
       <SectionHeader
@@ -80,6 +144,24 @@ export const KitsPage = () => {
           defaultValue: "Los kits se guardan en esta computadora y aún no se sincronizan entre máquinas.",
         })}
       </div>
+
+      {checkoutKit ? (
+        <KitCheckoutPanel
+          kitName={checkoutKit.name}
+          kitCode={checkoutKit.primaryCodeValue || checkoutKit.code}
+          memberCount={checkoutKit.assetCount}
+          projects={projects}
+          departments={catalog.departments}
+          users={catalog.users}
+          error={checkoutError}
+          isSubmitting={isSubmittingCheckout}
+          onClose={() => {
+            setCheckoutKit(null);
+            setCheckoutError(null);
+          }}
+          onSubmit={handleKitCheckout}
+        />
+      ) : null}
 
       <SurfaceCard className="surface-card--fill kits-register-card" title={t("assets.kits.listTitle", { defaultValue: "Kits armados" })}>
         {isLoading ? (
@@ -108,6 +190,18 @@ export const KitsPage = () => {
                     <StatusBadge tone="neutral">
                       {t("assets.kits.memberCount", { defaultValue: "{{count}} equipos", count: kit.assetCount })}
                     </StatusBadge>
+                    <button
+                      className="ghost-control"
+                      disabled={!kit.assetCount}
+                      onClick={() => {
+                        setCheckoutKit(kit);
+                        setCheckoutError(null);
+                      }}
+                      type="button"
+                    >
+                      <MoveRight size={14} />
+                      <span>{t("assets.kits.move", { defaultValue: "Mover kit" })}</span>
+                    </button>
                     <button className="ghost-control is-danger" onClick={() => void handleDisband(kit.id, kit.name)} type="button">
                       <Trash2 size={14} />
                       <span>{t("assets.kits.disbandShort", { defaultValue: "Desarmar" })}</span>
