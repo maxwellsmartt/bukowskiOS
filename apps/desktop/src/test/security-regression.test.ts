@@ -128,6 +128,47 @@ describe("security regression checks", () => {
     expect(source).toContain('requiredPermission: "users.invite"');
   });
 
+  it("re-verifies cached local workspace memberships in the main process", () => {
+    const source = readText("apps/desktop/electron/main/ipc/registerAppIpc.ts");
+    const handlerIndex = source.indexOf("ipcChannels.app.ensureLocalWorkspaces");
+    const handlerBlock = source.slice(handlerIndex, handlerIndex + 1200);
+
+    expect(handlerIndex).toBeGreaterThan(-1);
+    expect(source).toContain("sanitizeEnsureLocalWorkspacesInput");
+    expect(source).toContain("getFreshStoredUserId()");
+    expect(source).toContain('table: "workspace_memberships"');
+    expect(source).toContain("roles!workspace_memberships_workspace_role_fk");
+    expect(handlerBlock).toContain("sanitizeEnsureLocalWorkspacesInput(input)");
+  });
+
+  it("requires workspace access before applying remote pull rows locally", () => {
+    const source = readText("apps/desktop/electron/main/ipc/registerAppIpc.ts");
+    const guardedChannels = [
+      "ipcChannels.app.applyRemoteCatalogRows",
+      "ipcChannels.app.applyRemoteKits",
+      "ipcChannels.app.applyRemoteSyncTombstones",
+      "ipcChannels.app.applyRemoteExchangeRates",
+      "ipcChannels.app.applyRemoteAssetSnapshots",
+      "ipcChannels.app.applyRemoteOperationalSnapshots",
+      "ipcChannels.app.applyRemoteWorkspaceFiles",
+      "ipcChannels.app.applyRemoteTreasuryRows",
+      "ipcChannels.app.applyRemoteCollaboratorPaymentRows",
+      "ipcChannels.app.applyRemoteFinanceBusinessRows",
+      "ipcChannels.app.applyRemoteAutomationControlPlaneRows",
+    ];
+
+    const missingGuard = guardedChannels.filter((channel) => {
+      const channelIndex = source.indexOf(channel);
+      if (channelIndex < 0) return true;
+      const handlerBlock = source.slice(channelIndex, channelIndex + 1000);
+      return !handlerBlock.includes("assertWorkspaceReadAccess(");
+    });
+
+    expect(missingGuard).toEqual([]);
+    expect(source).toContain('accessLevel: "read"');
+    expect(source).toContain('action: "apply remote automation updates"');
+  });
+
   it("does not let plain workspace membership mutate the remote automation control plane", () => {
     const migrationText = listFiles("supabase/migrations")
       .filter((relativePath) => relativePath.endsWith(".sql"))

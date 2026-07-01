@@ -597,10 +597,10 @@ export const registerAppIpc = ({
       accessLevel: "write",
       requiredPermission: "users.invite",
     });
-  const assertWorkspaceReadAccess = (workspaceId: string, action: string) =>
+  const assertWorkspaceReadAccess = (options: { workspaceId: string; action: string }) =>
     workspaceAccess.assertWorkspaceAccess({
-      workspaceId,
-      action,
+      workspaceId: options.workspaceId,
+      action: options.action,
       accessLevel: "read",
     });
   // Sensitive app-level access (sync internals, backups, exports) requires the
@@ -1339,7 +1339,7 @@ export const registerAppIpc = ({
     ipcChannels.app.applyRemoteCatalogRows,
     applyRemoteCatalogRowsSchema,
     async (_event, input) => {
-      await assertWorkspaceReadAccess(input.workspaceId, "apply remote catalog updates");
+      await assertWorkspaceReadAccess({ workspaceId: input.workspaceId, action: "apply remote catalog updates" });
       return applyRemoteCatalogRows(input);
     },
     "The app could not apply remote catalog updates.",
@@ -1348,7 +1348,7 @@ export const registerAppIpc = ({
     ipcChannels.app.applyRemoteKits,
     applyRemoteKitsSchema,
     async (_event, input) => {
-      await assertWorkspaceReadAccess(input.workspaceId, "apply remote kit updates");
+      await assertWorkspaceReadAccess({ workspaceId: input.workspaceId, action: "apply remote kit updates" });
       return applyRemoteKits(input as import("@contracts").AppApplyRemoteKitsCommand);
     },
     "The app could not apply remote kit updates.",
@@ -1357,7 +1357,7 @@ export const registerAppIpc = ({
     ipcChannels.app.applyRemoteSyncTombstones,
     applyRemoteSyncTombstonesSchema,
     async (_event, input) => {
-      await assertWorkspaceReadAccess(input.workspaceId, "apply remote deletion markers");
+      await assertWorkspaceReadAccess({ workspaceId: input.workspaceId, action: "apply remote deletion markers" });
       return applyRemoteSyncTombstones(input as import("@contracts").AppApplyRemoteSyncTombstonesCommand);
     },
     "The app could not apply remote deletion markers.",
@@ -1366,7 +1366,7 @@ export const registerAppIpc = ({
     ipcChannels.app.applyRemoteExchangeRates,
     applyRemoteExchangeRatesSchema,
     async (_event, input) => {
-      await assertWorkspaceReadAccess(input.workspaceId, "apply remote exchange rates");
+      await assertWorkspaceReadAccess({ workspaceId: input.workspaceId, action: "apply remote exchange rates" });
       return applyRemoteExchangeRates(input as import("@contracts").AppApplyRemoteExchangeRatesCommand);
     },
     "The app could not apply remote exchange rates.",
@@ -1375,7 +1375,7 @@ export const registerAppIpc = ({
     ipcChannels.app.applyRemoteAssetSnapshots,
     applyRemoteAssetSnapshotsSchema,
     async (_event, input) => {
-      await assertWorkspaceReadAccess(input.workspaceId, "apply remote asset snapshots");
+      await assertWorkspaceReadAccess({ workspaceId: input.workspaceId, action: "apply remote asset snapshots" });
       return applyRemoteAssetSnapshots(input as import("@contracts").AppApplyRemoteAssetSnapshotsCommand);
     },
     "The app could not apply remote asset snapshots.",
@@ -1384,7 +1384,7 @@ export const registerAppIpc = ({
     ipcChannels.app.applyRemoteOperationalSnapshots,
     applyRemoteOperationalSnapshotsSchema,
     async (_event, input) => {
-      await assertWorkspaceReadAccess(input.workspaceId, "apply remote operational snapshots");
+      await assertWorkspaceReadAccess({ workspaceId: input.workspaceId, action: "apply remote operational snapshots" });
       return applyRemoteOperationalSnapshots(input as import("@contracts").AppApplyRemoteOperationalSnapshotsCommand);
     },
     "The app could not apply remote operational snapshots.",
@@ -1393,7 +1393,7 @@ export const registerAppIpc = ({
     ipcChannels.app.applyRemoteWorkspaceFiles,
     applyRemoteWorkspaceFilesSchema,
     async (_event, input) => {
-      await assertWorkspaceReadAccess(input.workspaceId, "apply remote workspace files");
+      await assertWorkspaceReadAccess({ workspaceId: input.workspaceId, action: "apply remote workspace files" });
       return applyRemoteWorkspaceFiles(input as import("@contracts").AppApplyRemoteWorkspaceFilesCommand);
     },
     "The app could not apply remote workspace files.",
@@ -1402,7 +1402,7 @@ export const registerAppIpc = ({
     ipcChannels.app.applyRemoteTreasuryRows,
     applyRemoteTreasuryRowsSchema,
     async (_event, input) => {
-      await assertWorkspaceReadAccess(input.workspaceId, "apply remote treasury rows");
+      await assertWorkspaceReadAccess({ workspaceId: input.workspaceId, action: "apply remote treasury rows" });
       return applyRemoteTreasuryRows(input as import("@contracts").AppApplyRemoteTreasuryRowsCommand);
     },
     "The app could not apply remote treasury rows.",
@@ -1411,7 +1411,7 @@ export const registerAppIpc = ({
     ipcChannels.app.applyRemoteCollaboratorPaymentRows,
     applyRemoteCollaboratorPaymentRowsSchema,
     async (_event, input) => {
-      await assertWorkspaceReadAccess(input.workspaceId, "apply remote collaborator payment rows");
+      await assertWorkspaceReadAccess({ workspaceId: input.workspaceId, action: "apply remote collaborator payment rows" });
       return applyRemoteCollaboratorPaymentRows(input as import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand);
     },
     "The app could not apply remote collaborator payment rows.",
@@ -1420,7 +1420,7 @@ export const registerAppIpc = ({
     ipcChannels.app.applyRemoteFinanceBusinessRows,
     applyRemoteFinanceBusinessRowsSchema,
     async (_event, input) => {
-      await assertWorkspaceReadAccess(input.workspaceId, "apply remote finance rows");
+      await assertWorkspaceReadAccess({ workspaceId: input.workspaceId, action: "apply remote finance rows" });
       return applyRemoteFinanceBusinessRows(input as import("@contracts").AppApplyRemoteFinanceBusinessRowsCommand);
     },
     "The app could not apply remote finance business rows.",
@@ -1429,7 +1429,7 @@ export const registerAppIpc = ({
     ipcChannels.app.applyRemoteAutomationControlPlaneRows,
     applyRemoteAutomationControlPlaneRowsSchema,
     async (_event, input) => {
-      await assertWorkspaceReadAccess(input.workspaceId, "apply remote automation updates");
+      await assertWorkspaceReadAccess({ workspaceId: input.workspaceId, action: "apply remote automation updates" });
       return applyRemoteAutomationControlPlaneRows(input as import("@contracts").AppApplyRemoteAutomationControlPlaneRowsCommand);
     },
     "The app could not apply remote automation control plane rows.",
