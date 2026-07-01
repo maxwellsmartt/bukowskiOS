@@ -1,6 +1,12 @@
 export const ipcChannels = {
   app: {
     getInfo: "bukowskiApp:getInfo",
+    getAppUpdateStatus: "bukowskiApp:getAppUpdateStatus",
+    checkForAppUpdate: "bukowskiApp:checkForAppUpdate",
+    downloadAppUpdate: "bukowskiApp:downloadAppUpdate",
+    openDownloadedAppUpdate: "bukowskiApp:openDownloadedAppUpdate",
+    revealDownloadedAppUpdate: "bukowskiApp:revealDownloadedAppUpdate",
+    appUpdateStatusChanged: "bukowskiApp:appUpdateStatusChanged",
     getDiagnostics: "bukowskiApp:getDiagnostics",
     getSupportSnapshot: "bukowskiApp:getSupportSnapshot",
     getUsersSnapshot: "bukowskiApp:getUsersSnapshot",

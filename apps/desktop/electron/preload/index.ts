@@ -38,6 +38,9 @@ import type {
   AppApplyRemoteAssetSnapshotsResult,
   AppApplyRemoteWorkspaceFilesCommand,
   AppApplyRemoteWorkspaceFilesResult,
+  AppUpdateActionResult,
+  AppUpdateCheckCommand,
+  AppUpdateStatus,
   AppApplyRemoteCatalogRowsCommand,
   AppApplyRemoteCatalogRowsResult,
   AppApplyRemoteKitsCommand,
@@ -220,6 +223,7 @@ import type {
 } from "@contracts";
 
 const shellActionListeners = new Set<(action: ShellAppAction) => void>();
+const appUpdateStatusListeners = new Set<(status: AppUpdateStatus) => void>();
 
 type StoredSupabaseTokens = {
   accessToken: string | null;
@@ -237,8 +241,28 @@ ipcRenderer.on(ipcChannels.shell.appAction, (_event, action: ShellAppAction) => 
   });
 });
 
+ipcRenderer.on(ipcChannels.app.appUpdateStatusChanged, (_event, nextStatus: AppUpdateStatus) => {
+  appUpdateStatusListeners.forEach((listener) => {
+    listener(nextStatus);
+  });
+});
+
 const bukowskiApp = {
   getAppInfo: () => ipcRenderer.invoke(ipcChannels.app.getInfo) as Promise<AppInfo>,
+  getAppUpdateStatus: () => ipcRenderer.invoke(ipcChannels.app.getAppUpdateStatus) as Promise<AppUpdateStatus>,
+  checkForAppUpdate: (input?: AppUpdateCheckCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.checkForAppUpdate, input) as Promise<AppUpdateStatus>,
+  downloadAppUpdate: () => ipcRenderer.invoke(ipcChannels.app.downloadAppUpdate) as Promise<AppUpdateActionResult>,
+  openDownloadedAppUpdate: () =>
+    ipcRenderer.invoke(ipcChannels.app.openDownloadedAppUpdate) as Promise<AppUpdateActionResult>,
+  revealDownloadedAppUpdate: () =>
+    ipcRenderer.invoke(ipcChannels.app.revealDownloadedAppUpdate) as Promise<AppUpdateActionResult>,
+  onAppUpdateStatus: (listener: (status: AppUpdateStatus) => void) => {
+    appUpdateStatusListeners.add(listener);
+    return () => {
+      appUpdateStatusListeners.delete(listener);
+    };
+  },
   getDiagnostics: () => ipcRenderer.invoke(ipcChannels.app.getDiagnostics) as Promise<AppDiagnosticsSnapshot>,
   getSupportSnapshot: () => ipcRenderer.invoke(ipcChannels.app.getSupportSnapshot) as Promise<AppSupportSnapshot>,
   getUsersSnapshot: (query?: AppUsersSnapshotQuery) =>

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { AppUpdateProvider } from "./AppUpdateProvider";
 import { AssistantChatProvider } from "./AssistantChatContext";
 import { CompareTrayProvider } from "./CompareTrayContext";
 import { NotificationsProvider } from "./NotificationsProvider";
@@ -18,13 +19,15 @@ export const AppProviders = ({ children }: AppProvidersProps) => (
     <UserSettingsProvider>
       <WorkspaceProvider>
         <ToastProvider>
-          <NotificationsProvider>
-            <ShellContextProvider>
-              <CompareTrayProvider>
-                <AssistantChatProvider>{children}</AssistantChatProvider>
-              </CompareTrayProvider>
-            </ShellContextProvider>
-          </NotificationsProvider>
+          <AppUpdateProvider>
+            <NotificationsProvider>
+              <ShellContextProvider>
+                <CompareTrayProvider>
+                  <AssistantChatProvider>{children}</AssistantChatProvider>
+                </CompareTrayProvider>
+              </ShellContextProvider>
+            </NotificationsProvider>
+          </AppUpdateProvider>
         </ToastProvider>
       </WorkspaceProvider>
     </UserSettingsProvider>

@@ -3001,6 +3001,32 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   padding-left: 8px;
 }
 
+.top-context-update-button {
+  min-width: 98px;
+  border-color: color-mix(in srgb, var(--accent-brand) 32%, var(--border-subtle));
+  background:
+    linear-gradient(135deg, rgba(77, 157, 255, 0.22), rgba(77, 157, 255, 0.08)),
+    rgba(255, 255, 255, 0.03);
+  color: #e8f1ff;
+  box-shadow: 0 10px 24px rgba(40, 113, 214, 0.16);
+}
+
+.top-context-update-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent-brand) 52%, rgba(255, 255, 255, 0.16));
+  background:
+    linear-gradient(135deg, rgba(77, 157, 255, 0.28), rgba(77, 157, 255, 0.12)),
+    rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.top-context-update-button.is-downloading {
+  background:
+    linear-gradient(135deg, rgba(95, 183, 255, 0.18), rgba(95, 183, 255, 0.07)),
+    rgba(255, 255, 255, 0.03);
+  color: rgba(232, 241, 255, 0.82);
+  box-shadow: none;
+}
+
 .top-context-group-end {
   margin-left: auto;
   justify-content: flex-end;
@@ -11306,6 +11332,161 @@ button.project-budget-command-metric {
 
 .modal-shell-dialog > .surface-card {
   min-height: 0;
+}
+
+.app-update-modal-shell {
+  overflow: hidden;
+}
+
+.app-update-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+}
+
+.app-update-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app-update-modal-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-update-modal-title-group h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 24px;
+  line-height: 1.05;
+}
+
+.app-update-modal-title-group p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.app-update-modal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-update-modal-badge-available,
+.app-update-modal-badge-downloading {
+  border-color: rgba(93, 163, 255, 0.26);
+  background: rgba(62, 127, 214, 0.16);
+  color: #d9e9ff;
+}
+
+.app-update-modal-badge-downloaded {
+  border-color: rgba(73, 196, 132, 0.24);
+  background: rgba(38, 122, 76, 0.16);
+  color: #d7ffe8;
+}
+
+.app-update-modal-badge-failed {
+  border-color: rgba(232, 129, 129, 0.22);
+  background: rgba(138, 54, 54, 0.16);
+  color: #ffd6d6;
+}
+
+.app-update-modal-card,
+.app-update-modal-progress-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+}
+
+.app-update-modal-row,
+.app-update-modal-progress-head,
+.app-update-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app-update-modal-row span,
+.app-update-modal-progress-meta span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.app-update-modal-row strong,
+.app-update-modal-progress-head strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.app-update-modal-progress-bar {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.app-update-modal-progress-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(85, 170, 255, 0.82), rgba(118, 232, 255, 0.7));
+  box-shadow: 0 0 24px rgba(85, 170, 255, 0.22);
+  transition: width 180ms ease;
+}
+
+.app-update-modal-progress-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app-update-modal-error {
+  margin: 0;
+  color: #ffbcbc;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.app-update-primary-action {
+  border-color: color-mix(in srgb, var(--accent-brand) 36%, var(--border-subtle));
+  background:
+    linear-gradient(135deg, rgba(77, 157, 255, 0.22), rgba(77, 157, 255, 0.08)),
+    rgba(255, 255, 255, 0.03);
+  color: #f3f8ff;
+}
+
+.app-update-primary-action:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent-brand) 52%, rgba(255, 255, 255, 0.16));
+  background:
+    linear-gradient(135deg, rgba(77, 157, 255, 0.28), rgba(77, 157, 255, 0.12)),
+    rgba(255, 255, 255, 0.05);
 }
 
 /* Availability headline merged into the asset summary card. */

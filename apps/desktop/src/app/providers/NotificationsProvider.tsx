@@ -18,6 +18,7 @@ import {
 } from "@shared/lib/userSettings";
 
 import { useToast } from "./ToastProvider";
+import { useAppUpdate } from "./AppUpdateProvider";
 import { useSession } from "./SessionProvider";
 import { useWorkspace } from "./WorkspaceProvider";
 
@@ -221,12 +222,7 @@ const isRecentSelfEcho = (row: NotificationRow, seenIds: Set<string>) => seenIds
 const reminderPollMs = 30_000;
 const notificationRefreshMs = 20_000;
 const remoteRefreshFailureBackoffMs = 2 * 60 * 1000;
-const appUpdateCheckIntervalMs = 24 * 60 * 60 * 1000;
-const appUpdateFailureRetryMs = 60 * 60 * 1000;
-const appUpdateLastCheckKey = "bukowski:notifications:last-app-update-check";
 const appUpdateLastNotifiedKey = "bukowski:notifications:last-app-update-notified";
-const appReleaseApiUrl = "https://api.github.com/repos/maxwellsmartt/bukowskiOS/releases?per_page=1";
-const appReleasePageUrl = "https://github.com/maxwellsmartt/bukowskiOS/releases/latest";
 const todoColumnsBase = "id,user_id,workspace_id,title,notes,due_at,priority,completed_at,created_by,agent_action_ref,created_at,updated_at";
 const todoColumnsWithRecurrence =
   "id,user_id,workspace_id,title,notes,due_at,recurrence_rule,priority,completed_at,created_by,agent_action_ref,created_at,updated_at";
@@ -265,23 +261,6 @@ const asLooseSupabase = (supabase: NonNullable<ReturnType<typeof useSession>["su
 
 const isNavigatorOnline = () => typeof navigator === "undefined" || navigator.onLine !== false;
 
-const parseVersionParts = (value: string) =>
-  value
-    .replace(/^v/i, "")
-    .split(".")
-    .map((part) => Number.parseInt(part.replace(/[^0-9].*$/, ""), 10) || 0)
-    .slice(0, 3);
-
-const isVersionGreater = (candidate: string, current: string) => {
-  const left = parseVersionParts(candidate);
-  const right = parseVersionParts(current);
-  for (let index = 0; index < 3; index += 1) {
-    if ((left[index] ?? 0) > (right[index] ?? 0)) return true;
-    if ((left[index] ?? 0) < (right[index] ?? 0)) return false;
-  }
-  return false;
-};
-
 const nativeCategoryForNotification = (row: Pick<NotificationRow, "kind" | "sourceRef">): NotificationCategory | null => {
   if (row.kind === "invoice_inbox") return "invoiceInbox";
   if (row.kind === "agent_approval") return "agentsApproval";
@@ -304,6 +283,7 @@ const nativeCategoryForNotification = (row: Pick<NotificationRow, "kind" | "sour
 export const NotificationsProvider = ({ children }: { children: ReactNode }) => {
   const { t } = useTranslation();
   const { status, user, supabase } = useSession();
+  const { status: appUpdateStatus } = useAppUpdate();
   const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const toast = useToast();
   const [nativeNotificationSettings] = useUserSetting(userSettingKeys.nativeNotifications);
@@ -991,54 +971,27 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     if (!canUseLocal || !activeUserId || !activeWorkspaceId || !isOnline) {
       return;
     }
-
-    const lastCheck = Number(window.localStorage.getItem(appUpdateLastCheckKey) ?? "0");
-    if (Number.isFinite(lastCheck) && Date.now() - lastCheck < appUpdateCheckIntervalMs) {
+    if (!appUpdateStatus?.available || !appUpdateStatus.latestVersion) {
+      return;
+    }
+    if (window.localStorage.getItem(appUpdateLastNotifiedKey) === appUpdateStatus.latestVersion) {
       return;
     }
 
-    // Optimistically stamp "now" so concurrent re-runs don't double-fetch. On a
-    // failed check we rewind the stamp so the next attempt is in ~1h instead of
-    // being blocked for the full 24h window.
-    window.localStorage.setItem(appUpdateLastCheckKey, String(Date.now()));
-    const backoffAfterFailure = () => {
-      window.localStorage.setItem(
-        appUpdateLastCheckKey,
-        String(Date.now() - (appUpdateCheckIntervalMs - appUpdateFailureRetryMs)),
-      );
-    };
-    void (async () => {
-      const appInfo = await window.bukowskiApp?.getAppInfo().catch(() => null);
-      const currentVersion = appInfo?.version ?? null;
-      if (!currentVersion) {
-        backoffAfterFailure();
-        return;
-      }
-      const response = await fetch(appReleaseApiUrl, { headers: { Accept: "application/vnd.github+json" } });
-      if (!response.ok) {
-        backoffAfterFailure();
-        return;
-      }
-      const [release] = (await response.json()) as Array<{ tag_name?: string; html_url?: string; name?: string }>;
-      const latest = release?.tag_name?.trim();
-      if (!latest || !isVersionGreater(latest, currentVersion)) {
-        return;
-      }
-      if (window.localStorage.getItem(appUpdateLastNotifiedKey) === latest) {
-        return;
-      }
-      window.localStorage.setItem(appUpdateLastNotifiedKey, latest);
-      await createNotification({
-        kind: "app_update",
-        title: t("notifications.events.appUpdateTitle"),
-        body: t("notifications.events.appUpdateBody", { version: release.name || latest }),
-        linkTo: release.html_url || appReleasePageUrl,
-        sourceType: "app_update",
-        sourceRef: { latestVersion: latest, currentVersion },
-        notifyNow: true,
-      });
-    })().catch(() => backoffAfterFailure());
-  }, [activeUserId, activeWorkspaceId, canUseLocal, createNotification, isOnline, t]);
+    window.localStorage.setItem(appUpdateLastNotifiedKey, appUpdateStatus.latestVersion);
+    void createNotification({
+      kind: "app_update",
+      title: t("notifications.events.appUpdateTitle"),
+      body: t("notifications.events.appUpdateBody", { version: appUpdateStatus.releaseName || appUpdateStatus.latestVersion }),
+      linkTo: appUpdateStatus.releasePageUrl,
+      sourceType: "app_update",
+      sourceRef: {
+        latestVersion: appUpdateStatus.latestVersion,
+        currentVersion: appUpdateStatus.currentVersion,
+      },
+      notifyNow: true,
+    }).catch(() => undefined);
+  }, [activeUserId, activeWorkspaceId, appUpdateStatus, canUseLocal, createNotification, isOnline, t]);
 
   useEffect(() => {
     if (!canUseLocal || !activeUserId || !activeWorkspaceId) {

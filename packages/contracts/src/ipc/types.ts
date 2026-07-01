@@ -6,6 +6,38 @@ export type AppInfo = {
   shellVersion: string;
 };
 
+export type AppUpdateState = "idle" | "checking" | "available" | "downloading" | "downloaded" | "failed";
+
+export type AppUpdateAssetArchitecture = "arm64" | "x64" | "universal" | "unknown";
+
+export type AppUpdateStatus = {
+  state: AppUpdateState;
+  available: boolean;
+  currentVersion: string;
+  latestVersion: string | null;
+  releaseName: string | null;
+  releasePageUrl: string | null;
+  assetName: string | null;
+  assetSizeBytes: number | null;
+  assetArchitecture: AppUpdateAssetArchitecture | null;
+  progressPercent: number | null;
+  bytesReceived: number;
+  bytesTotal: number | null;
+  statusLabel: string;
+  downloadedPath: string | null;
+  checkedAt: string | null;
+  errorMessage: string | null;
+};
+
+export type AppUpdateCheckCommand = {
+  force?: boolean;
+};
+
+export type AppUpdateActionResult = {
+  summary: string;
+  status: AppUpdateStatus;
+};
+
 export type AppUserRoleRow = {
   id: string;
   key: string;

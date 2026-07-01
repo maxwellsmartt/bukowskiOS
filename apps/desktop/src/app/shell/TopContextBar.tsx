@@ -1,9 +1,10 @@
-import { AlertTriangle, CheckCircle2, CloudCog, CloudOff, RefreshCw, Search, Wifi, WifiOff, X } from "lucide-react";
+import { AlertTriangle, ArrowDownCircle, CheckCircle2, CloudCog, CloudOff, Download, RefreshCw, Search, Wifi, WifiOff, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { HelpMenu } from "@features/onboarding/HelpMenu";
+import { useAppUpdate } from "@app/providers/AppUpdateProvider";
 import { useConnectivity } from "@shared/hooks/useConnectivity";
 import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
@@ -21,6 +22,7 @@ import { resolveProjectColor } from "@shared/lib/projectColors";
 import { parseSyncTimestamp } from "@shared/lib/syncHealth";
 import { inboundCursorLabel } from "@shared/lib/syncInbound";
 import type { AppDiagnosticsSnapshot, AppSyncPullCursorRow, AppSyncStatusSnapshot } from "@contracts";
+import { AppUpdateModal } from "./AppUpdateModal";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { NotificationsButton } from "./NotificationsTray";
 
@@ -41,6 +43,7 @@ const isFreshTimestamp = (value: string | null | undefined, windowMs: number) =>
 export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const { activeProject, scopeChipLabel } = useShellContext();
   const { activeWorkspaceId } = useWorkspace();
+  const { status: appUpdateStatus, openModal, downloadUpdate } = useAppUpdate();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { formatDateTime } = useLocale();
@@ -418,60 +421,91 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
     return formatSyncDate(latestSyncActivity);
   };
 
+  const shouldShowUpdateButton =
+    appUpdateStatus?.state === "available"
+    || appUpdateStatus?.state === "downloading"
+    || appUpdateStatus?.state === "downloaded"
+    || (appUpdateStatus?.state === "failed" && Boolean(appUpdateStatus.assetName));
+
+  const updateButtonLabel =
+    appUpdateStatus?.state === "downloading"
+      ? "Downloading…"
+      : appUpdateStatus?.state === "downloaded"
+        ? "Downloaded"
+        : "Update";
+
   return (
-    <div className="top-context-bar">
-      <div className="top-context-group top-context-group-primary">
-        <WorkspaceSwitcher />
-      </div>
-
-      {scopeChipLabel ? (
-        <div className="top-context-group top-context-group-center">
-          <div className="context-chip context-chip-project" style={projectChipStyle}>
-            {activeProject ? <span aria-hidden="true" className="context-chip-project-dot" /> : null}
-            <span>{scopeChipLabel}</span>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="top-context-group top-context-group-end">
-        <button className="ghost-control search-control" onClick={onOpenSearch} type="button">
-          <Search size={13} />
-          <span>{t("shell.topBar.search")}</span>
-          <kbd>⌘K</kbd>
-        </button>
-        <NotificationsButton />
-        <HelpMenu />
-        <span
-          aria-label={isOnline ? t("shell.topBar.online") : t("shell.topBar.offlineTooltip")}
-          className={`icon-ghost-control connectivity-indicator ${isOnline ? "is-online" : "is-offline"}`}
-          data-tooltip={isOnline ? t("shell.topBar.online") : t("shell.topBar.offlineTooltip")}
-          role="status"
-        >
-          {isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
-        </span>
-        <div className="sync-popover-anchor" ref={syncPopoverRef}>
-          <button
-            aria-expanded={syncPopoverOpen}
-            aria-label={syncState.label}
-            className={`icon-ghost-control sync-control ${syncState.className}`}
-            data-tooltip={syncPopoverOpen ? undefined : syncState.label}
-            onClick={() => {
-              setSyncPopoverOpen((current) => {
-                if (!current) {
-                  void refreshDiagnostics();
+    <>
+      <div className="top-context-bar">
+        <div className="top-context-group top-context-group-primary">
+          <WorkspaceSwitcher />
+          {shouldShowUpdateButton ? (
+            <button
+              className={`ghost-control top-context-update-button ${appUpdateStatus?.state === "downloading" ? "is-downloading" : ""}`.trim()}
+              disabled={appUpdateStatus?.state === "downloading"}
+              onClick={() => {
+                if (appUpdateStatus?.state === "available" || appUpdateStatus?.state === "failed") {
+                  void downloadUpdate().catch(() => undefined);
+                  return;
                 }
-                return !current;
-              });
-              setSyncActionError(null);
-            }}
-            type="button"
-          >
-            <CloudCog size={17} />
-            {syncState.badge ? <span className="sync-control-badge">{syncState.badge}</span> : null}
-          </button>
+                openModal();
+              }}
+              type="button"
+            >
+              {appUpdateStatus?.state === "downloaded" ? <ArrowDownCircle size={14} /> : <Download size={14} />}
+              <span>{updateButtonLabel}</span>
+            </button>
+          ) : null}
+        </div>
 
-          {syncPopoverOpen ? (
-            <div className="sync-popover" role="dialog" aria-label={t("shell.topBar.syncPopover.title", { defaultValue: "Sincronización" })}>
+        {scopeChipLabel ? (
+          <div className="top-context-group top-context-group-center">
+            <div className="context-chip context-chip-project" style={projectChipStyle}>
+              {activeProject ? <span aria-hidden="true" className="context-chip-project-dot" /> : null}
+              <span>{scopeChipLabel}</span>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="top-context-group top-context-group-end">
+          <button className="ghost-control search-control" onClick={onOpenSearch} type="button">
+            <Search size={13} />
+            <span>{t("shell.topBar.search")}</span>
+            <kbd>⌘K</kbd>
+          </button>
+          <NotificationsButton />
+          <HelpMenu />
+          <span
+            aria-label={isOnline ? t("shell.topBar.online") : t("shell.topBar.offlineTooltip")}
+            className={`icon-ghost-control connectivity-indicator ${isOnline ? "is-online" : "is-offline"}`}
+            data-tooltip={isOnline ? t("shell.topBar.online") : t("shell.topBar.offlineTooltip")}
+            role="status"
+          >
+            {isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
+          </span>
+          <div className="sync-popover-anchor" ref={syncPopoverRef}>
+            <button
+              aria-expanded={syncPopoverOpen}
+              aria-label={syncState.label}
+              className={`icon-ghost-control sync-control ${syncState.className}`}
+              data-tooltip={syncPopoverOpen ? undefined : syncState.label}
+              onClick={() => {
+                setSyncPopoverOpen((current) => {
+                  if (!current) {
+                    void refreshDiagnostics();
+                  }
+                  return !current;
+                });
+                setSyncActionError(null);
+              }}
+              type="button"
+            >
+              <CloudCog size={17} />
+              {syncState.badge ? <span className="sync-control-badge">{syncState.badge}</span> : null}
+            </button>
+
+            {syncPopoverOpen ? (
+              <div className="sync-popover" role="dialog" aria-label={t("shell.topBar.syncPopover.title", { defaultValue: "Sincronización" })}>
               <div className="sync-popover-header">
                 <div>
                   <strong>{syncState.label}</strong>
@@ -549,10 +583,12 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
                   {t("shell.topBar.syncPopover.details", { defaultValue: "Ver detalles" })}
                 </button>
               </div>
-            </div>
-          ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
-    </div>
+      <AppUpdateModal />
+    </>
   );
 };

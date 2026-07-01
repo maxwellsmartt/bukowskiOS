@@ -2874,7 +2874,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     onClick={() => void handleApplyDuplicateAudit()}
                     type="button"
                   >
-                    <Trash2 size={14} />
+                    <ShieldCheck size={14} />
                     <span>
                       {isApplyingDuplicateAudit
                         ? t("assets.duplicates.applying", { defaultValue: "Limpiando…" })

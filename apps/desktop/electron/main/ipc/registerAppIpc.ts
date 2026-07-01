@@ -16,6 +16,7 @@ import {
 } from "@contracts";
 import { ipcChannels } from "@contracts/ipc/channels";
 import { assertAllowedExternalUrl } from "../security/securityConfig";
+import { createAppUpdateService } from "../services/app/appUpdateService";
 import { getDesktopLogsDirectory, listRecentLogFiles } from "../services/logger";
 import type { WorkspaceAccessGuard } from "../services/auth/workspaceAccessGuard";
 import {
@@ -198,6 +199,12 @@ const setRolePermissionSchema = z.object({
   permissionId: z.string().trim().min(1),
   enabled: z.boolean(),
 });
+
+const appUpdateCheckSchema = z
+  .object({
+    force: z.boolean().optional(),
+  })
+  .optional();
 
 const assertWorkspaceRole = async (input: { workspaceId: string; roleId: string; requireCustom?: boolean }) => {
   const filters: Record<string, string> = {
@@ -590,6 +597,7 @@ export const registerAppIpc = ({
   applyRemoteFinanceBusinessRows,
   applyRemoteAutomationControlPlaneRows,
 }: RegisterAppIpcOptions) => {
+  const appUpdateService = createAppUpdateService();
   const assertWorkspaceAdminAccess = (workspaceId: string, action: string) =>
     workspaceAccess.assertWorkspaceAccess({
       workspaceId,
@@ -703,6 +711,36 @@ export const registerAppIpc = ({
     version: app.getVersion(),
     shellVersion: "Beta 1",
   }));
+  safeHandleReadWithSchema(
+    ipcChannels.app.getAppUpdateStatus,
+    emptyReadArgsSchema,
+    () => appUpdateService.getStatus(),
+    "The app could not read the update status.",
+  );
+  safeHandle(
+    ipcChannels.app.checkForAppUpdate,
+    appUpdateCheckSchema,
+    async (_event, input) => appUpdateService.checkForUpdate(input as import("@contracts").AppUpdateCheckCommand | undefined),
+    "The app could not check for updates.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.app.downloadAppUpdate,
+    emptyReadArgsSchema,
+    async () => appUpdateService.downloadUpdate(),
+    "The app could not download the update.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.app.openDownloadedAppUpdate,
+    emptyReadArgsSchema,
+    async () => appUpdateService.openDownloadedUpdate(),
+    "The app could not open the downloaded update.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.app.revealDownloadedAppUpdate,
+    emptyReadArgsSchema,
+    async () => appUpdateService.revealDownloadedUpdate(),
+    "The app could not reveal the downloaded update.",
+  );
   safeHandleReadWithSchema(ipcChannels.app.getDiagnostics, emptyReadArgsSchema, () => getDiagnosticsSnapshot());
   safeHandleReadWithSchema(ipcChannels.app.getSupportSnapshot, emptyReadArgsSchema, () => getSupportSnapshot());
   safeHandleReadWithSchema(ipcChannels.app.getUsersSnapshot, appUsersSnapshotReadArgsSchema, async (_event, query) => {

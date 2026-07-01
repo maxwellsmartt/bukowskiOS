@@ -16,17 +16,34 @@ Tener dos carriles claros:
    - stapling de artifacts
    - publicación opcional a GitHub Releases
 
-## Scripts disponibles
+## Comando oficial de publicación
 
-### Internal builds
+### Build interno
 - `corepack pnpm --filter @bukowski/desktop package:mac`
 - `corepack pnpm --filter @bukowski/desktop verify:mac-build`
 
-### Release builds
+### Publicar a GitHub Releases
 - `corepack pnpm --filter @bukowski/desktop package:mac:release`
 - `corepack pnpm --filter @bukowski/desktop release:github`
+- Alternativa equivalente dentro de `apps/desktop`: `pnpm release:github`
 
-## Variables requeridas para release signing
+## Qué hace `release:github`
+
+El script ya deja formalizado el pipeline real de publicación:
+
+1. valida entorno de packaging con `verify:package-env`
+2. limpia `dist-packaged`
+3. hace build del renderer y Electron
+4. recompila módulos nativos con `electron-rebuild`
+5. empaqueta macOS con `electron-builder`
+6. publica artifacts a GitHub Releases con `--publish always`
+
+Ese es el comando que debemos considerar la fuente de verdad para subir builds de distribución.
+
+## Prerrequisitos de release
+
+### Token de GitHub
+- `GH_TOKEN` o `GITHUB_TOKEN`
 
 ### Firma de desarrollador
 - `CSC_NAME` o `CSC_LINK`
@@ -36,16 +53,23 @@ Tener dos carriles claros:
 - `APPLE_ID`
 - `APPLE_APP_SPECIFIC_PASSWORD`
 - `APPLE_TEAM_ID`
+- `BUKOWSKI_RELEASE_SIGNING=1` para el carril firmado real
 
-### Publicación opcional
-- `GH_TOKEN` o `GITHUB_TOKEN`
+## Artifacts esperados
+
+Cuando la publicación sale bien, GitHub Releases debe mostrar por lo menos:
+
+- `.dmg`
+- `.zip`
+
+Si el release quedó publicado pero faltan esos archivos, el problema no es del botón in-app: el publish salió incompleto y hay que repetir el empaquetado.
 
 ## Comportamiento esperado
 
 ### Si no hay credenciales de developer signing
-- el hook `after-sign` usa firma ad-hoc
-- `spctl` puede fallar
-- el build sigue siendo válido para pruebas internas
+- `release:github` no es el camino recomendado
+- usa `package:mac` o `package:internal` para builds internos
+- el artifact puede servir para QA local, pero no debe asumirse listo para distribución limpia
 
 ### Si hay credenciales de developer signing
 - se desactiva el carril ad-hoc
@@ -53,6 +77,22 @@ Tener dos carriles claros:
 - `hardenedRuntime` se activa
 - `after-all-artifact-build` intenta notarizar artifacts `.dmg` y `.zip`
 - si hay notarization exitosa, intenta `staple`
+
+## Operación recomendada
+
+1. subir el cambio de versión al repo
+2. correr `corepack pnpm --filter @bukowski/desktop release:github`
+3. validar en GitHub que la release quedó publicada y no como draft accidental
+4. confirmar que el tag, el nombre visible y los assets `.dmg` / `.zip` coinciden con la versión
+5. probar al menos una descarga limpia del `.dmg`
+
+## Si no hay firma disponible
+
+Si faltan credenciales Apple o no queremos firmar todavía:
+
+- usar `package:mac` para smoke interno rápido
+- usar `package:mac:release` solo cuando el entorno de firma/notarización esté listo
+- no publicar a GitHub Releases un build que no queramos que el botón `Update` pueda ofrecer luego
 
 ## Verificación recomendada
 

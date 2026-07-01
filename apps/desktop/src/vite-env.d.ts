@@ -172,6 +172,14 @@ declare global {
   interface Window {
     bukowskiApp?: {
       getAppInfo: () => Promise<AppInfo>;
+      getAppUpdateStatus: () => Promise<import("@contracts").AppUpdateStatus>;
+      checkForAppUpdate: (
+        input?: import("@contracts").AppUpdateCheckCommand,
+      ) => Promise<import("@contracts").AppUpdateStatus>;
+      downloadAppUpdate: () => Promise<import("@contracts").AppUpdateActionResult>;
+      openDownloadedAppUpdate: () => Promise<import("@contracts").AppUpdateActionResult>;
+      revealDownloadedAppUpdate: () => Promise<import("@contracts").AppUpdateActionResult>;
+      onAppUpdateStatus: (listener: (status: import("@contracts").AppUpdateStatus) => void) => () => void;
       getDiagnostics: () => Promise<AppDiagnosticsSnapshot>;
       getSupportSnapshot: () => Promise<AppSupportSnapshot>;
       getUsersSnapshot: (query?: AppUsersSnapshotQuery) => Promise<AppUsersSnapshot>;
