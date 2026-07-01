@@ -843,6 +843,29 @@ describe("agent tool registry", () => {
     });
     const now = new Date().toISOString();
 
+    // Deterministic expense dated "now" so get_expense_breakdown's current-quarter
+    // window always finds a category. Without it the test leaned on the demo seed's
+    // fixed-date entries, which fall out of the quarter window once real time moves
+    // into the next quarter (a slow time-bomb, not true flakiness).
+    database
+      .prepare(
+        `
+          INSERT INTO financial_entries (
+            id, workspace_id, entry_type, category, amount, currency, status,
+            project_id, created_by_user_id, entry_date, created_at, updated_at
+          ) VALUES (?, ?, 'actual', 'Equipment', 1500, 'USD', 'confirmed', ?, ?, ?, ?, ?)
+        `,
+      )
+      .run(
+        "financial-entry-quarter-test",
+        "workspace-metadata",
+        "project-aurora",
+        "user-paola",
+        now.slice(0, 10),
+        now,
+        now,
+      );
+
     database
       .prepare(
         `
