@@ -8931,7 +8931,7 @@ body.is-resizing-side-rail {
     inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
-.asset-assign-kit-modal-shell > .surface-card {
+.asset-operation-modal-shell > .surface-card {
   gap: 14px;
   padding: 18px;
   border: 0;
@@ -8939,7 +8939,7 @@ body.is-resizing-side-rail {
   box-shadow: none;
 }
 
-.asset-assign-kit-modal-shell .surface-card-header {
+.asset-operation-modal-shell .surface-card-header {
   padding-bottom: 2px;
 }
 

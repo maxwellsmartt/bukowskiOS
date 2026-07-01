@@ -1194,7 +1194,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const location = useLocation();
   const { activeWorkspaceId } = useWorkspace();
   const { projects, refreshProjects } = useShellContext();
-  const { addItems, clear: clearCompareTray, replaceItems } = useCompareTray();
+  const { addItems, clear: clearCompareTray } = useCompareTray();
   const { confirm, confirmDialog } = useConfirmDialog();
   const isProjectMode = Boolean(projectId);
   const translatedSortOptions = useMemo(
@@ -1427,17 +1427,9 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     meta: asset.projectUnit && asset.projectUnit !== "—" ? t("assets.cart.unitMeta", { unit: asset.projectUnit }) : undefined,
   });
 
-  useEffect(() => {
-    if (selectedAssets.length >= 2) {
-      replaceItems(selectedAssets.map(buildAssetCompareItem));
-      return;
-    }
-
-    clearCompareTray();
-    // Keep the global compare launcher tied to the current Assets table selection.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAssets, clearCompareTray, replaceItems]);
-
+  // Compare is an explicit, accumulating action now (the "Comparar equipos" cart
+  // button and the per-row menu both add to the tray); we only clear it when
+  // leaving Assets so a stale selection doesn't linger in the global launcher.
   useEffect(() => () => clearCompareTray(), [clearCompareTray]);
 
   useEffect(() => {
@@ -1545,11 +1537,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     // Clearing the selection also empties the side rail so no stale detail lingers.
     setSelectedAssetId(null);
   };
-
-  useEffect(() => {
-    window.addEventListener("bukowski:compare-tray-clear-selection", clearOperationCart);
-    return () => window.removeEventListener("bukowski:compare-tray-clear-selection", clearOperationCart);
-  }, []);
 
   const replaceOperationCartWithAssets = (targetAssets: AssetListRow[]) => {
     setCartItemsById(
@@ -2710,24 +2697,33 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       ) : null}
 
       {actionPanelOpen && selectedRowIds.length ? (
-        <AssetAssignMovePanel
-          defaultProjectId={isProjectMode ? projectId ?? null : null}
-          departments={catalog.departments}
-          error={actionError}
-          initialAssetSelections={selectedAssetSelections}
-          isSubmitting={isSubmittingAction}
-          locations={catalog.locations}
-          onAssetSelectionsChange={updateCartSelections}
+        <ModalShell
           onClose={() => {
             setActionPanelOpen(false);
             setActionError(null);
           }}
-              onSubmit={handleAssignMove}
-              projects={projects}
-              selectedAssets={selectedAssets}
-              selectedCount={selectedRowIds.length}
-              users={catalog.users}
-            />
+          width={820}
+          className="asset-operation-modal-shell"
+        >
+          <AssetAssignMovePanel
+            defaultProjectId={isProjectMode ? projectId ?? null : null}
+            departments={catalog.departments}
+            error={actionError}
+            initialAssetSelections={selectedAssetSelections}
+            isSubmitting={isSubmittingAction}
+            locations={catalog.locations}
+            onAssetSelectionsChange={updateCartSelections}
+            onClose={() => {
+              setActionPanelOpen(false);
+              setActionError(null);
+            }}
+            onSubmit={handleAssignMove}
+            projects={projects}
+            selectedAssets={selectedAssets}
+            selectedCount={selectedRowIds.length}
+            users={catalog.users}
+          />
+        </ModalShell>
       ) : null}
 
       {kitPanelOpen && selectedRowIds.length ? (
@@ -2737,7 +2733,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             setKitError(null);
           }}
           width={760}
-          className="asset-assign-kit-modal-shell"
+          className="asset-operation-modal-shell"
         >
           <AssignToKitPanel
             error={kitError}
@@ -2760,23 +2756,32 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       ) : null}
 
       {packingPanelOpen && selectedRowIds.length ? (
-        <PackingSlipBuilderPanel
-          defaultProjectId={assignNextStep?.projectId ?? (isProjectMode ? projectId ?? null : null)}
-          departments={catalog.departments}
-          error={packingError}
-          initialAssetSelections={selectedAssetSelections}
-          isSubmitting={isSubmittingPacking}
-          onAssetSelectionsChange={updateCartSelections}
+        <ModalShell
           onClose={() => {
             setPackingPanelOpen(false);
             setPackingError(null);
           }}
-          onSubmit={handleCreatePackingSlip}
-          projects={projects}
-          selectedAssets={selectedAssets}
-          selectedCount={selectedRowIds.length}
-          users={catalog.users}
-        />
+          width={820}
+          className="asset-operation-modal-shell"
+        >
+          <PackingSlipBuilderPanel
+            defaultProjectId={assignNextStep?.projectId ?? (isProjectMode ? projectId ?? null : null)}
+            departments={catalog.departments}
+            error={packingError}
+            initialAssetSelections={selectedAssetSelections}
+            isSubmitting={isSubmittingPacking}
+            onAssetSelectionsChange={updateCartSelections}
+            onClose={() => {
+              setPackingPanelOpen(false);
+              setPackingError(null);
+            }}
+            onSubmit={handleCreatePackingSlip}
+            projects={projects}
+            selectedAssets={selectedAssets}
+            selectedCount={selectedRowIds.length}
+            users={catalog.users}
+          />
+        </ModalShell>
       ) : null}
 
       {editorMode ? (
@@ -3571,20 +3576,18 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
         {selectedAssets.length || activeAsset ? (
           <div className={`asset-side-rail${selectedAssets.length > 1 ? " is-selection-mode" : ""}`}>
-            <div className="asset-side-rail-context">
-              <span>{selectedAssets.length ? t("assets.sideRail.selection") : t("assets.sideRail.preview")}</span>
-              <strong>
-                {selectedAssets.length
-                  ? t("assets.sideRail.selectionCount", { count: selectedAssets.length })
-                  : activeAsset?.code ?? ""}
-              </strong>
-            </div>
             <AssetOperationCart
               items={selectedAssets}
               kitLockTooltip={selectedKitLockTooltip}
-              onAddToCompare={() =>
-                replaceItems(selectedAssets.map(buildAssetCompareItem))
-              }
+              onAddToCompare={() => {
+                addItems(selectedAssets.map(buildAssetCompareItem));
+                toast.info(
+                  t("assets.cart.compareAddedTitle", { defaultValue: "Comparar equipos" }),
+                  t("assets.cart.compareAddedBody", {
+                    defaultValue: "Añadidos a la bandeja de comparación — ábrela abajo para verlos lado a lado.",
+                  }),
+                );
+              }}
               onClear={clearOperationCart}
               onCreatePackingSlip={() => {
                 setPackingPanelOpen(true);
