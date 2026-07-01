@@ -26,6 +26,7 @@ const targets: Record<string, TombstoneTarget> = {
   production_companies: { table: "production_companies", idColumn: "id", freshnessColumn: "updated_at", outboxEntityType: "production_company" },
   crew_members: { table: "crew_members", idColumn: "id", freshnessColumn: "updated_at", outboxEntityType: "crew" },
   departments: { table: "departments", idColumn: "id", freshnessColumn: "created_at", outboxEntityType: "department" },
+  kits: { table: "kits", idColumn: "id", freshnessColumn: "updated_at", outboxEntityType: "kit" },
   bank_accounts: { table: "bank_accounts", idColumn: "id", freshnessColumn: "updated_at", outboxEntityType: "bank_account" },
   bank_statement_imports: { table: "bank_statement_imports", idColumn: "id", freshnessColumn: "created_at", outboxEntityType: "bank_statement_import", parentTable: "bank_accounts" },
   bank_transactions: { table: "bank_transactions", idColumn: "id", freshnessColumn: "created_at", outboxEntityType: "bank_transaction", parentTable: "bank_accounts" },
