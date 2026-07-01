@@ -432,18 +432,35 @@ type SectionTransitionLoaderProps = {
   detail: string;
 };
 
-const SectionTransitionLoader = ({ detail }: SectionTransitionLoaderProps) => (
-  <div aria-live="polite" className="shell-transition-loader" role="status">
-    <div aria-hidden="true" className="shell-transition-loader-aura">
-      <span className="shell-transition-loader-orb shell-transition-loader-orb-primary" />
-      <span className="shell-transition-loader-orb shell-transition-loader-orb-secondary" />
-      <span className="shell-transition-loader-orb shell-transition-loader-orb-tertiary" />
-      <span className="shell-transition-loader-core" />
+const SectionTransitionLoader = ({ detail }: SectionTransitionLoaderProps) => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    setIsVisible(false);
+    const timer = window.setTimeout(() => setIsVisible(true), 140);
+    return () => window.clearTimeout(timer);
+  }, [detail]);
+
+  return (
+    <div
+      aria-busy="true"
+      aria-live="polite"
+      className={`shell-transition-loader${isVisible ? " is-visible" : ""}`}
+      role="status"
+    >
+      <div className="shell-transition-loader-stage">
+        <div aria-hidden="true" className="shell-transition-loader-aura">
+          <span className="shell-transition-loader-orb shell-transition-loader-orb-primary" />
+          <span className="shell-transition-loader-orb shell-transition-loader-orb-secondary" />
+          <span className="shell-transition-loader-orb shell-transition-loader-orb-tertiary" />
+          <span className="shell-transition-loader-core" />
+        </div>
+        <div className="shell-transition-loader-copy">
+          <span className="shell-transition-loader-title">Preparing section</span>
+          <span className="shell-transition-loader-detail">{detail}</span>
+        </div>
+      </div>
+      <span className="sr-only">{detail}</span>
     </div>
-    <div className="shell-transition-loader-copy">
-      <span className="shell-transition-loader-title">Preparing section</span>
-      <span className="shell-transition-loader-detail">{detail}</span>
-    </div>
-    <span className="sr-only">{detail}</span>
-  </div>
-);
+  );
+};
