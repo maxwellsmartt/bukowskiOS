@@ -139,12 +139,6 @@ export const KitsPage = () => {
         })}
       />
 
-      <div className="action-feedback action-feedback-info kits-local-notice">
-        {t("assets.kits.localNotice", {
-          defaultValue: "Los kits se guardan en esta computadora y aún no se sincronizan entre máquinas.",
-        })}
-      </div>
-
       {checkoutKit ? (
         <KitCheckoutPanel
           kitName={checkoutKit.name}

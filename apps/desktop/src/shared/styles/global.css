@@ -8851,16 +8851,27 @@ body.is-resizing-side-rail {
 }
 
 .asset-quick-preview-card .asset-preview-image-strip {
-  flex: 1 1 160px;
+  /* Desired size as the flex-basis, but min-height:0 lets it shrink below that
+     when the rail is short so the action buttons below never get clipped. On a
+     tall screen it grows back to the basis. */
+  flex: 1 1 clamp(72px, 22vh, 240px);
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  min-height: clamp(132px, 24vh, 260px);
+  min-height: 0;
   margin-top: 6px;
 }
 
 .asset-quick-preview-card .asset-preview-image-empty {
   grid-column: 1 / -1;
-  min-height: 100%;
+  min-height: 0;
   padding: 14px;
+}
+
+/* Members of the strip inherit the base 112px floor; drop it inside the rail so
+   real image thumbnails shrink with the strip instead of pushing the actions
+   off-screen. object-fit keeps them undistorted. */
+.asset-quick-preview-card .asset-preview-image-card,
+.asset-quick-preview-card .asset-preview-image-card img {
+  min-height: 0;
 }
 
 .asset-quick-preview-card .asset-quick-preview-actions {
@@ -8870,6 +8881,7 @@ body.is-resizing-side-rail {
   justify-content: stretch;
   gap: 6px;
   width: 100%;
+  flex-shrink: 0;
 }
 
 .asset-quick-preview-card .asset-quick-preview-actions > button {
