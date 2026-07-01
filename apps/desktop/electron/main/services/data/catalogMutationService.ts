@@ -388,6 +388,7 @@ const SYNCED_CATALOG_ENTITIES = new Set([
   "production_company",
   "crew",
   "department",
+  "kit",
 ]);
 
 export const createCatalogMutationService = (db: DatabaseSync) => {
@@ -491,6 +492,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
         if (!result.changes) {
           throw new Error("Kit not found.");
         }
+        enqueueCatalogOutbox(input.workspaceId, "kit", input.id, "delete");
         break;
       }
     }
@@ -717,6 +719,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               entityId: kitId,
               preferredCodeValue: `KIT-${code}`,
             });
+            enqueueCatalogOutbox(workspaceId, "kit", kitId, "upsert");
             break;
           }
         }
@@ -952,6 +955,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               entityId: input.id,
               preferredCodeValue: `KIT-${code}`,
             });
+            enqueueCatalogOutbox(workspaceId, "kit", input.id, "upsert");
             break;
           }
         }

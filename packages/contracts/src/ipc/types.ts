@@ -334,6 +334,40 @@ export type AppApplyRemoteCatalogRowsResult = {
   cursorAfter: string | null;
 };
 
+export type AppRemoteKitRow = {
+  id: string;
+  workspace_id: string;
+  code?: string | null;
+  name?: string | null;
+  description?: string | null;
+  notes?: string | null;
+  is_active?: boolean | number | null;
+  created_at?: string | null;
+  updated_at: string;
+};
+
+export type AppRemoteKitAssetRow = {
+  kit_id: string;
+  asset_id: string;
+  quantity?: number | null;
+  added_at?: string | null;
+};
+
+export type AppApplyRemoteKitsCommand = {
+  workspaceId: string;
+  kits: AppRemoteKitRow[];
+  members: AppRemoteKitAssetRow[];
+};
+
+export type AppApplyRemoteKitsResult = {
+  workspaceId: string;
+  appliedCount: number;
+  skippedDueToOutboxCount: number;
+  skippedDueToOlderCount: number;
+  errors: string[];
+  cursorAfter: string | null;
+};
+
 export type AppRemoteSyncTombstone = {
   workspace_id: string;
   table_name: string;

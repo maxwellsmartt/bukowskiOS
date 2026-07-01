@@ -47,6 +47,7 @@ export const ipcChannels = {
     resetDocumentsRoot: "bukowskiApp:resetDocumentsRoot",
     reportRuntimeError: "bukowskiApp:reportRuntimeError",
     applyRemoteCatalogRows: "bukowskiApp:applyRemoteCatalogRows",
+    applyRemoteKits: "bukowskiApp:applyRemoteKits",
     applyRemoteSyncTombstones: "bukowskiApp:applyRemoteSyncTombstones",
     applyRemoteExchangeRates: "bukowskiApp:applyRemoteExchangeRates",
     applyRemoteAssetSnapshots: "bukowskiApp:applyRemoteAssetSnapshots",

@@ -3,6 +3,8 @@ import { useEffect, useRef } from "react";
 import type {
   AppRemoteCatalogRow,
   AppRemoteExchangeRateRow,
+  AppRemoteKitAssetRow,
+  AppRemoteKitRow,
   CatalogPullEntityType,
 } from "@contracts";
 import { useSession } from "@app/providers/SessionProvider";
@@ -45,6 +47,8 @@ const entityTables: CatalogPullEntityType[] = [
 ];
 const RATES_CURSOR_KEY = (workspaceId: string) =>
   `bukowski:catalog-pull-cursor:${workspaceId}:exchange_rates:v2`;
+const KITS_CURSOR_KEY = (workspaceId: string) =>
+  `bukowski:catalog-pull-cursor:${workspaceId}:kits:v2`;
 
 const errorLogger = {
   warn: (label: string, error: unknown) => {
@@ -157,6 +161,56 @@ export const useCatalogPull = () => {
               if (nextCursor) writeCompositePullCursor(ratesCursorKey, nextCursor);
             }
             if (result.appliedCount > 0) appliedAny = true;
+          }
+        }
+
+        // Kits pull. A kit's updated_at bumps whenever its membership changes
+        // (replaceKitAssets), so the parent cursor catches member edits too; we
+        // re-fetch the full member set and the main process reconciles wholesale.
+        if (window.bukowskiApp?.applyRemoteKits) {
+          const kitsCursorKey = KITS_CURSOR_KEY(activeWorkspaceId);
+          const kitsCursor = readCompositePullCursor(kitsCursorKey);
+          let kitsQuery = (supabase as any)
+            .from("kits")
+            .select("*")
+            .eq("workspace_id", activeWorkspaceId)
+            .order("updated_at", { ascending: true })
+            .order("id", { ascending: true })
+            .limit(PULL_BATCH_SIZE);
+          kitsQuery = applyCompositePullCursor(kitsQuery, kitsCursor, "updated_at", "id");
+
+          const { data: kitRows, error: kitsError } = await kitsQuery;
+          if (kitsError) {
+            // PGRST205 = remote kits table not migrated yet; degrade quietly.
+            if ((kitsError as { code?: string }).code !== "PGRST205") {
+              errorLogger.warn("Kit pull failed", kitsError);
+            }
+          } else if (kitRows && kitRows.length > 0) {
+            const kits: AppRemoteKitRow[] = kitRows.map((row: unknown) => row as AppRemoteKitRow);
+            const kitIds = kits.map((kit) => kit.id);
+            const { data: memberRows, error: membersError } = await (supabase as any)
+              .from("kit_assets")
+              .select("*")
+              .in("kit_id", kitIds);
+            if (membersError) {
+              errorLogger.warn("Kit member pull failed", membersError);
+            } else {
+              const members = (memberRows ?? []).map((row: unknown) => row as AppRemoteKitAssetRow);
+              const result = await window.bukowskiApp.applyRemoteKits({
+                workspaceId: activeWorkspaceId,
+                kits,
+                members,
+              });
+              if (canAdvanceCompositePullCursor(result)) {
+                const nextCursor = cursorFromRow(
+                  kits[kits.length - 1] as unknown as Record<string, unknown>,
+                  "updated_at",
+                  "id",
+                );
+                if (nextCursor) writeCompositePullCursor(kitsCursorKey, nextCursor);
+              }
+              if (result.appliedCount > 0) appliedAny = true;
+            }
           }
         }
 

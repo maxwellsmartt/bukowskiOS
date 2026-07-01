@@ -51,6 +51,7 @@ import { applyAdminFoundationMigration, bootstrapAdminFoundation, getWorkspaceRo
 import { createCatalogMutationService } from "./catalogMutationService";
 import { createAutomationControlPlanePullService } from "./automationControlPlanePullService";
 import { createCatalogPullService } from "./catalogPullService";
+import { createKitPullService } from "./kitPullService";
 import { applyFinancialEntryLocally, createFinancialDomainPullService } from "./financialDomainPullService";
 import { createSyncConflictService } from "./syncConflictService";
 import { applyConnectorFoundationMigration, bootstrapConnectorFoundation } from "./connectorFoundationBootstrap";
@@ -256,6 +257,9 @@ type LocalDatabaseRuntime = {
   applyRemoteCatalogRows: (
     input: import("@contracts").AppApplyRemoteCatalogRowsCommand,
   ) => import("@contracts").AppApplyRemoteCatalogRowsResult;
+  applyRemoteKits: (
+    input: import("@contracts").AppApplyRemoteKitsCommand,
+  ) => import("@contracts").AppApplyRemoteKitsResult;
   applyRemoteSyncTombstones: (
     input: import("@contracts").AppApplyRemoteSyncTombstonesCommand,
   ) => import("@contracts").AppApplyRemoteSyncTombstonesResult;
@@ -1528,6 +1532,22 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         const rows = selectAll("SELECT * FROM departments WHERE id = ?", row.entity_id);
         return rows.length ? [{ table: "departments", onConflict: "id", rows }] : [];
       }
+      case "kit": {
+        // Aggregate: the kit row plus its full member list. kit_assets is
+        // reconciled wholesale (deleteBeforeInsert) so removed members vanish
+        // remotely, mirroring replaceKitAssets on the local side.
+        const kits = selectAll("SELECT * FROM kits WHERE id = ?", row.entity_id);
+        if (!kits.length) return []; // deleted locally — nothing to materialize
+        const members = selectAll("SELECT * FROM kit_assets WHERE kit_id = ?", row.entity_id);
+        const upserts: SupabaseDomainUpsert[] = [{ table: "kits", onConflict: "id", rows: kits }];
+        upserts.push({
+          table: "kit_assets",
+          onConflict: "kit_id,asset_id",
+          rows: members,
+          deleteBeforeInsert: { column: "kit_id", value: row.entity_id },
+        });
+        return upserts;
+      }
       case "quote": {
         const quotes = selectAll("SELECT * FROM quotes WHERE id = ?", row.entity_id).map((r) =>
           parseJsonColumn(nullNonUuid(r, ["created_by_user_id", "updated_by_user_id"]), ["exchange_rate_snapshot_json"]),
@@ -1771,6 +1791,11 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         return [{ table: "crew_members", filters: [{ column: "id", value: row.entity_id }] }];
       case "department":
         return [{ table: "departments", filters: [{ column: "id", value: row.entity_id }] }];
+      case "kit":
+        return [
+          { table: "kit_assets", filters: [{ column: "kit_id", value: row.entity_id }] },
+          { table: "kits", filters: [{ column: "id", value: row.entity_id }] },
+        ];
       default:
         return null;
     }
@@ -2536,6 +2561,9 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     rmaMutations,
     applyRemoteCatalogRows: (input: import("@contracts").AppApplyRemoteCatalogRowsCommand) =>
       createCatalogPullService(database).applyRemoteRows(input.workspaceId, input.entityType, input.rows),
+
+    applyRemoteKits: (input: import("@contracts").AppApplyRemoteKitsCommand) =>
+      createKitPullService(database).applyRemoteKits(input.workspaceId, input.kits, input.members),
     applyRemoteSyncTombstones: (input: import("@contracts").AppApplyRemoteSyncTombstonesCommand) =>
       createSyncTombstonePullService(database).apply(input.workspaceId, input.rows),
     applyRemoteExchangeRates: (input: import("@contracts").AppApplyRemoteExchangeRatesCommand) => {

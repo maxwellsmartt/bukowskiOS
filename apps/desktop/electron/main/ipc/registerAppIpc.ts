@@ -68,6 +68,9 @@ type RegisterAppIpcOptions = {
   applyRemoteCatalogRows: (
     input: import("@contracts").AppApplyRemoteCatalogRowsCommand,
   ) => import("@contracts").AppApplyRemoteCatalogRowsResult;
+  applyRemoteKits: (
+    input: import("@contracts").AppApplyRemoteKitsCommand,
+  ) => import("@contracts").AppApplyRemoteKitsResult;
   applyRemoteSyncTombstones: (
     input: import("@contracts").AppApplyRemoteSyncTombstonesCommand,
   ) => import("@contracts").AppApplyRemoteSyncTombstonesResult;
@@ -253,6 +256,31 @@ const applyRemoteCatalogRowsSchema = z.object({
       default_weekly_rate: z.number().nullable().optional(),
       default_overtime_rate: z.number().nullable().optional(),
       rate_currency: z.string().nullable().optional(),
+    }),
+  ),
+});
+
+const applyRemoteKitsSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  kits: z.array(
+    z.object({
+      id: z.string().trim().min(1),
+      workspace_id: z.string().trim().min(1),
+      code: z.string().nullable().optional(),
+      name: z.string().nullable().optional(),
+      description: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+      is_active: z.union([z.boolean(), z.number()]).nullable().optional(),
+      created_at: z.string().nullable().optional(),
+      updated_at: z.string().min(1),
+    }),
+  ),
+  members: z.array(
+    z.object({
+      kit_id: z.string().trim().min(1),
+      asset_id: z.string().trim().min(1),
+      quantity: z.number().nullable().optional(),
+      added_at: z.string().nullable().optional(),
     }),
   ),
 });
@@ -459,6 +487,15 @@ const localWorkspacesReadArgsSchema = z.object({
   userId: z.string().trim().nullable().optional(),
 }).optional();
 
+type RemoteWorkspaceMembershipCacheRow = {
+  workspace_id?: string;
+  roles?: {
+    key?: string | null;
+    name?: string | null;
+    role_permissions?: Array<{ permissions?: { key?: string | null } | null }> | null;
+  } | null;
+};
+
 const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) => {
   const { canceled, filePath } = await dialog.showSaveDialog({
     title: "Export BukowskiOS data",
@@ -542,6 +579,7 @@ export const registerAppIpc = ({
   exportRecentLogs,
   exportSupportBundle,
   applyRemoteCatalogRows,
+  applyRemoteKits,
   applyRemoteSyncTombstones,
   applyRemoteExchangeRates,
   applyRemoteAssetSnapshots,
@@ -558,6 +596,12 @@ export const registerAppIpc = ({
       action,
       accessLevel: "write",
       requiredPermission: "users.invite",
+    });
+  const assertWorkspaceReadAccess = (workspaceId: string, action: string) =>
+    workspaceAccess.assertWorkspaceAccess({
+      workspaceId,
+      action,
+      accessLevel: "read",
     });
   // Sensitive app-level access (sync internals, backups, exports) requires the
   // user to be an admin. Granting requires passing the admin check for at least
@@ -591,6 +635,65 @@ export const registerAppIpc = ({
     }
 
     throw lastError ?? new Error(`You do not have access to ${action}.`);
+  };
+
+  const sanitizeEnsureLocalWorkspacesInput = async (
+    workspaces: z.infer<typeof ensureLocalWorkspacesSchema>,
+  ): Promise<z.infer<typeof ensureLocalWorkspacesSchema>> => {
+    if (!workspaces.length) {
+      return [];
+    }
+
+    const currentUserId = await getFreshStoredUserId();
+    const workspaceIds = Array.from(
+      new Set(
+        workspaces
+          .map((workspace) => workspace.id.trim())
+          .filter(Boolean),
+      ),
+    );
+
+    const membershipQuery = buildSupabaseRestQuery(
+      {
+        user_id: `eq.${currentUserId}`,
+        status: "eq.active",
+        workspace_id: `in.(${workspaceIds.join(",")})`,
+      },
+      "workspace_id,roles!workspace_memberships_workspace_role_fk(key,name,role_permissions(permissions(key)))",
+    );
+    const remoteMemberships = await requestSupabaseRest<RemoteWorkspaceMembershipCacheRow[]>({
+      table: "workspace_memberships",
+      query: membershipQuery,
+    });
+    const membershipByWorkspaceId = new Map(
+      remoteMemberships
+        .filter((membership): membership is RemoteWorkspaceMembershipCacheRow & { workspace_id: string } => Boolean(membership.workspace_id))
+        .map((membership) => [membership.workspace_id, membership]),
+    );
+
+    return workspaces.map((workspace) => {
+      const remoteMembership = membershipByWorkspaceId.get(workspace.id);
+      if (!remoteMembership) {
+        throw new Error("A workspace could not be verified for the signed-in user.");
+      }
+
+      const permissionKeys = Array.from(
+        new Set(
+          (remoteMembership.roles?.role_permissions ?? [])
+            .map((entry) => entry?.permissions?.key)
+            .filter((key): key is string => typeof key === "string" && key.trim().length > 0),
+        ),
+      );
+
+      return {
+        ...workspace,
+        userId: currentUserId,
+        userEmail: workspace.userEmail,
+        roleKey: remoteMembership.roles?.key?.trim() || null,
+        roleName: remoteMembership.roles?.name?.trim() || null,
+        permissions: permissionKeys,
+      };
+    });
   };
 
   safeHandleReadWithSchema(ipcChannels.app.getInfo, emptyReadArgsSchema, () => ({
@@ -692,9 +795,9 @@ export const registerAppIpc = ({
   safeHandle(
     ipcChannels.app.ensureLocalWorkspaces,
     ensureLocalWorkspacesSchema,
-    (_event, input) => ({
+    async (_event, input) => ({
       summary: "Remote workspaces cached locally.",
-      diagnostics: ensureLocalWorkspaces(input),
+      diagnostics: ensureLocalWorkspaces(await sanitizeEnsureLocalWorkspacesInput(input)),
     }),
     "The app could not cache remote workspaces locally.",
   );
@@ -1235,69 +1338,100 @@ export const registerAppIpc = ({
   safeHandle(
     ipcChannels.app.applyRemoteCatalogRows,
     applyRemoteCatalogRowsSchema,
-    (_event, input) => applyRemoteCatalogRows(input),
+    async (_event, input) => {
+      await assertWorkspaceReadAccess(input.workspaceId, "apply remote catalog updates");
+      return applyRemoteCatalogRows(input);
+    },
     "The app could not apply remote catalog updates.",
+  );
+  safeHandle(
+    ipcChannels.app.applyRemoteKits,
+    applyRemoteKitsSchema,
+    async (_event, input) => {
+      await assertWorkspaceReadAccess(input.workspaceId, "apply remote kit updates");
+      return applyRemoteKits(input as import("@contracts").AppApplyRemoteKitsCommand);
+    },
+    "The app could not apply remote kit updates.",
   );
   safeHandle(
     ipcChannels.app.applyRemoteSyncTombstones,
     applyRemoteSyncTombstonesSchema,
-    (_event, input) =>
-      applyRemoteSyncTombstones(input as import("@contracts").AppApplyRemoteSyncTombstonesCommand),
+    async (_event, input) => {
+      await assertWorkspaceReadAccess(input.workspaceId, "apply remote deletion markers");
+      return applyRemoteSyncTombstones(input as import("@contracts").AppApplyRemoteSyncTombstonesCommand);
+    },
     "The app could not apply remote deletion markers.",
   );
   safeHandle(
     ipcChannels.app.applyRemoteExchangeRates,
     applyRemoteExchangeRatesSchema,
-    (_event, input) =>
-      applyRemoteExchangeRates(input as import("@contracts").AppApplyRemoteExchangeRatesCommand),
+    async (_event, input) => {
+      await assertWorkspaceReadAccess(input.workspaceId, "apply remote exchange rates");
+      return applyRemoteExchangeRates(input as import("@contracts").AppApplyRemoteExchangeRatesCommand);
+    },
     "The app could not apply remote exchange rates.",
   );
   safeHandle(
     ipcChannels.app.applyRemoteAssetSnapshots,
     applyRemoteAssetSnapshotsSchema,
-    (_event, input) =>
-      applyRemoteAssetSnapshots(input as import("@contracts").AppApplyRemoteAssetSnapshotsCommand),
+    async (_event, input) => {
+      await assertWorkspaceReadAccess(input.workspaceId, "apply remote asset snapshots");
+      return applyRemoteAssetSnapshots(input as import("@contracts").AppApplyRemoteAssetSnapshotsCommand);
+    },
     "The app could not apply remote asset snapshots.",
   );
   safeHandle(
     ipcChannels.app.applyRemoteOperationalSnapshots,
     applyRemoteOperationalSnapshotsSchema,
-    (_event, input) =>
-      applyRemoteOperationalSnapshots(input as import("@contracts").AppApplyRemoteOperationalSnapshotsCommand),
+    async (_event, input) => {
+      await assertWorkspaceReadAccess(input.workspaceId, "apply remote operational snapshots");
+      return applyRemoteOperationalSnapshots(input as import("@contracts").AppApplyRemoteOperationalSnapshotsCommand);
+    },
     "The app could not apply remote operational snapshots.",
   );
   safeHandle(
     ipcChannels.app.applyRemoteWorkspaceFiles,
     applyRemoteWorkspaceFilesSchema,
-    (_event, input) =>
-      applyRemoteWorkspaceFiles(input as import("@contracts").AppApplyRemoteWorkspaceFilesCommand),
+    async (_event, input) => {
+      await assertWorkspaceReadAccess(input.workspaceId, "apply remote workspace files");
+      return applyRemoteWorkspaceFiles(input as import("@contracts").AppApplyRemoteWorkspaceFilesCommand);
+    },
     "The app could not apply remote workspace files.",
   );
   safeHandle(
     ipcChannels.app.applyRemoteTreasuryRows,
     applyRemoteTreasuryRowsSchema,
-    (_event, input) => applyRemoteTreasuryRows(input as import("@contracts").AppApplyRemoteTreasuryRowsCommand),
+    async (_event, input) => {
+      await assertWorkspaceReadAccess(input.workspaceId, "apply remote treasury rows");
+      return applyRemoteTreasuryRows(input as import("@contracts").AppApplyRemoteTreasuryRowsCommand);
+    },
     "The app could not apply remote treasury rows.",
   );
   safeHandle(
     ipcChannels.app.applyRemoteCollaboratorPaymentRows,
     applyRemoteCollaboratorPaymentRowsSchema,
-    (_event, input) =>
-      applyRemoteCollaboratorPaymentRows(input as import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand),
+    async (_event, input) => {
+      await assertWorkspaceReadAccess(input.workspaceId, "apply remote collaborator payment rows");
+      return applyRemoteCollaboratorPaymentRows(input as import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand);
+    },
     "The app could not apply remote collaborator payment rows.",
   );
   safeHandle(
     ipcChannels.app.applyRemoteFinanceBusinessRows,
     applyRemoteFinanceBusinessRowsSchema,
-    (_event, input) =>
-      applyRemoteFinanceBusinessRows(input as import("@contracts").AppApplyRemoteFinanceBusinessRowsCommand),
+    async (_event, input) => {
+      await assertWorkspaceReadAccess(input.workspaceId, "apply remote finance rows");
+      return applyRemoteFinanceBusinessRows(input as import("@contracts").AppApplyRemoteFinanceBusinessRowsCommand);
+    },
     "The app could not apply remote finance business rows.",
   );
   safeHandle(
     ipcChannels.app.applyRemoteAutomationControlPlaneRows,
     applyRemoteAutomationControlPlaneRowsSchema,
-    (_event, input) =>
-      applyRemoteAutomationControlPlaneRows(input as import("@contracts").AppApplyRemoteAutomationControlPlaneRowsCommand),
+    async (_event, input) => {
+      await assertWorkspaceReadAccess(input.workspaceId, "apply remote automation updates");
+      return applyRemoteAutomationControlPlaneRows(input as import("@contracts").AppApplyRemoteAutomationControlPlaneRowsCommand);
+    },
     "The app could not apply remote automation control plane rows.",
   );
 };

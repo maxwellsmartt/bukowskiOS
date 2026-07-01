@@ -40,6 +40,8 @@ import type {
   AppApplyRemoteWorkspaceFilesResult,
   AppApplyRemoteCatalogRowsCommand,
   AppApplyRemoteCatalogRowsResult,
+  AppApplyRemoteKitsCommand,
+  AppApplyRemoteKitsResult,
   AppApplyRemoteSyncTombstonesCommand,
   AppApplyRemoteSyncTombstonesResult,
   AppApplyRemoteTreasuryRowsCommand,
@@ -323,6 +325,8 @@ const bukowskiApp = {
     }>,
   applyRemoteCatalogRows: (input: AppApplyRemoteCatalogRowsCommand) =>
     ipcRenderer.invoke(ipcChannels.app.applyRemoteCatalogRows, input) as Promise<AppApplyRemoteCatalogRowsResult>,
+  applyRemoteKits: (input: AppApplyRemoteKitsCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.applyRemoteKits, input) as Promise<AppApplyRemoteKitsResult>,
   applyRemoteSyncTombstones: (input: AppApplyRemoteSyncTombstonesCommand) =>
     ipcRenderer.invoke(ipcChannels.app.applyRemoteSyncTombstones, input) as Promise<AppApplyRemoteSyncTombstonesResult>,
   applyRemoteExchangeRates: (input: import("@contracts").AppApplyRemoteExchangeRatesCommand) =>
