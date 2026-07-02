@@ -108,7 +108,36 @@ Si faltan credenciales Apple o no queremos firmar todavía:
    - abrir la app
    - verificar que SQLite, preload y arranque funcionan
 
+## Prueba completa del updater in-app
+
+Para validar el flujo sin depender de una release real en GitHub, usa el smoke E2E local:
+
+```bash
+VITE_BUKOWSKI_E2E_LOCAL_AUTH=1 corepack pnpm --filter @bukowski/desktop build
+corepack pnpm --filter @bukowski/desktop exec playwright test -c playwright.electron.config.ts e2e/smoke/app-update.spec.ts
+```
+
+Qué cubre esta prueba:
+
+- levanta un servidor local que simula GitHub Releases
+- fuerza una versión actual menor con `BUKOWSKI_UPDATE_CURRENT_VERSION`
+- apunta el updater a `BUKOWSKI_UPDATE_RELEASES_URL`
+- descarga un `.dmg` falso hacia `BUKOWSKI_UPDATE_DOWNLOADS_DIR`
+- valida que aparece el botón `Update`
+- valida que el modal muestra progreso y llega a `Descarga completada`
+- valida que el archivo final existe y tiene el tamaño esperado
+- fuerza auth local con `VITE_BUKOWSKI_E2E_LOCAL_AUTH=1` para que el smoke no dependa de Supabase ni de una sesión real
+
+Estos overrides son solo para pruebas:
+
+- `BUKOWSKI_UPDATE_RELEASES_URL`: URL REST compatible con GitHub Releases
+- `BUKOWSKI_UPDATE_RELEASE_PAGE_URL`: fallback opcional para abrir la página de release
+- `BUKOWSKI_UPDATE_CURRENT_VERSION`: versión actual simulada
+- `BUKOWSKI_UPDATE_DOWNLOADS_DIR`: carpeta temporal donde guardar el instalador
+
+En producción, si estas variables no existen, el app usa GitHub Releases reales y `app.getPath("downloads")`.
+
 ## Riesgos abiertos
 - Sin credenciales Apple reales no podemos validar notarization end-to-end desde este repo.
 - El flujo de GitHub Releases queda listo a nivel de config, pero requiere token y disciplina de versionado/tagging.
-- `auto-update` todavía no está activado en runtime; este documento deja la base de build/publicación, no el updater completo.
+- El updater in-app descarga el `.dmg`, pero no ejecuta auto-instalación. Esa decisión es intencional para mantener el flujo simple y auditable.

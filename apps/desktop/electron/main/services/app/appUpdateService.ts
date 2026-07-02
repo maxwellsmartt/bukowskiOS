@@ -20,8 +20,8 @@ import {
 
 const logger = getDesktopLogger("app-update-service");
 
-const RELEASES_API_URL = "https://api.github.com/repos/maxwellsmartt/bukowskiOS/releases?per_page=10";
-const RELEASES_PAGE_URL = "https://github.com/maxwellsmartt/bukowskiOS/releases/latest";
+const DEFAULT_RELEASES_API_URL = "https://api.github.com/repos/maxwellsmartt/bukowskiOS/releases?per_page=10";
+const DEFAULT_RELEASES_PAGE_URL = "https://github.com/maxwellsmartt/bukowskiOS/releases/latest";
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const FAILURE_RETRY_MS = 60 * 60 * 1000;
 
@@ -66,6 +66,19 @@ const createBaseStatus = (currentVersion: string): AppUpdateStatus => ({
   errorMessage: null,
 });
 
+const readEnvOverride = (key: string) => {
+  const value = process.env[key]?.trim();
+  return value && value.length > 0 ? value : null;
+};
+
+const getCurrentAppVersion = () => readEnvOverride("BUKOWSKI_UPDATE_CURRENT_VERSION") ?? app.getVersion();
+
+const getReleasesApiUrl = () => readEnvOverride("BUKOWSKI_UPDATE_RELEASES_URL") ?? DEFAULT_RELEASES_API_URL;
+
+const getReleasesPageUrl = () => readEnvOverride("BUKOWSKI_UPDATE_RELEASE_PAGE_URL") ?? DEFAULT_RELEASES_PAGE_URL;
+
+const getDownloadsRoot = () => readEnvOverride("BUKOWSKI_UPDATE_DOWNLOADS_DIR") ?? app.getPath("downloads");
+
 const summarizeDownloadProgress = (bytesReceived: number, bytesTotal: number | null) => {
   if (!bytesTotal || bytesTotal <= 0) {
     return null;
@@ -76,7 +89,7 @@ const summarizeDownloadProgress = (bytesReceived: number, bytesTotal: number | n
 const isSafeDownloadedFile = (candidatePath: string | null) => {
   if (!candidatePath) return false;
   try {
-    const downloadsRoot = app.getPath("downloads");
+    const downloadsRoot = getDownloadsRoot();
     const safePath = assertPathWithinRoot(candidatePath, downloadsRoot);
     return fs.existsSync(safePath);
   } catch {
@@ -154,7 +167,7 @@ const readJsonFile = (filePath: string) => {
 };
 
 export const createAppUpdateService = () => {
-  const currentVersion = app.getVersion();
+  const currentVersion = getCurrentAppVersion();
   const persistenceFile = path.join(app.getPath("userData"), "app-update-status.json");
   let persistedStatus = sanitizePersistedStatus(readJsonFile(persistenceFile), currentVersion);
   let status: AppUpdateStatus = persistedStatus
@@ -282,7 +295,7 @@ export const createAppUpdateService = () => {
     });
 
     try {
-      const response = await fetch(RELEASES_API_URL, {
+      const response = await fetch(getReleasesApiUrl(), {
         headers: {
           Accept: "application/vnd.github+json",
           "User-Agent": "bukowskiOS Desktop",
@@ -294,7 +307,7 @@ export const createAppUpdateService = () => {
       }
 
       const releases = (await response.json()) as GithubRelease[];
-      return applyCandidateStatus(selectMajorReleaseCandidate(releases, currentVersion, process.arch, RELEASES_PAGE_URL));
+      return applyCandidateStatus(selectMajorReleaseCandidate(releases, currentVersion, process.arch, getReleasesPageUrl()));
     } catch (error) {
       logger.warn("App update check failed.", { error: String(error) });
       const checkedAt = new Date().toISOString();
@@ -312,7 +325,7 @@ export const createAppUpdateService = () => {
     if (!status.downloadedPath) {
       throw new Error("No hay un instalador descargado todavía.");
     }
-    const downloadsRoot = app.getPath("downloads");
+    const downloadsRoot = getDownloadsRoot();
     const safePath = assertPathWithinRoot(status.downloadedPath, downloadsRoot);
     if (!fs.existsSync(safePath)) {
       throw new Error("El instalador descargado ya no existe en Downloads.");
@@ -333,7 +346,7 @@ export const createAppUpdateService = () => {
         throw new Error("No hay un update descargable disponible ahora mismo.");
       }
 
-      const downloadsRoot = app.getPath("downloads");
+      const downloadsRoot = getDownloadsRoot();
       fs.mkdirSync(downloadsRoot, { recursive: true });
       const finalPath = assertPathWithinRoot(path.join(downloadsRoot, path.basename(status.assetName)), downloadsRoot);
       const tempPath = assertPathWithinRoot(`${finalPath}.download`, downloadsRoot);

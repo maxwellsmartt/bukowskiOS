@@ -78,6 +78,10 @@ const toSessionUser = (
 };
 
 const createSupabaseClientsFromEnv = () => {
+  if (import.meta.env.VITE_BUKOWSKI_E2E_LOCAL_AUTH === "1") {
+    return null;
+  }
+
   try {
     const env = resolveBukowskiSupabaseEnv(import.meta.env);
     return {

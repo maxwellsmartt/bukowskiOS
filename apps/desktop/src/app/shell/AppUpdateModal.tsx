@@ -1,6 +1,8 @@
-import { CheckCircle2, Download, ExternalLink, FolderOpen, RefreshCw, XCircle } from "lucide-react";
+import { Download, ExternalLink, FolderOpen, RefreshCw, X } from "lucide-react";
 
 import { useAppUpdate } from "@app/providers/AppUpdateProvider";
+import brandLogoWhite1x from "@shared/assets/inbox/logos/bukowskiOS_logo_white.png";
+import brandLogoWhite from "@shared/assets/logos/bukowskiOS_logo_white@2x.png";
 import { ModalShell } from "@shared/components/ModalShell";
 
 const formatBytes = (value: number | null | undefined) => {
@@ -46,24 +48,25 @@ export const AppUpdateModal = () => {
         : null;
 
   return (
-    <ModalShell className="app-update-modal-shell" onClose={closeModal} width={560}>
+    <ModalShell className="app-update-modal-shell" onClose={closeModal} width={520}>
       <section className="app-update-modal">
+        <button aria-label="Cerrar update" className="app-update-modal-close" onClick={closeModal} type="button">
+          <X size={18} />
+        </button>
         <header className="app-update-modal-header">
           <div className="app-update-modal-title-group">
-            <span className={`app-update-modal-badge app-update-modal-badge-${status.state}`}>
-              {isDownloaded ? <CheckCircle2 size={14} /> : isFailed ? <XCircle size={14} /> : <Download size={14} />}
-              <span>
-                {isDownloaded
-                  ? "Instalador listo"
-                  : isDownloading
-                    ? "Descargando update"
-                    : isFailed
-                      ? "Update pendiente"
-                      : "Nueva versión disponible"}
-              </span>
-            </span>
-            <h2>Update de bukowskiOS</h2>
+            <img className="app-update-modal-logo" src={brandLogoWhite1x} srcSet={`${brandLogoWhite1x} 1x, ${brandLogoWhite} 2x`} alt="bukowskiOS" />
+            <h2 className="sr-only">Update de bukowskiOS</h2>
             <p>
+              {isDownloaded
+                ? "Instalador descargado y listo para revisar."
+                : isDownloading
+                  ? "Descargando el nuevo instalador."
+                  : isFailed
+                    ? "No pudimos completar la descarga."
+                    : "Nueva versión disponible."}
+            </p>
+            <p className="app-update-modal-release">
               {status.releaseName || status.latestVersion || "Release nueva"}
               {status.currentVersion ? ` · actual ${status.currentVersion}` : ""}
             </p>
@@ -105,13 +108,9 @@ export const AppUpdateModal = () => {
         </div>
 
         <footer className="app-update-modal-actions">
-          <button className="ghost-control" onClick={closeModal} type="button">
-            Cerrar
-          </button>
-
           {isDownloaded ? (
             <>
-              <button className="ghost-control" onClick={() => void revealDownloadedUpdate().catch(() => undefined)} type="button">
+              <button className="ghost-control app-update-secondary-action" onClick={() => void revealDownloadedUpdate().catch(() => undefined)} type="button">
                 <FolderOpen size={14} />
                 <span>Mostrar en Downloads</span>
               </button>
