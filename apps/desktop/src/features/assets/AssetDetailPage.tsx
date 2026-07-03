@@ -1,4 +1,4 @@
-import { FolderOpen, Trash2, X } from "lucide-react";
+import { FolderOpen, ImagePlus, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -18,7 +18,6 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useLocale } from "@shared/hooks/useLocale";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { resolveAssetAvailability, translateAssetAvailabilityLabel, translateAssetAvailabilityNextAction, translateAssetAvailabilityReason } from "@shared/lib/assetAvailability";
-import { presentAssetStatus } from "@shared/lib/assetStatusPresentation";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { printScannableLabel } from "@shared/utils/printScannableLabel";
 
@@ -343,6 +342,25 @@ export const AssetDetailPage = () => {
     }
   };
 
+  // Shared by the card header action and the clickable empty drop-zone.
+  const handleAddImages = () => {
+    setFilesError(null);
+    void (async () => {
+      try {
+        setIsUploadingImages(true);
+        const result = await uploadAssetImages(data.asset!.id);
+        if (result.uploadedCount > 0) {
+          await reload();
+        }
+        toast.success(t("assets.detail.toasts.filesUpdated"), result.summary);
+      } catch (nextError) {
+        setFilesError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableAddImages")));
+      } finally {
+        setIsUploadingImages(false);
+      }
+    })();
+  };
+
   return (
     <div className="page-stack is-dense entity-detail-scroll">
       <div className="entity-detail-action-bar">
@@ -384,6 +402,7 @@ export const AssetDetailPage = () => {
             {t("assets.detail.actions.assignToKit", { defaultValue: "Asignar a Kit" })}
           </button>
         </span>
+        <span aria-hidden className="entity-detail-action-divider" />
         <button
           className="ghost-control action-row-button"
           onClick={() => {
@@ -407,34 +426,28 @@ export const AssetDetailPage = () => {
       </div>
 
       <SurfaceCard
+        className="asset-detail-hero"
         title={data.asset.name}
+        subtitle={data.asset.code}
         aside={
           <span data-tooltip={t("assets.detail.summary.lifecycleTooltip")}>
-            {(() => {
-              const presented = presentAssetStatus(data.asset.status, t);
-              return <StatusBadge tone={presented.tone}>{presented.label}</StatusBadge>;
-            })()}
+            <StatusBadge tone={availability.tone}>{translateAssetAvailabilityLabel(availability, t)}</StatusBadge>
           </span>
         }
       >
         <div className="asset-availability-headline">
-          <StatusBadge tone={availability.tone}>{translateAssetAvailabilityLabel(availability, t)}</StatusBadge>
           <span className="asset-availability-text">
             {translateAssetAvailabilityReason(availability, t)} {translateAssetAvailabilityNextAction(availability, t)}
           </span>
         </div>
-        <div className="summary-grid">
+        <div className="summary-grid asset-hero-grid">
           <div className="summary-row">
-            <span className="summary-label">{t("assets.detail.summary.assetCode")}</span>
-            <span className="summary-value">{data.asset.code}</span>
+            <span className="summary-label">{t("assets.detail.summary.stock")}</span>
+            <span className="summary-value">{stockSummary}</span>
           </div>
           <div className="summary-row">
             <span className="summary-label">{t("assets.detail.summary.currentLocation")}</span>
             <span className="summary-value">{data.asset.location}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-label">{t("assets.detail.summary.stock")}</span>
-            <span className="summary-value">{stockSummary}</span>
           </div>
           <div className="summary-row">
             <span className="summary-label">{t("assets.detail.summary.project")}</span>
@@ -459,24 +472,7 @@ export const AssetDetailPage = () => {
           <button
             className="surface-card-action-text"
             disabled={isUploadingImages || remainingImageSlots <= 0}
-            onClick={() => {
-              setFilesError(null);
-
-              void (async () => {
-                try {
-                  setIsUploadingImages(true);
-                  const result = await uploadAssetImages(data.asset!.id);
-                  if (result.uploadedCount > 0) {
-                    await reload();
-                  }
-                  toast.success(t("assets.detail.toasts.filesUpdated"), result.summary);
-                } catch (nextError) {
-                  setFilesError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableAddImages")));
-                } finally {
-                  setIsUploadingImages(false);
-                }
-              })();
-            }}
+            onClick={handleAddImages}
             type="button"
           >
             {isUploadingImages
@@ -531,9 +527,10 @@ export const AssetDetailPage = () => {
             ))}
           </div>
         ) : (
-          <div className="asset-image-empty">
-            {t("assets.detail.images.empty")}
-          </div>
+          <button className="asset-image-empty asset-image-empty-action" disabled={isUploadingImages} onClick={handleAddImages} type="button">
+            <ImagePlus size={16} />
+            <span>{isUploadingImages ? t("assets.detail.images.adding") : t("assets.detail.images.empty")}</span>
+          </button>
         )}
       </SurfaceCard>
 
@@ -884,25 +881,6 @@ export const AssetDetailPage = () => {
             </details>
           </SurfaceCard>
 
-          <SurfaceCard title={t("assets.detail.sections.timeline")}>
-            {data.timeline.length ? (
-              <div className="timeline-list">
-                {data.timeline.map((event) => (
-                  <div key={event.timestamp + event.title} className="timeline-item">
-                    <span className="timeline-time">{event.timestamp}</span>
-                    <strong>{event.title}</strong>
-                    <span>{event.body}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">
-                {t("assets.detail.timelineEmpty", {
-                  defaultValue: "Sin movimientos todavía. Las asignaciones, salidas y retornos aparecerán aquí.",
-                })}
-              </div>
-            )}
-          </SurfaceCard>
         </div>
 
         <div className="page-stack">
@@ -1008,6 +986,26 @@ export const AssetDetailPage = () => {
                 )}
               </section>
             </div>
+          </SurfaceCard>
+
+          <SurfaceCard title={t("assets.detail.sections.timeline")}>
+            {data.timeline.length ? (
+              <div className="timeline-list">
+                {data.timeline.map((event) => (
+                  <div key={event.timestamp + event.title} className="timeline-item">
+                    <span className="timeline-time">{event.timestamp}</span>
+                    <strong>{event.title}</strong>
+                    <span>{event.body}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                {t("assets.detail.timelineEmpty", {
+                  defaultValue: "Sin movimientos todavía. Las asignaciones, salidas y retornos aparecerán aquí.",
+                })}
+              </div>
+            )}
           </SurfaceCard>
         </div>
       </ResizableSideRailLayout>

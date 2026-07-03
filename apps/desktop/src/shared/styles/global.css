@@ -11554,6 +11554,61 @@ button.project-budget-command-metric {
   line-height: 1.4;
 }
 
+/* ----- Asset detail hero: single-line stat strip ----- */
+.asset-detail-hero .asset-availability-headline {
+  padding-bottom: 10px;
+}
+
+.asset-hero-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.asset-hero-grid .summary-row {
+  justify-content: center;
+  min-height: 54px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 12px;
+  background: rgba(8, 11, 13, 0.28);
+}
+
+.asset-hero-grid .summary-label {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Clickable empty drop-zone: compact, invites the upload instead of parking
+   dead space. */
+.asset-image-empty-action {
+  justify-content: center;
+  gap: 10px;
+  min-height: 84px;
+  color: var(--text-muted);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.asset-image-empty-action:hover:not(:disabled) {
+  border-color: rgba(126, 183, 178, 0.4);
+  background: rgba(126, 183, 178, 0.05);
+  color: var(--text-secondary);
+}
+
+.asset-image-empty-action:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.entity-detail-action-divider {
+  align-self: center;
+  width: 1px;
+  height: 20px;
+  background: var(--hairline-faint);
+}
+
 /* ----- Asset image lightbox (in-app, instead of opening Finder) ----- */
 .asset-lightbox-overlay {
   position: fixed;
