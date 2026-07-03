@@ -10480,6 +10480,21 @@ button.project-budget-command-metric {
   font-weight: 600;
 }
 
+/* Clickable summary value (e.g. kit membership → Kits view): keeps the summary
+   typography but reads as a link on hover. */
+.summary-value-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: rgba(150, 207, 200, 0.95);
+}
+
+.summary-value-link:hover {
+  text-decoration: underline;
+}
+
 .stock-inline-text {
   color: var(--text-secondary);
   font-size: 12px;

@@ -1,7 +1,7 @@
 import { FolderOpen, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import type { AssetListRow } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
@@ -73,6 +73,7 @@ export const AssetDetailPage = () => {
   const { t } = useTranslation();
   const { assetId } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const toast = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const { formatDate } = useLocale();
@@ -763,9 +764,18 @@ export const AssetDetailPage = () => {
               </div>
               <div className="summary-row">
                 <span className="summary-label">{t("assets.detail.labels.kitMembership")}</span>
-                <span className="summary-value">
-                  {data.asset.linkedKitCount ? data.asset.linkedKitCodes.join(" · ") : t("assets.quickPreview.standalone")}
-                </span>
+                {data.asset.linkedKitCount ? (
+                  <button
+                    className="summary-value summary-value-link"
+                    data-tooltip={t("assets.detail.labels.openKits", { defaultValue: "Ver en Kits" })}
+                    onClick={() => navigate("/assets/kits")}
+                    type="button"
+                  >
+                    {(data.asset.linkedKitNames.length ? data.asset.linkedKitNames : data.asset.linkedKitCodes).join(" · ")}
+                  </button>
+                ) : (
+                  <span className="summary-value">{t("assets.quickPreview.standalone")}</span>
+                )}
               </div>
             </div>
 
@@ -896,36 +906,7 @@ export const AssetDetailPage = () => {
         </div>
 
         <div className="page-stack">
-          <SurfaceCard
-            title={t("assets.detail.sections.operations")}
-            aside={
-              <button
-                className="surface-card-action-text"
-                disabled={isUploadingFiles}
-                onClick={() => {
-                  setFilesError(null);
-                  
-                  void (async () => {
-                    try {
-                      setIsUploadingFiles(true);
-                      const result = await uploadAssetFiles(data.asset!.id);
-                      if (result.uploadedCount > 0) {
-                        await reload();
-                      }
-                      toast.success(t("assets.detail.toasts.filesUpdated"), result.summary);
-                    } catch (nextError) {
-                      setFilesError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableAttachFiles")));
-                    } finally {
-                      setIsUploadingFiles(false);
-                    }
-                  })();
-                }}
-                type="button"
-              >
-                {isUploadingFiles ? t("assets.detail.files.uploading") : t("assets.detail.files.attachPdf")}
-              </button>
-            }
-          >
+          <SurfaceCard title={t("assets.detail.sections.operations")}>
             <div className="entity-detail-section-stack">
               <section className="entity-detail-section">
                 <header className="entity-detail-section-header">
@@ -956,7 +937,30 @@ export const AssetDetailPage = () => {
               <section className="entity-detail-section">
                 <header className="entity-detail-section-header">
                   <h3>{t("assets.detail.sections.files")}</h3>
-                  <span>{documentFiles.length || t("common.none")}</span>
+                  <button
+                    className="surface-card-action-text"
+                    disabled={isUploadingFiles}
+                    onClick={() => {
+                      setFilesError(null);
+                      void (async () => {
+                        try {
+                          setIsUploadingFiles(true);
+                          const result = await uploadAssetFiles(data.asset!.id);
+                          if (result.uploadedCount > 0) {
+                            await reload();
+                          }
+                          toast.success(t("assets.detail.toasts.filesUpdated"), result.summary);
+                        } catch (nextError) {
+                          setFilesError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableAttachFiles")));
+                        } finally {
+                          setIsUploadingFiles(false);
+                        }
+                      })();
+                    }}
+                    type="button"
+                  >
+                    {isUploadingFiles ? t("assets.detail.files.uploading") : t("assets.detail.files.attachPdf")}
+                  </button>
                 </header>
                 {documentFiles.length ? (
                   <div className="entity-file-list entity-detail-compact-list">
