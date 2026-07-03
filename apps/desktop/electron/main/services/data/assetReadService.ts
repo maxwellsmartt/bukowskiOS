@@ -535,12 +535,15 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
         };
       }
 
+      // asset_state_repaired rows are startup self-heal bookkeeping, not user
+      // operations — keep them out of the user-facing Cronología.
       const timelineRows = db
         .prepare(
           `
             SELECT event_type, event_timestamp, notes
             FROM asset_events
             WHERE asset_id = ?
+              AND event_type <> 'asset_state_repaired'
             ORDER BY event_timestamp DESC
             LIMIT 6
           `,

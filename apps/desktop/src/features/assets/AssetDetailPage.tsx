@@ -566,15 +566,23 @@ export const AssetDetailPage = () => {
           </SurfaceCard>
 
           <SurfaceCard title={t("assets.detail.sections.timeline")}>
-            <div className="timeline-list">
-              {data.timeline.map((event) => (
-                <div key={event.timestamp + event.title} className="timeline-item">
-                  <span className="timeline-time">{event.timestamp}</span>
-                  <strong>{event.title}</strong>
-                  <span>{event.body}</span>
-                </div>
-              ))}
-            </div>
+            {data.timeline.length ? (
+              <div className="timeline-list">
+                {data.timeline.map((event) => (
+                  <div key={event.timestamp + event.title} className="timeline-item">
+                    <span className="timeline-time">{event.timestamp}</span>
+                    <strong>{event.title}</strong>
+                    <span>{event.body}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                {t("assets.detail.timelineEmpty", {
+                  defaultValue: "Sin movimientos todavía. Las asignaciones, salidas y retornos aparecerán aquí.",
+                })}
+              </div>
+            )}
           </SurfaceCard>
         </div>
 
