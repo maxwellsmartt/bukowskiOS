@@ -3,11 +3,14 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useSearchParams } from "react-router-dom";
 
+import type { AssetListRow } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
 import { reportIncident } from "@features/incidents/useIncidentsData";
-import { useCatalogData } from "@features/projects/useProjectsData";
+import { PackingSlipBuilderPanel, type PackingSlipBuilderDraft } from "@features/packing/PackingSlipBuilderPanel";
+import { createPackingSlip } from "@features/packing/usePackingData";
+import { createCatalogEntity, updateCatalogEntity, useCatalogData } from "@features/projects/useProjectsData";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { ScannableCodePanel } from "@shared/components/ScannableCodePanel";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -22,8 +25,13 @@ import { printScannableLabel } from "@shared/utils/printScannableLabel";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { ModalShell } from "@shared/components/ModalShell";
 
+import { notifyWorkspaceDataChanged } from "@shared/hooks/useWorkspaceDataRefresh";
+
+import { AssetAssignMovePanel, type AssetAssignMoveFormValue } from "./AssetAssignMovePanel";
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
-import { archiveAsset, deleteAssetFile, openAssetFile, updateAsset, uploadAssetFiles, uploadAssetImages, useAssetDetail } from "./useAssetsData";
+import { AssignToKitPanel, type AssignToKitFormValue } from "./AssignToKitPanel";
+import { mergeKitAssetSelections } from "./kitMergeSelection";
+import { archiveAsset, assignMoveAssets, deleteAssetFile, openAssetFile, updateAsset, uploadAssetFiles, uploadAssetImages, useAssetDetail } from "./useAssetsData";
 
 const FILE_DATE_FORMAT: Intl.DateTimeFormatOptions = {
   month: "short",
@@ -70,7 +78,7 @@ export const AssetDetailPage = () => {
   const { formatDate } = useLocale();
   const { data, reload } = useAssetDetail(assetId);
   const { projects, refreshProjects } = useShellContext();
-  const { data: catalog, error: catalogError } = useCatalogData({
+  const { data: catalog, error: catalogError, reload: reloadCatalog } = useCatalogData({
     workspaceId: activeWorkspaceId,
     entityType: "location",
     search: "",
@@ -91,6 +99,17 @@ export const AssetDetailPage = () => {
   const [lightbox, setLightbox] = useState<{ src: string; name: string; fileId: string } | null>(null);
   const [isSubmittingEditor, setIsSubmittingEditor] = useState(false);
   const [isArchivingAsset, setIsArchivingAsset] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [isSubmittingAssign, setIsSubmittingAssign] = useState(false);
+  const [packingOpen, setPackingOpen] = useState(false);
+  const [packingError, setPackingError] = useState<string | null>(null);
+  const [isSubmittingPacking, setIsSubmittingPacking] = useState(false);
+  const [packingAssets, setPackingAssets] = useState<AssetListRow[]>([]);
+  const [isPreparingPacking, setIsPreparingPacking] = useState(false);
+  const [kitOpen, setKitOpen] = useState(false);
+  const [kitError, setKitError] = useState<string | null>(null);
+  const [isSubmittingKit, setIsSubmittingKit] = useState(false);
 
   const openInFinder = (fileId: string) => {
     setFilesError(null);
@@ -157,9 +176,213 @@ export const AssetDetailPage = () => {
   const documentFiles = data.files.filter((file) => !isAssetImageFile(file));
   const remainingImageSlots = Math.max(0, 2 - assetImages.length);
 
+  // Operational actions from the detail page. A kit member moves as part of its
+  // kit (same rule the backend enforces), so individual assign/pack/kit actions
+  // lock with an explanatory tooltip instead of failing on submit.
+  const kitLocked = Boolean(data.asset.linkedKitCount);
+  const kitLockTooltip = kitLocked
+    ? t("assets.detail.kitLockedTooltip", {
+        defaultValue: "Este equipo pertenece al kit {{kits}} y se mueve como parte del kit.",
+        kits: data.asset.linkedKitCodes.join(" · "),
+      })
+    : undefined;
+  const assignSelectionRow = {
+    id: data.asset.id,
+    name: data.asset.name,
+    code: data.asset.code,
+    quantity: data.asset.quantity,
+    assignedQuantity: data.asset.assignedQuantity,
+    checkedOutQuantity: data.asset.checkedOutQuantity,
+    status: data.asset.status,
+    project: data.asset.project,
+    linkedKitCount: data.asset.linkedKitCount,
+    linkedKitCodes: data.asset.linkedKitCodes,
+  };
+  const detailAssetSelections = [{ assetId: data.asset.id, quantity: 1 }];
+
+  const handleAssignMove = async (formValue: AssetAssignMoveFormValue) => {
+    try {
+      setIsSubmittingAssign(true);
+      const result = await assignMoveAssets({
+        commandId: crypto.randomUUID(),
+        workspaceId: activeWorkspaceId,
+        assetIds: [data.asset!.id],
+        assetSelections: formValue.assetSelections,
+        mode: formValue.mode,
+        projectId: formValue.projectId,
+        projectUnitId: formValue.projectUnitId,
+        departmentId: formValue.departmentId,
+        assignedToUserId: formValue.assignedToUserId,
+        targetLocationId: formValue.targetLocationId,
+        expectedReturnAt: formValue.expectedReturnAt ? new Date(formValue.expectedReturnAt).toISOString() : undefined,
+        notes: formValue.notes,
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+
+      await Promise.all([reload(), refreshProjects()]);
+      setAssignError(null);
+      toast.success(t("assets.toasts.doneTitle"), result.summary);
+      if (result.warningSummary) {
+        toast.warning(t("assets.toasts.reviewAssignTitle"), result.warningSummary);
+      }
+      setAssignOpen(false);
+    } catch (nextError) {
+      setAssignError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableSaveChanges")));
+    } finally {
+      setIsSubmittingAssign(false);
+    }
+  };
+
+  const openPackingBuilder = () => {
+    setPackingError(null);
+    void (async () => {
+      try {
+        setIsPreparingPacking(true);
+        // The builder consumes the list read model (availability, kit locks,
+        // pricing) — fetch this asset's row instead of duplicating that shape.
+        const rows = await window.bukowskiAssets!.getList({
+          workspaceId: activeWorkspaceId,
+          scopeProjectId: null,
+          search: data.asset!.code,
+          sortBy: "name",
+          sortDirection: "asc",
+        });
+        const row = rows.find((candidate) => candidate.id === data.asset!.id);
+        if (!row) {
+          throw new Error(t("assets.detail.toasts.packingRowMissing", { defaultValue: "No se pudo preparar el equipo para el packing slip." }));
+        }
+        setPackingAssets([row]);
+        setPackingOpen(true);
+      } catch (nextError) {
+        toast.error(
+          t("assets.detail.toasts.packingPrepFailed", { defaultValue: "No se pudo abrir el packing slip" }),
+          getUserFacingErrorMessage(nextError, t("assets.detail.toasts.packingRowMissing", { defaultValue: "No se pudo preparar el equipo para el packing slip." })),
+        );
+      } finally {
+        setIsPreparingPacking(false);
+      }
+    })();
+  };
+
+  const handleCreatePackingSlip = async (formValue: PackingSlipBuilderDraft) => {
+    try {
+      setIsSubmittingPacking(true);
+      const result = await createPackingSlip({
+        commandId: crypto.randomUUID(),
+        workspaceId: activeWorkspaceId,
+        assetIds: [data.asset!.id],
+        assetSelections: formValue.assetSelections,
+        projectId: formValue.projectId,
+        projectUnitId: formValue.projectUnitId,
+        departmentId: formValue.departmentId,
+        responsibleUserId: formValue.responsibleUserId,
+        returnDueAt: formValue.returnDueAt ? new Date(formValue.returnDueAt).toISOString() : undefined,
+        notes: formValue.notes,
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+
+      await Promise.all([reload(), refreshProjects()]);
+      setPackingError(null);
+      toast.success(t("assets.toasts.doneTitle"), result.summary);
+      setPackingOpen(false);
+    } catch (nextError) {
+      setPackingError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableSaveChanges")));
+    } finally {
+      setIsSubmittingPacking(false);
+    }
+  };
+
+  const handleAssignKit = async (formValue: AssignToKitFormValue) => {
+    try {
+      setIsSubmittingKit(true);
+
+      if (formValue.mode === "new") {
+        await createCatalogEntity({
+          workspaceId: activeWorkspaceId,
+          entityType: "kit",
+          code: formValue.code ?? "",
+          name: formValue.name ?? "",
+          description: formValue.description,
+          assetSelections: detailAssetSelections,
+        });
+      } else {
+        const targetKit = catalog.kits.find((kit) => kit.id === formValue.kitId);
+        if (!targetKit) {
+          throw new Error(t("assets.assignKit.missingKit", { defaultValue: "El kit seleccionado ya no existe." }));
+        }
+        // Update REPLACES kit_assets, so resend the full merged membership plus
+        // the kit's existing scalar fields to avoid wiping them.
+        const merged = mergeKitAssetSelections(targetKit.assetSelections, detailAssetSelections);
+        await updateCatalogEntity({
+          workspaceId: activeWorkspaceId,
+          entityType: "kit",
+          id: targetKit.id,
+          code: targetKit.code,
+          name: targetKit.name,
+          description: targetKit.description || undefined,
+          notes: targetKit.notes || undefined,
+          assetSelections: merged,
+        });
+      }
+
+      await Promise.all([reload(), reloadCatalog()]);
+      notifyWorkspaceDataChanged();
+      setKitError(null);
+      toast.success(
+        t("assets.assignKit.doneTitle", { defaultValue: "Kit actualizado" }),
+        t("assets.assignKit.doneBody", { defaultValue: "Los equipos quedaron amarrados al kit." }),
+      );
+      setKitOpen(false);
+    } catch (nextError) {
+      setKitError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableSaveChanges")));
+    } finally {
+      setIsSubmittingKit(false);
+    }
+  };
+
   return (
     <div className="page-stack is-dense entity-detail-scroll">
       <div className="entity-detail-action-bar">
+        <span data-tooltip={kitLockTooltip}>
+          <button
+            className="ghost-control action-row-button"
+            disabled={kitLocked}
+            onClick={() => {
+              setAssignOpen(true);
+              setAssignError(null);
+            }}
+            type="button"
+          >
+            {t("assets.detail.actions.assignMove", { defaultValue: "Asignar / mover" })}
+          </button>
+        </span>
+        <span data-tooltip={kitLockTooltip}>
+          <button
+            className="ghost-control action-row-button"
+            disabled={kitLocked || isPreparingPacking}
+            onClick={openPackingBuilder}
+            type="button"
+          >
+            {isPreparingPacking
+              ? t("assets.detail.actions.preparingPacking", { defaultValue: "Preparando…" })
+              : t("assets.detail.actions.createPackingSlip", { defaultValue: "Crear packing slip" })}
+          </button>
+        </span>
+        <span data-tooltip={kitLockTooltip}>
+          <button
+            className="ghost-control action-row-button"
+            disabled={kitLocked}
+            onClick={() => {
+              setKitOpen(true);
+              setKitError(null);
+            }}
+            type="button"
+          >
+            {t("assets.detail.actions.assignToKit", { defaultValue: "Asignar a Kit" })}
+          </button>
+        </span>
         <button
           className="ghost-control action-row-button"
           onClick={() => {
@@ -441,6 +664,92 @@ export const AssetDetailPage = () => {
           projects={projects}
           users={catalog.users}
         />
+        </ModalShell>
+      ) : null}
+
+      {assignOpen ? (
+        <ModalShell
+          onClose={() => {
+            setAssignOpen(false);
+            setAssignError(null);
+          }}
+          width={820}
+          className="asset-operation-modal-shell"
+        >
+          <AssetAssignMovePanel
+            defaultProjectId={null}
+            departments={catalog.departments}
+            error={assignError}
+            isSubmitting={isSubmittingAssign}
+            locations={catalog.locations}
+            onClose={() => {
+              setAssignOpen(false);
+              setAssignError(null);
+            }}
+            onSubmit={handleAssignMove}
+            projects={projects}
+            selectedAssets={[assignSelectionRow]}
+            selectedCount={1}
+            users={catalog.users}
+          />
+        </ModalShell>
+      ) : null}
+
+      {packingOpen && packingAssets.length ? (
+        <ModalShell
+          onClose={() => {
+            setPackingOpen(false);
+            setPackingError(null);
+          }}
+          width={820}
+          className="asset-operation-modal-shell"
+        >
+          <PackingSlipBuilderPanel
+            defaultProjectId={null}
+            departments={catalog.departments}
+            error={packingError}
+            isSubmitting={isSubmittingPacking}
+            onClose={() => {
+              setPackingOpen(false);
+              setPackingError(null);
+            }}
+            onSubmit={handleCreatePackingSlip}
+            projects={projects}
+            selectedAssets={packingAssets}
+            selectedCount={1}
+            users={catalog.users}
+          />
+        </ModalShell>
+      ) : null}
+
+      {kitOpen ? (
+        <ModalShell
+          onClose={() => {
+            setKitOpen(false);
+            setKitError(null);
+          }}
+          width={760}
+          className="asset-operation-modal-shell"
+        >
+          <AssignToKitPanel
+            error={kitError}
+            isSubmitting={isSubmittingKit}
+            kits={catalog.kits}
+            onClose={() => {
+              setKitOpen(false);
+              setKitError(null);
+            }}
+            onSubmit={handleAssignKit}
+            selectedAssets={[
+              {
+                id: data.asset.id,
+                name: data.asset.name,
+                code: data.asset.code,
+                quantity: 1,
+              },
+            ]}
+            selectedCount={1}
+          />
         </ModalShell>
       ) : null}
 
