@@ -29,6 +29,7 @@ export type KitPullResult = {
   appliedCount: number;
   skippedDueToOutboxCount: number;
   skippedDueToOlderCount: number;
+  missingAssetCount: number;
   errors: string[];
   cursorAfter: string | null;
 };
@@ -170,13 +171,15 @@ export const createKitPullService = (db: DatabaseSync) => {
     kits: RemoteKitRow[],
     members: RemoteKitAssetRow[],
   ): KitPullResult => {
+    const cursorBefore = readCursor(workspaceId);
     const result: KitPullResult = {
       workspaceId,
       appliedCount: 0,
       skippedDueToOutboxCount: 0,
       skippedDueToOlderCount: 0,
+      missingAssetCount: 0,
       errors: [],
-      cursorAfter: readCursor(workspaceId),
+      cursorAfter: cursorBefore,
     };
 
     if (!kits.length) {
@@ -220,6 +223,7 @@ export const createKitPullService = (db: DatabaseSync) => {
             membersByKitId.get(row.id) ?? [],
           );
           if (skippedMembers > 0) {
+            result.missingAssetCount += skippedMembers;
             logger.warn("Kit pulled with members whose assets are not local yet.", {
               kitId: row.id,
               skippedMembers,
@@ -243,7 +247,16 @@ export const createKitPullService = (db: DatabaseSync) => {
         }
       }
 
-      updateCursor(workspaceId, result.cursorAfter, result.appliedCount, result.errors[0] ?? null);
+      const shouldDeferCursor = result.errors.length > 0 || result.missingAssetCount > 0;
+      if (shouldDeferCursor) {
+        result.cursorAfter = cursorBefore;
+      }
+      updateCursor(
+        workspaceId,
+        result.cursorAfter,
+        result.appliedCount,
+        result.errors[0] ?? (result.missingAssetCount > 0 ? "Kit members reference assets that are not local yet." : null),
+      );
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");

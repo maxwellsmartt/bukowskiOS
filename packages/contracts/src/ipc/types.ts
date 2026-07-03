@@ -396,6 +396,7 @@ export type AppApplyRemoteKitsResult = {
   appliedCount: number;
   skippedDueToOutboxCount: number;
   skippedDueToOlderCount: number;
+  missingAssetCount: number;
   errors: string[];
   cursorAfter: string | null;
 };

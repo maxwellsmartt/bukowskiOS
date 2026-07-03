@@ -58,6 +58,7 @@ import { applyConnectorFoundationMigration, bootstrapConnectorFoundation } from 
 import { applyCrewCatalogFoundationMigration } from "./crewCatalogFoundationBootstrap";
 import { deduplicateCrewCatalog } from "./crewCatalogDeduplicationBackfill";
 import { backfillCrewDepartmentSyncOutbox, cleanupSeedCrewDepartmentOutbox } from "./crewDepartmentSyncBackfill";
+import { backfillKitSyncOutbox, cleanupSeedKitOutbox } from "./kitSyncBackfill";
 import { createDataRetentionService, summarizeDataRetention } from "./dataRetentionService";
 import { createCurrencyMutationService } from "./currencyMutationService";
 import { createCurrencyRateProviderService, type CurrencyRateProviderService } from "./currencyRateProviderService";
@@ -726,6 +727,12 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   );
   runStartupStep("clean up seed-workspace crew/department outbox", () =>
     applyTrackedStep(database, "runtime_crew_department_seed_outbox_cleanup_v1", () => cleanupSeedCrewDepartmentOutbox(database)),
+  );
+  runStartupStep("backfill kit sync outbox", () =>
+    applyTrackedStep(database, "runtime_kit_sync_backfill_v1", () => backfillKitSyncOutbox(database)),
+  );
+  runStartupStep("clean up seed-workspace kit outbox", () =>
+    applyTrackedStep(database, "runtime_kit_seed_outbox_cleanup_v1", () => cleanupSeedKitOutbox(database)),
   );
   runStartupStep("deduplicate crew catalog", () =>
     applyTrackedStep(database, "runtime_crew_catalog_deduplication_v1", () => deduplicateCrewCatalog(database)),
