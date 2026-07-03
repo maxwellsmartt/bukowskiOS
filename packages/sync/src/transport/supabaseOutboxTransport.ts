@@ -58,6 +58,7 @@ export type SupabaseDomainUpsert = {
   deleteBeforeInsert?: {
     column: string;
     value: string;
+    workspaceScoped?: boolean;
   };
 };
 
@@ -264,7 +265,9 @@ const scopedDeleteEndpoint = (
   table: string,
   filters: Array<{ column: string; value: string }>,
   workspaceId: string,
+  options: { workspaceScoped?: boolean } = {},
 ) => {
+  const workspaceScoped = options.workspaceScoped !== false;
   const normalizedTable = table.trim();
   if (!/^[a-z_][a-z0-9_]*$/.test(normalizedTable)) {
     throw new Error(`Supabase delete target table is invalid: ${table}.`);
@@ -272,7 +275,7 @@ const scopedDeleteEndpoint = (
   if (!filters.length) {
     throw new Error(`Supabase delete filters cannot be empty for table ${table}.`);
   }
-  if (!workspaceId.trim()) {
+  if (workspaceScoped && !workspaceId.trim()) {
     throw new Error(`Supabase delete workspace_id cannot be empty for table ${table}.`);
   }
 
@@ -290,7 +293,10 @@ const scopedDeleteEndpoint = (
     return { column: normalizedColumn, value };
   });
 
-  const query = [...validatedFilters, { column: "workspace_id", value: workspaceId }]
+  const queryFilters = workspaceScoped
+    ? [...validatedFilters, { column: "workspace_id", value: workspaceId }]
+    : validatedFilters;
+  const query = queryFilters
     .map(({ column, value }) => filterParam(column, value))
     .join("&");
   return `${normalizedUrl}/rest/v1/${normalizedTable}?${query}`;
@@ -489,7 +495,7 @@ export const createSupabaseOutboxTransport = ({
       if (domainUpserts) {
         for (const upsert of domainUpserts) {
           if (upsert.deleteBeforeInsert) {
-            const { column, value } = upsert.deleteBeforeInsert;
+            const { column, value, workspaceScoped } = upsert.deleteBeforeInsert;
             await deleteSupabaseRows({
               accessToken,
               anonKey,
@@ -498,6 +504,7 @@ export const createSupabaseOutboxTransport = ({
                 upsert.table,
                 [{ column, value }],
                 row.workspace_id,
+                { workspaceScoped },
               ),
               fetchImpl,
             });

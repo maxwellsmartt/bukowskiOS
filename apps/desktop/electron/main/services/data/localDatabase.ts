@@ -1551,7 +1551,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
           table: "kit_assets",
           onConflict: "kit_id,asset_id",
           rows: members,
-          deleteBeforeInsert: { column: "kit_id", value: row.entity_id },
+          deleteBeforeInsert: { column: "kit_id", value: row.entity_id, workspaceScoped: false },
         });
         return upserts;
       }

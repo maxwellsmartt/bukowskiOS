@@ -895,6 +895,55 @@ describe("sync outbox worker service", () => {
     ]);
   });
 
+  it("can replace aggregate child rows that inherit workspace scope from the parent", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const transport = createSupabaseOutboxTransport({
+      supabaseUrl: "https://bukowski.test/",
+      anonKey: "anon-test-key",
+      getAccessToken: async () => "access-test-token",
+      resolveDomainUpserts: (row) =>
+        row.entity_type === "kit"
+          ? [
+              {
+                table: "kits",
+                onConflict: "id",
+                rows: [{ id: row.entity_id, workspace_id: row.workspace_id, code: "KIT-1" }],
+              },
+              {
+                table: "kit_assets",
+                onConflict: "kit_id,asset_id",
+                deleteBeforeInsert: { column: "kit_id", value: row.entity_id, workspaceScoped: false },
+                rows: [{ kit_id: row.entity_id, asset_id: "asset-1", quantity: 1 }],
+              },
+            ]
+          : null,
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(null, { status: 201 });
+      }) as typeof fetch,
+    });
+
+    await transport({
+      id: "outbox-kit-1",
+      workspace_id: "11111111-1111-4111-8111-111111111111",
+      entity_type: "kit",
+      entity_id: "kit-1",
+      event_id: null,
+      operation_type: "upsert",
+      payload_json: JSON.stringify({ id: "kit-1" }),
+      attempt_count: 0,
+      created_at: "2026-07-03T20:00:00.000Z",
+      updated_at: "2026-07-03T20:01:00.000Z",
+    });
+
+    expect(requests.map((request) => `${request.init.method ?? "POST"} ${request.url}`)).toEqual([
+      "POST https://bukowski.test/rest/v1/kits?on_conflict=id",
+      "DELETE https://bukowski.test/rest/v1/kit_assets?kit_id=eq.kit-1",
+      "POST https://bukowski.test/rest/v1/kit_assets?on_conflict=kit_id,asset_id",
+      "POST https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
+    ]);
+  });
+
   it("propagates a local deletion by removing the cloud rows (delete op)", async () => {
     const requests: Array<{ url: string; init: RequestInit }> = [];
     let upsertResolverCalled = false;
