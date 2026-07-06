@@ -990,6 +990,45 @@ describe("sync outbox worker service", () => {
     expect(upsertResolverCalled).toBe(false);
   });
 
+  it("can delete aggregate child rows that inherit workspace scope from the parent", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const transport = createSupabaseOutboxTransport({
+      supabaseUrl: "https://bukowski.test/",
+      anonKey: "anon-test-key",
+      getAccessToken: async () => "access-test-token",
+      resolveDomainDeletes: (row) =>
+        row.entity_type === "kit"
+          ? [
+              { table: "kit_assets", filters: [{ column: "kit_id", value: row.entity_id }], workspaceScoped: false },
+              { table: "kits", filters: [{ column: "id", value: row.entity_id }] },
+            ]
+          : null,
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(null, { status: 200 });
+      }) as typeof fetch,
+    });
+
+    await transport({
+      id: "outbox-kit-delete",
+      workspace_id: "11111111-1111-4111-8111-111111111111",
+      entity_type: "kit",
+      entity_id: "kit-1",
+      event_id: null,
+      operation_type: "delete",
+      payload_json: JSON.stringify({ id: "kit-1" }),
+      attempt_count: 0,
+      created_at: "2026-07-06T17:20:00.000Z",
+      updated_at: "2026-07-06T17:21:00.000Z",
+    });
+
+    expect(requests.map((request) => `${request.init.method ?? "POST"} ${request.url}`)).toEqual([
+      "DELETE https://bukowski.test/rest/v1/kit_assets?kit_id=eq.kit-1",
+      "DELETE https://bukowski.test/rest/v1/kits?id=eq.kit-1&workspace_id=eq.11111111-1111-4111-8111-111111111111",
+      "POST https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
+    ]);
+  });
+
   it("records an operational project tombstone instead of hard-deleting the project", async () => {
     const requests: Array<{ url: string; init: RequestInit }> = [];
     let deleteResolverCalled = false;

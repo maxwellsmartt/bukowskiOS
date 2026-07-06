@@ -1803,7 +1803,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         return [{ table: "departments", filters: [{ column: "id", value: row.entity_id }] }];
       case "kit":
         return [
-          { table: "kit_assets", filters: [{ column: "kit_id", value: row.entity_id }] },
+          { table: "kit_assets", filters: [{ column: "kit_id", value: row.entity_id }], workspaceScoped: false },
           { table: "kits", filters: [{ column: "id", value: row.entity_id }] },
         ];
       default:

@@ -93,6 +93,7 @@ export type SupabaseDomainDelete = {
     { column: string; value: string },
     ...Array<{ column: string; value: string }>,
   ];
+  workspaceScoped?: boolean;
 };
 
 const normalizeUrl = (value: string) => value.trim().replace(/\/+$/, "");
@@ -427,7 +428,9 @@ export const createSupabaseOutboxTransport = ({
         throw new Error(`Supabase delete targets unavailable for outbox row ${row.id}.`);
       }
       const endpoints = deletes.map((target) =>
-        scopedDeleteEndpoint(normalizedUrl, target.table, target.filters, row.workspace_id),
+        scopedDeleteEndpoint(normalizedUrl, target.table, target.filters, row.workspace_id, {
+          workspaceScoped: target.workspaceScoped,
+        }),
       );
       for (const endpoint of endpoints) {
         await deleteSupabaseRows({
