@@ -3,7 +3,15 @@ import { Boxes, ClipboardList, ExternalLink, FileUp, GitCompareArrows, Import, M
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import type { AssetDuplicateAuditGroup, AssetDuplicateAuditPreview, AssetListQuery, AssetListRow, AssetSortField } from "@contracts";
+import type {
+  AssetDuplicateAuditGroup,
+  AssetDuplicateAuditPreview,
+  AssetListQuery,
+  AssetListRow,
+  AssetSortField,
+  CatalogAssetOptionRow,
+  CatalogKitRow,
+} from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
@@ -409,6 +417,41 @@ type AssetOperationCartItem = AssetListRow & {
 
 const resolveAssignableQuantity = (asset: Pick<AssetListRow, "quantity">) => Math.max(0, asset.quantity);
 
+const buildAssetListRowFromCatalogOption = (asset: CatalogAssetOptionRow, kit?: CatalogKitRow): AssetListRow => ({
+  id: asset.id,
+  name: asset.name,
+  code: asset.code,
+  category: asset.category,
+  quantity: asset.quantity,
+  totalQuantity: asset.totalQuantity,
+  assignedQuantity: asset.assignedQuantity,
+  checkedOutQuantity: asset.checkedOutQuantity,
+  tracking: "—",
+  status: asset.status,
+  condition: asset.operationalStatus,
+  custody: asset.custodyStatus,
+  location: "—",
+  projectId: asset.currentProjectId,
+  project: asset.currentProject ?? "—",
+  projectUnitId: asset.currentUnitId,
+  projectUnit: asset.currentUnit ?? "—",
+  responsible: asset.currentDepartment ?? "—",
+  serialNumber: "—",
+  qrCode: "—",
+  warehouseSlot: "—",
+  folderPath: "—",
+  hasAccessories: "—",
+  source: "Catálogo",
+  purchasePrice: "—",
+  additionalCosts: "—",
+  currentBookValue: "—",
+  replacementValue: "—",
+  incidentsOpen: 0,
+  linkedKitCount: Math.max(asset.linkedKitCount, kit ? 1 : 0),
+  linkedKitCodes: asset.linkedKitCodes.length ? asset.linkedKitCodes : kit ? [kit.code] : [],
+  linkedKitNames: asset.linkedKitNames.length ? asset.linkedKitNames : kit ? [kit.name] : [],
+});
+
 const clampOperationQuantity = (asset: Pick<AssetListRow, "quantity">, quantity: number | undefined) => {
   const maxQuantity = resolveAssignableQuantity(asset);
 
@@ -433,7 +476,7 @@ type AssetOperationCartProps = {
   onCreatePackingSlip: () => void;
   onCreateRma: () => void;
   onDeleteSelected: () => void;
-  onOpenAssignMove: () => void;
+  onOpenAssignMove: () => void | Promise<void>;
   onOpenAssignToKit: () => void;
   onOpenAssetDetail: (assetId: string) => void;
   onOpenProjectReturns?: () => void;
@@ -533,7 +576,7 @@ const AssetOperationCart = ({
           className="action-primary-button action-row-button"
           data-tooltip={lockedItems.length ? kitLockTooltip ?? t("assets.cart.kitLockedTip", { defaultValue: "Ya pertenecen a un kit" }) : undefined}
           disabled={hasBulkKitLock}
-          onClick={onOpenAssignMove}
+          onClick={() => void onOpenAssignMove()}
           type="button"
         >
           {t("assets.cart.assignMove")}
@@ -1239,6 +1282,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [actionPanelOpen, setActionPanelOpen] = useState(false);
   const [packingPanelOpen, setPackingPanelOpen] = useState(false);
   const [kitPanelOpen, setKitPanelOpen] = useState(false);
+  const [assignMoveSourceKitId, setAssignMoveSourceKitId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [packingError, setPackingError] = useState<string | null>(null);
   const [kitError, setKitError] = useState<string | null>(null);
@@ -1273,6 +1317,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const activeAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedAssetId) ?? null,
     [assets, selectedAssetId],
+  );
+  const visibleAssetById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset] as const)), [assets]);
+  const catalogAssetOptionById = useMemo(
+    () => new Map(catalog.assetOptions.map((asset) => [asset.id, asset] as const)),
+    [catalog.assetOptions],
   );
   const projectStatusById = useMemo(() => new Map(projects.map((project) => [project.id, project.status])), [projects]);
   const csvReconciliationCandidates = useMemo(
@@ -1421,6 +1470,121 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     );
   };
 
+  const findActiveKitForAsset = (assetId: string) =>
+    catalog.kits.find((kit) => kit.isActive && kit.assetSelections.some((selection) => selection.assetId === assetId)) ??
+    catalog.kits.find((kit) => kit.isActive && kit.assetIds.includes(assetId)) ??
+    null;
+
+  const buildOperationItemsForKit = (kit: CatalogKitRow) => {
+    const kitSelections = kit.assetSelections.length
+      ? kit.assetSelections
+      : kit.assetIds.map((assetId) => ({ assetId, quantity: 1 }));
+    const missingAssetIds: string[] = [];
+    const items = kitSelections
+      .map((selection) => {
+        const visibleAsset = visibleAssetById.get(selection.assetId);
+        if (visibleAsset) {
+          return buildOperationCartItem(visibleAsset, selection.quantity);
+        }
+
+        const catalogAsset = catalogAssetOptionById.get(selection.assetId);
+        if (!catalogAsset) {
+          missingAssetIds.push(selection.assetId);
+          return null;
+        }
+
+        return buildOperationCartItem(buildAssetListRowFromCatalogOption(catalogAsset, kit), selection.quantity);
+      })
+      .filter(Boolean) as AssetOperationCartItem[];
+
+    return { items, missingAssetIds };
+  };
+
+  const confirmAssignMoveFullKitFromAsset = async (asset: AssetListRow | AssetOperationCartItem) => {
+    const kit = findActiveKitForAsset(asset.id);
+
+    if (!kit) {
+      showIndividualKitLockedToast(asset);
+      return false;
+    }
+
+    const { items, missingAssetIds } = buildOperationItemsForKit(kit);
+    if (missingAssetIds.length || !items.length) {
+      toast.error(
+        t("assets.selection.kitResolveErrorTitle", { defaultValue: "No se pudo preparar el kit" }),
+        t("assets.selection.kitResolveErrorBody", {
+          defaultValue: "El catálogo no devolvió todos los equipos del kit. Refresca el inventario e inténtalo de nuevo.",
+        }),
+      );
+      return false;
+    }
+
+    const selectedAssetLabel = `${asset.code} · ${asset.name}`;
+    const confirmed = await confirm({
+      title: t("assets.selection.kitConfirmTitle", { defaultValue: "Este equipo pertenece a un kit" }),
+      body: t("assets.selection.kitConfirmBody", {
+        defaultValue:
+          "Este asset no puede operarse individualmente porque viaja dentro de un kit activo. Puedes continuar agregando el kit completo al flujo de asignar / mover.",
+      }),
+      details: (
+        <div className="asset-kit-confirm-details">
+          <div className="asset-kit-confirm-summary">
+            <span className="confirm-dialog-details-label">
+              {t("assets.selection.kitConfirmKitLabel", { defaultValue: "Kit detectado" })}
+            </span>
+            <strong>{kit.name}</strong>
+            <span>{kit.code}</span>
+          </div>
+          <div className="asset-kit-confirm-summary">
+            <span className="confirm-dialog-details-label">
+              {t("assets.selection.kitConfirmAssetLabel", { defaultValue: "Intentaste operar" })}
+            </span>
+            <span>{selectedAssetLabel}</span>
+          </div>
+          <div>
+            <span className="confirm-dialog-details-label">
+              {t("assets.selection.kitConfirmMembersLabel", {
+                count: items.length,
+                defaultValue: "Se agregarán estos equipos",
+              })}
+            </span>
+            <ul className="confirm-dialog-list asset-kit-confirm-member-list">
+              {items.map((item) => (
+                <li key={item.id}>
+                  <strong>{item.code}</strong>
+                  <span>{item.name}</span>
+                  {item.requestedQuantity > 1 ? <small>× {item.requestedQuantity}</small> : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ),
+      confirmLabel: t("assets.selection.kitConfirmAction", { defaultValue: "Agregar kit completo" }),
+      cancelLabel: t("common.cancel"),
+      tone: "default",
+    });
+
+    if (!confirmed) {
+      return false;
+    }
+
+    setCartItemsById(
+      items.reduce<Record<string, AssetOperationCartItem>>((nextItems, item) => {
+        nextItems[item.id] = item;
+        return nextItems;
+      }, {}),
+    );
+    setSelectedAssetId(asset.id);
+    setAssignMoveSourceKitId(kit.id);
+    setActionPanelOpen(true);
+    setPackingPanelOpen(false);
+    setKitPanelOpen(false);
+    setAssignNextStep(null);
+    setActionError(null);
+    return true;
+  };
+
   const buildAssetCompareItem = (asset: AssetListRow) => ({
     id: asset.id,
     entityType: "asset" as const,
@@ -1536,6 +1700,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const clearOperationCart = () => {
     setCartItemsById({});
     setAssignNextStep(null);
+    setAssignMoveSourceKitId(null);
     // Clearing the selection also empties the side rail so no stale detail lingers.
     setSelectedAssetId(null);
   };
@@ -1549,16 +1714,18 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     );
   };
 
-  const openAssignMoveForAsset = (asset: AssetListRow) => {
+  const openAssignMoveForAsset = async (asset: AssetListRow) => {
     if (asset.linkedKitCount > 0) {
-      showIndividualKitLockedToast(asset);
+      await confirmAssignMoveFullKitFromAsset(asset);
       return;
     }
 
     replaceOperationCartWithAssets([asset]);
     setSelectedAssetId(asset.id);
+    setAssignMoveSourceKitId(null);
     setActionPanelOpen(true);
     setPackingPanelOpen(false);
+    setKitPanelOpen(false);
     setAssignNextStep(null);
     setActionError(null);
   };
@@ -1597,18 +1764,20 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     setKitPanelOpen(true);
     setActionPanelOpen(false);
     setPackingPanelOpen(false);
+    setAssignMoveSourceKitId(null);
     setKitError(null);
   };
 
-  const openAssignMoveForSelection = () => {
+  const openAssignMoveForSelection = async () => {
     if (selectedAssets.length === 1 && selectedKitLockedAssets.length === 1) {
-      showIndividualKitLockedToast(selectedAssets[0]);
+      await confirmAssignMoveFullKitFromAsset(selectedAssets[0]);
       return;
     }
 
     setActionPanelOpen(true);
     setPackingPanelOpen(false);
     setKitPanelOpen(false);
+    setAssignMoveSourceKitId(null);
     setAssignNextStep(null);
   };
 
@@ -1623,6 +1792,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         workspaceId: activeWorkspaceId,
         assetIds: selectedRowIds,
         assetSelections: formValue.assetSelections,
+        sourceKitId: assignMoveSourceKitId ?? undefined,
         mode: formValue.mode,
         projectId: formValue.projectId,
         projectUnitId: formValue.projectUnitId,
@@ -1642,6 +1812,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         toast.warning(t("assets.toasts.reviewAssignTitle"), result.warningSummary);
       }
       setActionPanelOpen(false);
+      setAssignMoveSourceKitId(null);
       if (formValue.mode === "assign" && formValue.projectId) {
         const assignedProject = projects.find((project) => project.id === formValue.projectId);
         setAssignNextStep({
@@ -2709,6 +2880,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         <ModalShell
           onClose={() => {
             setActionPanelOpen(false);
+            setAssignMoveSourceKitId(null);
             setActionError(null);
           }}
           width={820}
@@ -2724,6 +2896,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             onAssetSelectionsChange={updateCartSelections}
             onClose={() => {
               setActionPanelOpen(false);
+              setAssignMoveSourceKitId(null);
               setActionError(null);
             }}
             onSubmit={handleAssignMove}
@@ -3560,7 +3733,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 key: "assign-move",
                 label: t("assets.cart.assignMove"),
                 icon: <MoveRight size={14} />,
-                onSelect: (target) => openAssignMoveForAsset(target),
+                onSelect: (target) => void openAssignMoveForAsset(target),
               },
               {
                 key: "assign-to-kit",

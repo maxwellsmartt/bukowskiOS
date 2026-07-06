@@ -20318,6 +20318,51 @@ select.field-input {
   font-weight: 500;
 }
 
+.asset-kit-confirm-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.asset-kit-confirm-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.asset-kit-confirm-summary strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.asset-kit-confirm-member-list {
+  margin-top: 8px;
+  grid-template-columns: 1fr;
+  max-height: 168px;
+  overflow: auto;
+}
+
+.asset-kit-confirm-member-list li {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.asset-kit-confirm-member-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-kit-confirm-member-list small {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
 .permission-matrix-wrapper {
   overflow-x: auto;
   border: 1px solid rgba(255, 255, 255, 0.06);
