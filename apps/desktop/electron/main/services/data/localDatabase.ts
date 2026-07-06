@@ -731,6 +731,9 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   runStartupStep("backfill kit sync outbox", () =>
     applyTrackedStep(database, "runtime_kit_sync_backfill_v1", () => backfillKitSyncOutbox(database)),
   );
+  runStartupStep("replay kit sync outbox after membership delete fix", () =>
+    applyTrackedStep(database, "runtime_kit_sync_backfill_v2", () => backfillKitSyncOutbox(database, { batchId: "v2" })),
+  );
   runStartupStep("clean up seed-workspace kit outbox", () =>
     applyTrackedStep(database, "runtime_kit_seed_outbox_cleanup_v1", () => cleanupSeedKitOutbox(database)),
   );

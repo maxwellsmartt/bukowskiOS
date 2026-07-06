@@ -68,6 +68,45 @@ describe("kit sync backfill", () => {
     cleanup();
   });
 
+  it("can replay sent kit backfills without duplicating active outbox rows", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-kit-sync-backfill-replay", { includeDemoData: false });
+    const originalUpdatedAt = "2026-07-01T10:00:00.000Z";
+    insertRemoteWorkspace(database);
+    database
+      .prepare(
+        `
+          INSERT INTO kits (id, workspace_id, code, name, description, notes, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, NULL, NULL, 1, ?, ?)
+        `,
+      )
+      .run("kit-sync-replay", remoteWorkspaceId, "REPLAY-KIT", "Replay Kit", originalUpdatedAt, originalUpdatedAt);
+
+    backfillKitSyncOutbox(database);
+    database
+      .prepare("UPDATE sync_outbox SET status = 'sent', updated_at = ? WHERE id = ?")
+      .run("2026-07-02T10:00:00.000Z", "backfill-kit-kit-sync-replay");
+    backfillKitSyncOutbox(database, { batchId: "v2" });
+    backfillKitSyncOutbox(database, { batchId: "v2" });
+
+    const rows = database
+      .prepare(
+        `
+          SELECT id, status
+          FROM sync_outbox
+          WHERE entity_type = 'kit' AND entity_id = ?
+          ORDER BY id
+        `,
+      )
+      .all("kit-sync-replay") as Array<{ id: string; status: string }>;
+
+    expect(rows).toEqual([
+      { id: "backfill-kit-kit-sync-replay", status: "sent" },
+      { id: "backfill-kit-v2-kit-sync-replay", status: "pending" },
+    ]);
+
+    cleanup();
+  });
+
   it("skips seed workspace kits and cleans invalid kit outbox rows", () => {
     const { cleanup, database } = createTestDatabase("bukowski-kit-sync-backfill-seed", { includeDemoData: false });
     const now = "2026-07-03T12:00:00.000Z";

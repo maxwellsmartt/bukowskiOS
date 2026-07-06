@@ -5,14 +5,46 @@ import type { DatabaseSync } from "node:sqlite";
 // `kit` outbox rows; this catches pre-existing local kits so they can sync to
 // other machines without direct DB surgery.
 
-const enqueueKitUpsert = (db: DatabaseSync, workspaceId: string, kitId: string, now: string) => {
+const hasActiveKitOutbox = (db: DatabaseSync, workspaceId: string, kitId: string): boolean => {
+  const row = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM sync_outbox
+        WHERE workspace_id = ?
+          AND entity_type = 'kit'
+          AND entity_id = ?
+          AND status IN ('pending', 'processing', 'failed')
+      `,
+    )
+    .get(workspaceId, kitId) as { count: number };
+  return row.count > 0;
+};
+
+const enqueueKitUpsert = (
+  db: DatabaseSync,
+  workspaceId: string,
+  kitId: string,
+  now: string,
+  batchId?: string,
+) => {
+  if (hasActiveKitOutbox(db, workspaceId, kitId)) return;
+
   db.prepare(
     `INSERT OR IGNORE INTO sync_outbox (
        id, workspace_id, entity_type, entity_id, operation_type,
        payload_json, status, attempt_count, last_error, next_retry_at,
        created_at, updated_at
      ) VALUES (?, ?, 'kit', ?, 'upsert', ?, 'pending', 0, NULL, ?, ?, ?)`,
-  ).run(`backfill-kit-${kitId}`, workspaceId, kitId, JSON.stringify({ id: kitId }), now, now, now);
+  ).run(
+    batchId ? `backfill-kit-${batchId}-${kitId}` : `backfill-kit-${kitId}`,
+    workspaceId,
+    kitId,
+    JSON.stringify({ id: kitId }),
+    now,
+    now,
+    now,
+  );
 };
 
 // Only real (Supabase-backed) workspaces sync: their ids are uuids (36 chars).
@@ -20,7 +52,7 @@ const enqueueKitUpsert = (db: DatabaseSync, workspaceId: string, kitId: string, 
 // fails because the remote mirror has a uuid FK for workspace_id.
 const isSyncableWorkspaceId = (workspaceId: string) => workspaceId.length === 36 && workspaceId.split("-").length === 5;
 
-export const backfillKitSyncOutbox = (db: DatabaseSync) => {
+export const backfillKitSyncOutbox = (db: DatabaseSync, options: { batchId?: string } = {}) => {
   const now = new Date().toISOString();
   const kits = db.prepare("SELECT id, workspace_id FROM kits").all() as Array<{ id: string; workspace_id: string }>;
 
@@ -30,7 +62,7 @@ export const backfillKitSyncOutbox = (db: DatabaseSync) => {
     // Bump updated_at so this machine's authoritative local kit wins over any
     // older remote placeholder/state if last-writer-wins reconciliation runs.
     db.prepare("UPDATE kits SET updated_at = ? WHERE id = ?").run(now, row.id);
-    enqueueKitUpsert(db, row.workspace_id, row.id, now);
+    enqueueKitUpsert(db, row.workspace_id, row.id, now, options.batchId);
   }
 };
 

@@ -48,7 +48,7 @@ const entityTables: CatalogPullEntityType[] = [
 const RATES_CURSOR_KEY = (workspaceId: string) =>
   `bukowski:catalog-pull-cursor:${workspaceId}:exchange_rates:v2`;
 const KITS_CURSOR_KEY = (workspaceId: string) =>
-  `bukowski:catalog-pull-cursor:${workspaceId}:kits:v2`;
+  `bukowski:catalog-pull-cursor:${workspaceId}:kits:v3`;
 
 const errorLogger = {
   warn: (label: string, error: unknown) => {
