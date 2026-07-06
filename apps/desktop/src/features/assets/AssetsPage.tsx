@@ -30,7 +30,12 @@ import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
-import { resolveAssetAvailability, translateAssetAvailabilityLabel, translateAssetAvailabilityReason } from "@shared/lib/assetAvailability";
+import {
+  resolveAssetAvailability,
+  resolveAssetPackingAvailability,
+  translateAssetAvailabilityLabel,
+  translateAssetAvailabilityReason,
+} from "@shared/lib/assetAvailability";
 import { formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
 import { presentAssetCondition, presentAssetStatus } from "@shared/lib/assetStatusPresentation";
 import { cleanDisplay } from "@shared/lib/displayValue";
@@ -480,6 +485,8 @@ type AssetOperationCartProps = {
   onOpenAssignToKit: () => void;
   onOpenAssetDetail: (assetId: string) => void;
   onOpenProjectReturns?: () => void;
+  packingProjectId?: string | null;
+  packingSourceKitId?: string | null;
   onQuantityChange: (assetId: string, quantity: number) => void;
   onRemove: (assetId: string) => void;
 };
@@ -496,6 +503,8 @@ const AssetOperationCart = ({
   onOpenAssignToKit,
   onOpenAssetDetail,
   onOpenProjectReturns,
+  packingProjectId,
+  packingSourceKitId,
   onQuantityChange,
   onRemove,
 }: AssetOperationCartProps) => {
@@ -506,9 +515,9 @@ const AssetOperationCart = ({
   }
 
   const lockedItems = items.filter((asset) => asset.linkedKitCount > 0);
-  const unavailableItems = items.filter((asset) => asset.linkedKitCount <= 0 && !resolveAssetAvailability(asset).isAvailable);
+  const unavailablePackingItems = items.filter((asset) => !resolveAssetPackingAvailability(asset, packingProjectId, packingSourceKitId).isAvailable);
   const hasBulkKitLock = lockedItems.length > 0 && items.length > 1;
-  const issueActionsDisabled = lockedItems.length > 0 || unavailableItems.length > 0;
+  const issueActionsDisabled = unavailablePackingItems.length > 0;
   const singleAsset = items.length === 1 ? items[0] : null;
   const checkedOutUnits = items.reduce((total, asset) => total + asset.checkedOutQuantity, 0);
 
@@ -1392,6 +1401,18 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   }, [activeAsset, t]);
   const selectedRowIds = useMemo(() => Object.keys(cartItemsById), [cartItemsById]);
   const selectedAssets = useMemo(() => selectedRowIds.map((assetId) => cartItemsById[assetId]).filter(Boolean), [cartItemsById, selectedRowIds]);
+  const packingDefaultProjectId = useMemo(() => {
+    if (assignNextStep?.projectId) {
+      return assignNextStep.projectId;
+    }
+
+    if (isProjectMode && projectId) {
+      return projectId;
+    }
+
+    const selectedProjectIds = [...new Set(selectedAssets.map((asset) => asset.projectId).filter(Boolean))] as string[];
+    return selectedProjectIds.length === 1 ? selectedProjectIds[0] : null;
+  }, [assignNextStep?.projectId, isProjectMode, projectId, selectedAssets]);
   const selectedAssetSelections = useMemo(
     () =>
       selectedAssets.map((asset) => ({
@@ -1733,8 +1754,10 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const openPackingSlipForAsset = (asset: AssetListRow) => {
     replaceOperationCartWithAssets([asset]);
     setSelectedAssetId(asset.id);
+    setAssignMoveSourceKitId(null);
     setPackingPanelOpen(true);
     setActionPanelOpen(false);
+    setKitPanelOpen(false);
     setPackingError(null);
   };
 
@@ -1787,6 +1810,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const handleAssignMove = async (formValue: AssetAssignMoveFormValue) => {
     try {
       setIsSubmittingAction(true);
+      const sourceKitIdForFollowUp = assignMoveSourceKitId;
       const result = await assignMoveAssets({
         commandId: crypto.randomUUID(),
         workspaceId: activeWorkspaceId,
@@ -1812,13 +1836,13 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         toast.warning(t("assets.toasts.reviewAssignTitle"), result.warningSummary);
       }
       setActionPanelOpen(false);
-      setAssignMoveSourceKitId(null);
       if (formValue.mode === "assign" && formValue.projectId) {
         const assignedProject = projects.find((project) => project.id === formValue.projectId);
         setAssignNextStep({
           projectId: formValue.projectId,
           projectName: assignedProject?.name ?? t("assets.selection.thisProject"),
         });
+        setAssignMoveSourceKitId(sourceKitIdForFollowUp);
       } else {
         clearOperationCart();
       }
@@ -1886,6 +1910,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         workspaceId: activeWorkspaceId,
         assetIds: selectedRowIds,
         assetSelections: formValue.assetSelections,
+        sourceKitId: assignMoveSourceKitId ?? undefined,
         projectId: formValue.projectId,
         projectUnitId: formValue.projectUnitId,
         departmentId: formValue.departmentId,
@@ -2947,7 +2972,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           className="asset-operation-modal-shell"
         >
           <PackingSlipBuilderPanel
-            defaultProjectId={assignNextStep?.projectId ?? (isProjectMode ? projectId ?? null : null)}
+            defaultProjectId={packingDefaultProjectId}
             departments={catalog.departments}
             error={packingError}
             initialAssetSelections={selectedAssetSelections}
@@ -2961,6 +2986,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             projects={projects}
             selectedAssets={selectedAssets}
             selectedCount={selectedRowIds.length}
+            sourceKitId={assignMoveSourceKitId}
             users={catalog.users}
           />
         </ModalShell>
@@ -3846,6 +3872,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               onOpenAssignToKit={openAssignKitForSelection}
               onOpenAssetDetail={(assetId) => navigate(`/assets/${assetId}?report=incident`)}
               onOpenProjectReturns={isProjectMode && projectId ? () => navigate(`/projects/${projectId}/packing`) : undefined}
+              packingProjectId={packingDefaultProjectId}
+              packingSourceKitId={assignMoveSourceKitId}
               onQuantityChange={updateCartQuantity}
               onRemove={removeFromCart}
             />

@@ -7,6 +7,7 @@ type AvailabilityAsset = {
   checkedOutQuantity?: number;
   linkedKitCount?: number;
   linkedKitCodes?: string[];
+  projectId?: string | null;
   project?: string;
 };
 
@@ -107,6 +108,58 @@ export const resolveAssetAvailability = (asset: AvailabilityAsset): AssetAvailab
     values: { count: asset.quantity },
     tone: "success",
   };
+};
+
+export const resolveAssetPackingAvailability = (
+  asset: AvailabilityAsset,
+  projectId?: string | null,
+  sourceKitId?: string | null,
+): AssetAvailability => {
+  if ((asset.linkedKitCount ?? 0) > 0 && sourceKitId) {
+    return {
+      key: "available",
+      isAvailable: true,
+      label: "Kit ready",
+      reason: "This kit will be packed as a complete unit.",
+      nextAction: "Ready to issue.",
+      values: { count: asset.assignedQuantity ?? asset.quantity },
+      tone: "success",
+    };
+  }
+
+  const baseAvailability = resolveAssetAvailability(asset);
+  if (baseAvailability.key === "retired" || baseAvailability.key === "inRepair" || baseAvailability.key === "checkedOut") {
+    return baseAvailability;
+  }
+
+  const assignedQuantity = asset.assignedQuantity ?? 0;
+  const isReservedForSelectedProject = Boolean(projectId && asset.projectId === projectId && assignedQuantity > 0);
+
+  if (isReservedForSelectedProject && !asset.checkedOutQuantity) {
+    return {
+      key: "available",
+      isAvailable: true,
+      label: "Reserved for project",
+      reason: "Reserved for this project and ready to issue on a packing slip.",
+      nextAction: "Ready to issue.",
+      values: { count: assignedQuantity },
+      tone: "success",
+    };
+  }
+
+  if (projectId && asset.projectId && asset.projectId !== projectId && assignedQuantity > 0) {
+    return {
+      key: "assigned",
+      isAvailable: false,
+      label: "Assigned",
+      reason: `${assignedQuantity} reserved${hasMeaningfulProject(asset.project) ? ` for ${asset.project}` : " for another project"}.`,
+      nextAction: "Move the reservation before issuing this packing slip.",
+      values: { count: assignedQuantity, project: hasMeaningfulProject(asset.project) ? asset.project : undefined },
+      tone: "info",
+    };
+  }
+
+  return baseAvailability;
 };
 
 export const translateAssetAvailabilityLabel = (availability: AssetAvailability, t: TFunction) =>

@@ -6,7 +6,7 @@ import type { AssetListRow, CatalogSnapshot, PackingSlipAssetSelection, ProjectC
 import { useProjectDetail } from "@features/projects/useProjectsData";
 import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
-import { resolveAssetAvailability, summarizeUnavailableAssets } from "@shared/lib/assetAvailability";
+import { resolveAssetPackingAvailability, summarizeUnavailableAssets } from "@shared/lib/assetAvailability";
 
 export type PackingSlipBuilderDraft = {
   assetSelections: PackingSlipAssetSelection[];
@@ -30,6 +30,7 @@ type PackingSlipBuilderPanelProps = {
   projects: ProjectCardRow[];
   selectedAssets: AssetListRow[];
   selectedCount: number;
+  sourceKitId?: string | null;
   users: CatalogSnapshot["users"];
 };
 
@@ -49,6 +50,7 @@ export const PackingSlipBuilderPanel = ({
   projects,
   selectedAssets,
   selectedCount,
+  sourceKitId,
   users,
 }: PackingSlipBuilderPanelProps) => {
   const { t } = useTranslation();
@@ -64,19 +66,23 @@ export const PackingSlipBuilderPanel = ({
     () => new Map((initialAssetSelections ?? []).map((selection) => [selection.assetId, selection.quantity] as const)),
     [initialAssetSelections],
   );
+  const getPackingSourceQuantity = (asset: AssetListRow) =>
+    normalizeOptional(projectId) && asset.projectId === normalizeOptional(projectId) && asset.assignedQuantity > 0
+      ? asset.assignedQuantity
+      : asset.quantity;
 
   useEffect(() => {
     setQuantityByAssetId((current) => {
       const nextState: Record<string, number> = {};
 
       selectedAssets.forEach((asset) => {
-        const maxQuantity = Math.max(1, asset.quantity);
+        const maxQuantity = Math.max(1, getPackingSourceQuantity(asset));
         nextState[asset.id] = Math.min(maxQuantity, Math.max(1, current[asset.id] ?? initialQuantityByAssetId.get(asset.id) ?? 1));
       });
 
       return nextState;
     });
-  }, [initialQuantityByAssetId, selectedAssets]);
+  }, [initialQuantityByAssetId, projectId, selectedAssets]);
 
   useEffect(() => {
     setProjectUnitId((current) =>
@@ -88,19 +94,22 @@ export const PackingSlipBuilderPanel = ({
   const selectedAssetDetails = useMemo(
     () =>
       selectedAssets.map((asset) => {
-        const maxQuantity = Math.max(1, asset.quantity);
+        const maxQuantity = Math.max(1, getPackingSourceQuantity(asset));
         return {
           ...asset,
+          quantity: maxQuantity,
           requestedQuantity: Math.min(maxQuantity, Math.max(1, quantityByAssetId[asset.id] ?? maxQuantity)),
         };
       }),
-    [quantityByAssetId, selectedAssets],
+    [projectId, quantityByAssetId, selectedAssets],
   );
   const totalIssueQuantity = selectedAssetDetails.reduce((sum, asset) => sum + asset.requestedQuantity, 0);
   const issueQuantityLabel = t("packing.builder.itemCount", { count: totalIssueQuantity });
   const hasVariableQuantityAssets = selectedAssetDetails.some((asset) => asset.quantity > 1);
-  const kitLockedAssets = selectedAssetDetails.filter((asset) => asset.linkedKitCount > 0);
-  const unavailableAssets = selectedAssetDetails.filter((asset) => asset.linkedKitCount <= 0 && !resolveAssetAvailability(asset).isAvailable);
+  const kitLockedAssets = selectedAssetDetails.filter((asset) => asset.linkedKitCount > 0 && !sourceKitId);
+  const unavailableAssets = selectedAssetDetails.filter(
+    (asset) => !resolveAssetPackingAvailability(asset, normalizeOptional(projectId), sourceKitId).isAvailable,
+  );
   const kitLockSummary = kitLockedAssets.map((asset) => `${asset.code} (${asset.linkedKitCodes.join(", ")})`).join(", ");
   const availableSummaryLabel = unavailableAssets.length
     ? t("packing.builder.blocked", { count: unavailableAssets.length })

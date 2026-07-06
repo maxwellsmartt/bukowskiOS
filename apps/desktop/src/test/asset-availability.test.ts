@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveAssetAvailability, summarizeUnavailableAssets } from "@shared/lib/assetAvailability";
+import { resolveAssetAvailability, resolveAssetPackingAvailability, summarizeUnavailableAssets } from "@shared/lib/assetAvailability";
 
 const baseAsset = {
   status: "Available",
@@ -10,6 +10,7 @@ const baseAsset = {
   linkedKitCount: 0,
   linkedKitCodes: [],
   project: "—",
+  projectId: null,
 };
 
 describe("asset availability", () => {
@@ -79,5 +80,67 @@ describe("asset availability", () => {
         { ...baseAsset, quantity: 0, assignedQuantity: 1 },
       ]),
     ).toBe("1 in repair, 1 retired, 1 out of stock, 1 assigned");
+  });
+
+  it("allows packing assets that are already reserved for the selected project", () => {
+    expect(
+      resolveAssetPackingAvailability(
+        { ...baseAsset, quantity: 0, assignedQuantity: 2, project: "Shiver", projectId: "project-shiver" },
+        "project-shiver",
+      ),
+    ).toMatchObject({
+      isAvailable: true,
+      label: "Reserved for project",
+      tone: "success",
+    });
+  });
+
+  it("does not let project reservations override repair or checkout blockers", () => {
+    expect(
+      resolveAssetPackingAvailability(
+        { ...baseAsset, status: "Maintenance", quantity: 0, assignedQuantity: 1, projectId: "project-shiver" },
+        "project-shiver",
+      ),
+    ).toMatchObject({
+      isAvailable: false,
+      label: "In repair",
+    });
+
+    expect(
+      resolveAssetPackingAvailability(
+        { ...baseAsset, quantity: 0, assignedQuantity: 1, checkedOutQuantity: 1, projectId: "project-shiver" },
+        "project-shiver",
+      ),
+    ).toMatchObject({
+      isAvailable: false,
+      label: "Checked out",
+    });
+  });
+
+  it("blocks packing assets reserved for a different project", () => {
+    expect(
+      resolveAssetPackingAvailability(
+        { ...baseAsset, quantity: 1, assignedQuantity: 1, project: "Shiver", projectId: "project-shiver" },
+        "project-wave",
+      ),
+    ).toMatchObject({
+      isAvailable: false,
+      label: "Assigned",
+      reason: "1 reserved for Shiver.",
+    });
+  });
+
+  it("allows packing kit members only when the action is sourced from that kit", () => {
+    const kitAsset = { ...baseAsset, quantity: 0, linkedKitCount: 1, linkedKitCodes: ["KIT-01"] };
+
+    expect(resolveAssetPackingAvailability(kitAsset, "project-shiver")).toMatchObject({
+      isAvailable: false,
+      label: "In kit",
+    });
+
+    expect(resolveAssetPackingAvailability(kitAsset, "project-shiver", "kit-01")).toMatchObject({
+      isAvailable: true,
+      label: "Kit ready",
+    });
   });
 });
