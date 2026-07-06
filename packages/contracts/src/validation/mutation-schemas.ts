@@ -471,7 +471,7 @@ export const assignMoveAssetsSchema = z
       )
       .optional(),
     sourceKitId: optionalTrimmedString,
-    mode: z.enum(["assign", "move"]),
+    mode: z.enum(["assign", "move", "release"]),
     projectId: optionalTrimmedString,
     projectUnitId: optionalTrimmedString,
     departmentId: optionalTrimmedString,

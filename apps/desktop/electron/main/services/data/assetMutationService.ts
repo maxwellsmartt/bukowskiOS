@@ -251,11 +251,15 @@ const buildMoveNote = (assetName: string, fromLocationName: string | undefined, 
   return `Moved ${assetName}.`;
 };
 
-const summarizeResult = (eventType: "assigned" | "moved", processedCount: number) => {
+const summarizeResult = (eventType: "assigned" | "moved" | "released", processedCount: number) => {
   const assetLabel = processedCount === 1 ? "asset" : "assets";
-  return eventType === "assigned"
-    ? `${processedCount} ${assetLabel} updated through assignment flow.`
-    : `${processedCount} ${assetLabel} moved successfully.`;
+  if (eventType === "assigned") {
+    return `${processedCount} ${assetLabel} updated through assignment flow.`;
+  }
+  if (eventType === "released") {
+    return `${processedCount} ${assetLabel} released to available inventory.`;
+  }
+  return `${processedCount} ${assetLabel} moved successfully.`;
 };
 
 const resolveDateOverlap = (
@@ -514,7 +518,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
     if (existingReceipt?.outcome_status === "success") {
       return {
         commandId: input.commandId,
-        eventType: input.mode === "assign" ? "assigned" : "moved",
+        eventType: input.mode === "assign" ? "assigned" : input.mode === "release" ? "released" : "moved",
         processedAssetIds: assetIds,
         repeated: true,
         summary: "This command was already applied.",
@@ -695,7 +699,9 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
     const currentLocationIds = uniqueValues(assetStateRows.map((row) => row.current_location_id));
     const currentLocationMap = loadNamedEntities(db, "locations", input.workspaceId, currentLocationIds);
     const processedRows =
-      input.mode === "move"
+      input.mode === "release"
+        ? assetStateRows.filter((row) => row.assigned_quantity > 0 || row.active_assignment_id)
+        : input.mode === "move"
         ? assetStateRows.filter((row) => row.current_location_id !== input.targetLocationId)
         : assetStateRows.filter((row) => {
             const nextProjectId = input.projectId ?? row.current_project_id;
@@ -734,10 +740,26 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
           });
 
     if (!processedRows.length) {
-      fail("The selected assets already match the requested assignment or movement.");
+      fail(
+        input.mode === "release"
+          ? "The selected assets do not have active project reservations to release."
+          : "The selected assets already match the requested assignment or movement.",
+      );
     }
 
-    if (input.mode === "assign") {
+    if (input.mode === "release") {
+      const checkedOutAsset = processedRows.find((row) => row.checked_out_quantity > 0);
+
+      if (checkedOutAsset) {
+        fail(`${checkedOutAsset.asset_name} is currently checked out. Return its packing slip before releasing the reservation.`);
+      }
+
+      const unassignedAsset = processedRows.find((row) => row.assigned_quantity < 1 || !row.active_assignment_id);
+
+      if (unassignedAsset) {
+        fail(`${unassignedAsset.asset_name} does not have an active project reservation to release.`);
+      }
+    } else if (input.mode === "assign") {
       const checkedOutAsset = processedRows.find((row) => row.checked_out_quantity > 0);
 
       if (checkedOutAsset) {
@@ -784,7 +806,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
     }
 
     const now = new Date().toISOString();
-    const eventType = input.mode === "assign" ? "assigned" : "moved";
+    const eventType = input.mode === "assign" ? "assigned" : input.mode === "release" ? "released" : "moved";
     const currentProjectIds = uniqueValues(processedRows.map((row) => row.current_project_id));
     const currentProjectWindows = currentProjectIds.length
       ? (db
@@ -845,6 +867,13 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         `
           UPDATE asset_assignments
           SET assignment_status = 'reassigned', updated_at = ?
+          WHERE id = ?
+        `,
+      );
+      const releaseAssignmentStatement = db.prepare(
+        `
+          UPDATE asset_assignments
+          SET assignment_status = 'returned', returned_at = ?, notes = ?, updated_at = ?
           WHERE id = ?
         `,
       );
@@ -968,16 +997,32 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
 
       processedRows.forEach((row, index) => {
         const targetLocationId = input.targetLocationId ?? row.current_location_id;
-        let nextProjectId = input.mode === "assign" ? input.projectId ?? row.current_project_id : row.current_project_id;
+        let nextProjectId =
+          input.mode === "release"
+            ? null
+            : input.mode === "assign"
+              ? input.projectId ?? row.current_project_id
+              : row.current_project_id;
         let nextProjectUnitId =
-          input.mode === "assign"
+          input.mode === "release"
+            ? null
+            : input.mode === "assign"
             ? input.projectId && input.projectId !== row.current_project_id
               ? null
               : row.project_unit_id
             : row.project_unit_id;
-        const nextDepartmentId = input.mode === "assign" ? input.departmentId ?? row.current_department_id : row.current_department_id;
+        const nextDepartmentId =
+          input.mode === "release"
+            ? null
+            : input.mode === "assign"
+              ? input.departmentId ?? row.current_department_id
+              : row.current_department_id;
         const nextResponsibleUserId =
-          input.mode === "assign" ? input.assignedToUserId ?? row.current_responsible_user_id : row.current_responsible_user_id;
+          input.mode === "release"
+            ? null
+            : input.mode === "assign"
+              ? input.assignedToUserId ?? row.current_responsible_user_id
+              : row.current_responsible_user_id;
         let nextAssignmentId = row.active_assignment_id;
 
         if (input.mode === "assign" && input.projectUnitId) {
@@ -1014,7 +1059,15 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         const assignSourceFlow =
           input.mode === "assign" && sourceQuantity === row.assigned_quantity && row.available_quantity === 0 ? "assigned" : "available";
 
-        if (input.mode === "assign") {
+        if (input.mode === "release" && row.active_assignment_id) {
+          releaseAssignmentStatement.run(
+            now,
+            input.notes?.trim() || `Released ${row.asset_name} back to available inventory.`,
+            now,
+            row.active_assignment_id,
+          );
+          nextAssignmentId = null;
+        } else if (input.mode === "assign") {
           const sameActiveContext =
             row.active_assignment_id &&
             row.checked_out_quantity === 0 &&
@@ -1078,7 +1131,9 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         const responsibleName = nextResponsibleUserId ? userMap.get(nextResponsibleUserId) : undefined;
         const note =
           input.notes?.trim() ||
-          (input.mode === "assign"
+          (input.mode === "release"
+            ? `Released ${row.asset_name} back to available inventory.`
+            : input.mode === "assign"
             ? buildAssignmentNote(
                 row.asset_name,
                 unitName ? `${projectName ?? departmentName ?? "Project"} / ${unitName}` : projectName ?? departmentName,
@@ -1105,32 +1160,44 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             departmentId: nextDepartmentId,
             responsibleUserId: nextResponsibleUserId,
             activeAssignmentId: nextAssignmentId,
-            custodyStatus: input.mode === "assign" ? "assigned" : row.custody_status,
+            custodyStatus: input.mode === "release" ? "available" : input.mode === "assign" ? "assigned" : row.custody_status,
           },
           expectedReturnAt: input.expectedReturnAt ?? null,
-          quantity: input.mode === "assign" ? requestedQuantity : null,
+          quantity: input.mode === "release" ? row.assigned_quantity : input.mode === "assign" ? requestedQuantity : null,
         });
         const nextAvailableQuantity =
-          input.mode === "assign"
+          input.mode === "release"
+            ? row.available_quantity + row.assigned_quantity
+            : input.mode === "assign"
             ? assignSourceFlow === "assigned"
               ? row.available_quantity
               : Math.max(0, row.available_quantity - requestedQuantity)
             : row.available_quantity;
         const nextAssignedQuantity =
-          input.mode === "assign"
+          input.mode === "release"
+            ? 0
+            : input.mode === "assign"
             ? assignSourceFlow === "assigned"
               ? requestedQuantity
               : row.assigned_quantity + requestedQuantity
             : row.assigned_quantity;
         const nextCheckedOutQuantity = input.mode === "assign" ? 0 : row.checked_out_quantity;
+        const nextCustodyStatus =
+          input.mode === "release"
+            ? "available"
+            : input.mode === "assign"
+              ? nextAvailableQuantity > 0
+                ? "partial_assigned"
+                : "assigned"
+              : row.custody_status;
 
         insertEventStatement.run(
           eventId,
           input.workspaceId,
           row.asset_id,
           nextAssignmentId,
-          nextProjectId,
-          nextDepartmentId,
+          input.mode === "release" ? row.current_project_id : nextProjectId,
+          input.mode === "release" ? row.current_department_id : nextDepartmentId,
           defaultActorUserId,
           eventType,
           targetLocationId,
@@ -1155,7 +1222,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
           nextAvailableQuantity,
           nextAssignedQuantity,
           nextCheckedOutQuantity,
-          input.mode === "assign" ? (nextAvailableQuantity > 0 ? "partial_assigned" : "assigned") : row.custody_status,
+          nextCustodyStatus,
           eventId,
           row.version + 1,
           now,

@@ -103,7 +103,7 @@ export type AssignMoveAssetsInput = {
     quantity: number;
   }>;
   sourceKitId?: string;
-  mode: "assign" | "move";
+  mode: "assign" | "move" | "release";
   projectId?: string;
   projectUnitId?: string;
   departmentId?: string;
@@ -117,7 +117,7 @@ export type AssignMoveAssetsInput = {
 
 export type AssignMoveAssetsResult = {
   commandId: string;
-  eventType: "assigned" | "moved";
+  eventType: "assigned" | "moved" | "released";
   processedAssetIds: string[];
   repeated: boolean;
   summary: string;

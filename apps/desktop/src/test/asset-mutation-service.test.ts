@@ -369,6 +369,71 @@ describe("asset mutation service", () => {
     cleanup();
   });
 
+  it("releases assigned project reservations back to available inventory", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-release-reservation-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createAssetMutationService(database);
+
+    mutations.assignMoveAssets({
+      commandId: "cmd-test-asset-release-seed",
+      workspaceId: "workspace-metadata",
+      assetIds: ["asset-legacy-rentman-1"],
+      assetSelections: [{ assetId: "asset-legacy-rentman-1", quantity: 1 }],
+      mode: "assign",
+      projectId: "project-aurora",
+      assignedToUserId: "user-paola",
+      targetLocationId: "loc-video-village",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    const releaseResult = mutations.assignMoveAssets({
+      commandId: "cmd-test-asset-release",
+      workspaceId: "workspace-metadata",
+      assetIds: ["asset-legacy-rentman-1"],
+      mode: "release",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(releaseResult.eventType).toBe("released");
+    expect(releaseResult.processedAssetIds).toEqual(["asset-legacy-rentman-1"]);
+
+    const state = database
+      .prepare(
+        "SELECT available_quantity, assigned_quantity, checked_out_quantity, custody_status, active_assignment_id, current_project_id FROM asset_current_state WHERE asset_id = ?",
+      )
+      .get("asset-legacy-rentman-1") as
+      | {
+          available_quantity: number;
+          assigned_quantity: number;
+          checked_out_quantity: number;
+          custody_status: string;
+          active_assignment_id: string | null;
+          current_project_id: string | null;
+        }
+      | undefined;
+
+    expect(state).toMatchObject({
+      available_quantity: 2,
+      assigned_quantity: 0,
+      checked_out_quantity: 0,
+      custody_status: "available",
+      active_assignment_id: null,
+      current_project_id: null,
+    });
+
+    const assignment = database
+      .prepare("SELECT assignment_status, returned_at FROM asset_assignments WHERE asset_id = ? ORDER BY updated_at DESC LIMIT 1")
+      .get("asset-legacy-rentman-1") as { assignment_status: string; returned_at: string | null } | undefined;
+
+    expect(assignment?.assignment_status).toBe("returned");
+    expect(assignment?.returned_at).toBeTruthy();
+    expect(reads.getAssetDetail("asset-legacy-rentman-1").asset?.quantity).toBe(2);
+
+    cleanup();
+  });
+
   it("blocks assigning kit members individually unless the action comes from that kit", () => {
     const { cleanup, database } = createTestDatabase("bukowski-asset-kit-guard-test");
     const assetMutations = createAssetMutationService(database);

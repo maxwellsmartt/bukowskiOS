@@ -420,7 +420,19 @@ type AssetOperationCartItem = AssetListRow & {
   requestedQuantity: number;
 };
 
-const resolveAssignableQuantity = (asset: Pick<AssetListRow, "quantity">) => Math.max(0, asset.quantity);
+const resolveAssignableQuantity = (
+  asset: Pick<AssetListRow, "quantity" | "assignedQuantity" | "checkedOutQuantity">,
+) => {
+  if (asset.quantity > 0) {
+    return asset.quantity;
+  }
+
+  if (asset.assignedQuantity > 0 && asset.checkedOutQuantity === 0) {
+    return asset.assignedQuantity;
+  }
+
+  return Math.max(0, asset.quantity);
+};
 
 const buildAssetListRowFromCatalogOption = (asset: CatalogAssetOptionRow, kit?: CatalogKitRow): AssetListRow => ({
   id: asset.id,
@@ -457,7 +469,10 @@ const buildAssetListRowFromCatalogOption = (asset: CatalogAssetOptionRow, kit?: 
   linkedKitNames: asset.linkedKitNames.length ? asset.linkedKitNames : kit ? [kit.name] : [],
 });
 
-const clampOperationQuantity = (asset: Pick<AssetListRow, "quantity">, quantity: number | undefined) => {
+const clampOperationQuantity = (
+  asset: Pick<AssetListRow, "quantity" | "assignedQuantity" | "checkedOutQuantity">,
+  quantity: number | undefined,
+) => {
   const maxQuantity = resolveAssignableQuantity(asset);
 
   if (maxQuantity <= 0) {
@@ -488,6 +503,7 @@ type AssetOperationCartProps = {
   packingProjectId?: string | null;
   packingSourceKitId?: string | null;
   onQuantityChange: (assetId: string, quantity: number) => void;
+  onReleaseAssignedAssets?: () => void;
   onRemove: (assetId: string) => void;
 };
 
@@ -506,6 +522,7 @@ const AssetOperationCart = ({
   packingProjectId,
   packingSourceKitId,
   onQuantityChange,
+  onReleaseAssignedAssets,
   onRemove,
 }: AssetOperationCartProps) => {
   const { t } = useTranslation();
@@ -520,6 +537,10 @@ const AssetOperationCart = ({
   const issueActionsDisabled = unavailablePackingItems.length > 0;
   const singleAsset = items.length === 1 ? items[0] : null;
   const checkedOutUnits = items.reduce((total, asset) => total + asset.checkedOutQuantity, 0);
+  const releasableReservedUnits = items.reduce(
+    (total, asset) => total + (asset.checkedOutQuantity > 0 ? 0 : asset.assignedQuantity),
+    0,
+  );
 
   return (
     <div className="asset-operation-cart">
@@ -608,6 +629,26 @@ const AssetOperationCart = ({
             type="button"
           >
             {t("assets.cart.return")}
+          </button>
+        ) : null}
+        {onReleaseAssignedAssets ? (
+          <button
+            className="ghost-control action-row-button"
+            data-tooltip={
+              releasableReservedUnits
+                ? t("assets.cart.releaseAssignedTip", {
+                    count: releasableReservedUnits,
+                    defaultValue: "Libera estas reservas y devuelve las unidades al inventario disponible.",
+                  })
+                : t("assets.cart.releaseAssignedUnavailableTip", {
+                    defaultValue: "No hay reservas seleccionadas para liberar.",
+                  })
+            }
+            disabled={!releasableReservedUnits}
+            onClick={onReleaseAssignedAssets}
+            type="button"
+          >
+            {t("assets.cart.releaseAssigned", { defaultValue: "Liberar reserva" })}
           </button>
         ) : null}
         <button
@@ -1401,6 +1442,27 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   }, [activeAsset, t]);
   const selectedRowIds = useMemo(() => Object.keys(cartItemsById), [cartItemsById]);
   const selectedAssets = useMemo(() => selectedRowIds.map((assetId) => cartItemsById[assetId]).filter(Boolean), [cartItemsById, selectedRowIds]);
+  const inferredCompleteKitSourceId = useMemo(() => {
+    const lockedAssetIds = selectedAssets.filter((asset) => asset.linkedKitCount > 0).map((asset) => asset.id);
+    if (!lockedAssetIds.length) {
+      return null;
+    }
+
+    const selectedAssetIdSet = new Set(selectedAssets.map((asset) => asset.id));
+    const matchingKits = catalog.kits.filter((kit) => {
+      if (!kit.isActive || !kit.assetSelections.length) {
+        return false;
+      }
+
+      const kitAssetIds = kit.assetSelections.map((selection) => selection.assetId);
+      const includesEveryLockedAsset = lockedAssetIds.every((assetId) => kitAssetIds.includes(assetId));
+      const includesFullKitSelection = kitAssetIds.every((assetId) => selectedAssetIdSet.has(assetId));
+      return includesEveryLockedAsset && includesFullKitSelection;
+    });
+
+    return matchingKits.length === 1 ? matchingKits[0]!.id : null;
+  }, [catalog.kits, selectedAssets]);
+  const effectivePackingSourceKitId = assignMoveSourceKitId ?? inferredCompleteKitSourceId;
   const packingDefaultProjectId = useMemo(() => {
     if (assignNextStep?.projectId) {
       return assignNextStep.projectId;
@@ -1816,7 +1878,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         workspaceId: activeWorkspaceId,
         assetIds: selectedRowIds,
         assetSelections: formValue.assetSelections,
-        sourceKitId: assignMoveSourceKitId ?? undefined,
+        sourceKitId: effectivePackingSourceKitId ?? undefined,
         mode: formValue.mode,
         projectId: formValue.projectId,
         projectUnitId: formValue.projectUnitId,
@@ -1937,6 +1999,74 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setPackingError(getUserFacingErrorMessage(nextError, t("assets.toasts.unableIssueSlip")));
     } finally {
       setIsSubmittingPacking(false);
+    }
+  };
+
+  const handleReleaseAssignedAssets = async () => {
+    const releasableAssets = selectedAssets.filter((asset) => asset.assignedQuantity > 0 && asset.checkedOutQuantity === 0);
+
+    if (!releasableAssets.length) {
+      toast.info(
+        t("assets.release.noneTitle", { defaultValue: "No hay reservas para liberar" }),
+        t("assets.release.noneBody", { defaultValue: "Selecciona equipos asignados al proyecto que todavía no estén fuera en packing." }),
+      );
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: t("assets.release.confirmTitle", { defaultValue: "Liberar reservas seleccionadas" }),
+      body: t("assets.release.confirmBody", {
+        count: releasableAssets.length,
+        defaultValue: "Esto quitará estos equipos del proyecto y devolverá sus unidades al inventario disponible.",
+      }),
+      details: (
+        <ul className="confirm-dialog-list">
+          {releasableAssets.slice(0, 8).map((asset) => (
+            <li key={asset.id}>
+              <strong>{asset.code}</strong>
+              {asset.name}
+            </li>
+          ))}
+          {releasableAssets.length > 8 ? <li>+{releasableAssets.length - 8}</li> : null}
+        </ul>
+      ),
+      confirmLabel: t("assets.release.confirmAction", { defaultValue: "Liberar reserva" }),
+      cancelLabel: t("common.cancel"),
+      tone: "default",
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setIsSubmittingAction(true);
+      const result = await assignMoveAssets({
+        commandId: crypto.randomUUID(),
+        workspaceId: activeWorkspaceId,
+        assetIds: releasableAssets.map((asset) => asset.id),
+        sourceKitId: effectivePackingSourceKitId ?? undefined,
+        mode: "release",
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+
+      await Promise.all([reload(), refreshProjects()]);
+      setAssignNextStep(null);
+      setAssignMoveSourceKitId(null);
+      setActionError(null);
+      setPackingError(null);
+      clearOperationCart();
+      toast.success(t("assets.toasts.doneTitle"), result.summary);
+    } catch (nextError) {
+      const message = getUserFacingErrorMessage(
+        nextError,
+        t("assets.release.failed", { defaultValue: "No se pudo liberar la reserva." }),
+      );
+      setActionError(message);
+      toast.error(t("assets.release.failedTitle", { defaultValue: "No se pudo liberar" }), message);
+    } finally {
+      setIsSubmittingAction(false);
     }
   };
 
@@ -2986,7 +3116,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             projects={projects}
             selectedAssets={selectedAssets}
             selectedCount={selectedRowIds.length}
-            sourceKitId={assignMoveSourceKitId}
+            sourceKitId={effectivePackingSourceKitId}
             users={catalog.users}
           />
         </ModalShell>
@@ -3873,8 +4003,9 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               onOpenAssetDetail={(assetId) => navigate(`/assets/${assetId}?report=incident`)}
               onOpenProjectReturns={isProjectMode && projectId ? () => navigate(`/projects/${projectId}/packing`) : undefined}
               packingProjectId={packingDefaultProjectId}
-              packingSourceKitId={assignMoveSourceKitId}
+              packingSourceKitId={effectivePackingSourceKitId}
               onQuantityChange={updateCartQuantity}
+              onReleaseAssignedAssets={handleReleaseAssignedAssets}
               onRemove={removeFromCart}
             />
 
