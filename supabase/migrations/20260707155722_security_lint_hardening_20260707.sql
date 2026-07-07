@@ -67,19 +67,49 @@ BEGIN
 
     CREATE POLICY sync_conflicts_members_read ON public.sync_conflicts
       FOR SELECT TO authenticated
-      USING (public.is_workspace_member(workspace_id));
+      USING (
+        CASE
+          WHEN workspace_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            THEN public.is_workspace_member(workspace_id::text::uuid)
+          ELSE false
+        END
+      );
 
     CREATE POLICY sync_conflicts_members_insert ON public.sync_conflicts
       FOR INSERT TO authenticated
-      WITH CHECK (public.is_workspace_member(workspace_id));
+      WITH CHECK (
+        CASE
+          WHEN workspace_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            THEN public.is_workspace_member(workspace_id::text::uuid)
+          ELSE false
+        END
+      );
 
     CREATE POLICY sync_conflicts_members_update ON public.sync_conflicts
       FOR UPDATE TO authenticated
-      USING (public.is_workspace_member(workspace_id))
-      WITH CHECK (public.is_workspace_member(workspace_id));
+      USING (
+        CASE
+          WHEN workspace_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            THEN public.is_workspace_member(workspace_id::text::uuid)
+          ELSE false
+        END
+      )
+      WITH CHECK (
+        CASE
+          WHEN workspace_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            THEN public.is_workspace_member(workspace_id::text::uuid)
+          ELSE false
+        END
+      );
 
     CREATE POLICY sync_conflicts_members_delete ON public.sync_conflicts
       FOR DELETE TO authenticated
-      USING (public.is_workspace_member(workspace_id));
+      USING (
+        CASE
+          WHEN workspace_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            THEN public.is_workspace_member(workspace_id::text::uuid)
+          ELSE false
+        END
+      );
   END IF;
 END $$;
