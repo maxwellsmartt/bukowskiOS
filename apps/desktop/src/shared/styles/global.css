@@ -5018,9 +5018,20 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 10px;
+  min-height: auto;
+  padding: 3px 2px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: rgba(185, 194, 207, 0.78);
   font-size: 11px;
   line-height: 1;
+}
+
+.asset-operation-cart-header .asset-operation-cart-clear:hover {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-primary);
 }
 
 .asset-operation-cart-copy {
@@ -5062,8 +5073,24 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   padding-inline: 9px;
 }
 
-.asset-operation-cart-actions .asset-operation-cart-delete {
-  grid-column: span 2;
+.asset-operation-cart-actions .action-row-button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.46;
+  filter: saturate(0.72);
+}
+
+.asset-operation-cart-actions .ghost-control[aria-disabled="true"]:hover,
+.asset-operation-cart-actions .action-primary-button[aria-disabled="true"]:hover {
+  background: rgba(255, 255, 255, 0.025);
+  border-color: rgba(255, 255, 255, 0.07);
+  color: var(--text-secondary);
+  transform: none;
+}
+
+.asset-operation-cart-actions .ghost-control.is-danger[aria-disabled="true"]:hover {
+  background: transparent;
+  border-color: rgba(227, 113, 113, 0.45);
+  color: rgba(231, 154, 154, 0.82);
 }
 
 .asset-operation-cart-list {
@@ -5078,7 +5105,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .asset-operation-cart-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 48px 28px;
+  grid-template-columns: minmax(0, 1fr) minmax(118px, 132px) 28px;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -5117,21 +5144,102 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .asset-operation-cart-quantity {
-  display: grid;
-  justify-items: start;
-  gap: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
-.asset-operation-cart-quantity .action-field-label {
+.asset-operation-cart-quantity-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.asset-operation-cart-availability {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(245, 197, 107, 0.78);
   font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-operation-cart-availability strong {
+  color: rgba(255, 211, 132, 0.98);
+  font-weight: 800;
+}
+
+.asset-operation-cart-stepper {
+  position: relative;
+  flex: 0 0 48px;
 }
 
 .asset-operation-cart-quantity .action-field-control {
   width: 48px;
   min-height: 26px;
-  padding: 0 6px;
+  padding: 0 17px 0 6px;
   border-radius: 8px;
   font-size: 11px;
+  text-align: center;
+}
+
+.asset-operation-cart-stepper-buttons {
+  position: absolute;
+  inset-block: 2px;
+  right: 2px;
+  display: grid;
+  width: 14px;
+  overflow: hidden;
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(2px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.asset-operation-cart-stepper:hover .asset-operation-cart-stepper-buttons,
+.asset-operation-cart-stepper:focus-within .asset-operation-cart-stepper-buttons {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.asset-operation-cart-stepper-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  min-width: 0;
+  height: 11px;
+  padding: 0;
+  border: 0;
+  color: rgba(225, 232, 241, 0.74);
+  background: rgba(255, 255, 255, 0.055);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.asset-operation-cart-stepper-button:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: rgba(126, 183, 178, 0.16);
+}
+
+.asset-operation-cart-stepper-button:disabled {
+  cursor: default;
+  opacity: 0.34;
 }
 
 .asset-operation-cart-row .icon-ghost-control {
@@ -5892,6 +6000,15 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   margin: 2px 0 4px;
 }
 
+.asset-assign-move-panel {
+  padding-bottom: 18px;
+}
+
+.asset-assign-move-panel .packing-builder-selection-list {
+  gap: 7px;
+  margin: 0 0 2px;
+}
+
 .packing-builder-summary-grid,
 .packing-detail-summary-grid,
 .packing-detail-hero-grid,
@@ -6106,10 +6223,20 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.asset-assign-move-panel .packing-builder-selection-row {
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
 .packing-builder-selection-copy {
   min-width: 0;
   display: grid;
   gap: 4px;
+}
+
+.asset-assign-move-panel .packing-builder-selection-copy {
+  gap: 2px;
 }
 
 .packing-builder-selection-title {
@@ -6118,15 +6245,41 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   color: rgba(246, 248, 250, 0.96);
 }
 
+.asset-assign-move-panel .packing-builder-selection-title {
+  font-size: 0.82rem;
+}
+
 .packing-builder-selection-meta {
   font-size: 0.78rem;
   color: rgba(185, 193, 205, 0.78);
+}
+
+.asset-assign-move-panel .packing-builder-selection-meta {
+  font-size: 0.68rem;
 }
 
 .packing-builder-selection-quantity {
   width: 92px;
   display: grid;
   gap: 6px;
+}
+
+.asset-assign-move-panel .packing-builder-selection-quantity {
+  width: 70px;
+  gap: 3px;
+}
+
+.asset-assign-move-panel .packing-builder-selection-quantity .action-field-label {
+  color: rgba(245, 197, 107, 0.72);
+  font-size: 9px;
+}
+
+.asset-assign-move-panel .packing-builder-selection-quantity .action-field-control {
+  min-height: 28px;
+  color: rgba(255, 211, 132, 0.98);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-align: center;
 }
 
 .packing-builder-selection-fixed {
@@ -6137,6 +6290,15 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   background: rgba(255, 255, 255, 0.04);
   font-size: 0.78rem;
   color: rgba(214, 220, 228, 0.82);
+}
+
+.asset-assign-move-panel .packing-builder-selection-fixed {
+  padding: 5px 9px;
+  border-color: rgba(245, 197, 107, 0.2);
+  background: rgba(245, 197, 107, 0.075);
+  color: rgba(255, 211, 132, 0.98);
+  font-size: 0.68rem;
+  font-weight: 800;
 }
 
 .packing-builder-selection-more {
@@ -7233,6 +7395,10 @@ button.project-incidents-command-metric {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.asset-assign-move-actions {
+  padding-bottom: 8px;
 }
 
 .action-panel-actions-inline {

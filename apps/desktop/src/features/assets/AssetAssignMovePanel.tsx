@@ -1,5 +1,5 @@
 import { ArrowRightLeft, PackagePlus, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
@@ -25,6 +25,7 @@ export type AssetAssignSelectionRow = {
   name: string;
   code: string;
   quantity: number;
+  totalQuantity?: number;
   assignedQuantity: number;
   checkedOutQuantity: number;
   status: string;
@@ -59,6 +60,39 @@ const normalizeOptional = (value: string) => {
   return trimmedValue ? trimmedValue : undefined;
 };
 
+const resolveAssignableAssetQuantity = (asset: AssetAssignSelectionRow) => {
+  if (asset.quantity > 0) {
+    return asset.quantity;
+  }
+
+  if ((asset.linkedKitCount ?? 0) > 0 && asset.checkedOutQuantity <= 0 && (asset.totalQuantity ?? 0) > 0) {
+    return asset.assignedQuantity > 0 ? asset.assignedQuantity : (asset.totalQuantity ?? 0);
+  }
+
+  if (asset.assignedQuantity > 0 && asset.checkedOutQuantity === 0) {
+    return asset.assignedQuantity;
+  }
+
+  return Math.max(1, asset.quantity);
+};
+
+const toSuggestedReturnDateTime = (date: string | null | undefined) => {
+  if (!date) {
+    return "";
+  }
+
+  const parsedDate = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "";
+  }
+
+  parsedDate.setDate(parsedDate.getDate() + 1);
+  const year = parsedDate.getFullYear();
+  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  const day = String(parsedDate.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}T09:00`;
+};
+
 export const AssetAssignMovePanel = ({
   allowedModes = ["assign", "move"],
   defaultProjectId,
@@ -88,11 +122,53 @@ export const AssetAssignMovePanel = ({
   const [expectedReturnAt, setExpectedReturnAt] = useState("");
   const [notes, setNotes] = useState("");
   const [quantityByAssetId, setQuantityByAssetId] = useState<Record<string, number>>({});
+  const userTouchedResponsibleRef = useRef(false);
+  const userTouchedExpectedReturnRef = useRef(false);
   const { data: projectDetail } = useProjectDetail(mode === "assign" ? normalizeOptional(projectId) ?? null : null);
   const initialQuantityByAssetId = useMemo(
     () => new Map((initialAssetSelections ?? []).map((selection) => [selection.assetId, selection.quantity] as const)),
     [initialAssetSelections],
   );
+  const selectedProjectUnit = useMemo(
+    () => projectDetail.units.find((unit) => unit.id === projectUnitId) ?? null,
+    [projectDetail.units, projectUnitId],
+  );
+  const suggestedExpectedReturnAt = useMemo(
+    () => toSuggestedReturnDateTime((selectedProjectUnit ?? projectDetail.project)?.endDate),
+    [projectDetail.project, selectedProjectUnit],
+  );
+  const departmentOptions = useMemo(() => {
+    const departmentIds = new Set<string>();
+
+    const sourceUnits = selectedProjectUnit ? [selectedProjectUnit] : projectDetail.units;
+    sourceUnits.forEach((unit) => {
+      unit.unitDepartments.forEach((department) => {
+        if (department.departmentId) {
+          departmentIds.add(department.departmentId);
+        }
+      });
+    });
+
+    return departmentIds.size ? departments.filter((department) => departmentIds.has(department.id)) : departments;
+  }, [departments, projectDetail.units, selectedProjectUnit]);
+  const suggestedResponsibleUserId = useMemo(() => {
+    if (!departmentId) {
+      return "";
+    }
+
+    const unitsToSearch = selectedProjectUnit ? [selectedProjectUnit, ...projectDetail.units.filter((unit) => unit.id !== selectedProjectUnit.id)] : projectDetail.units;
+    for (const unit of unitsToSearch) {
+      const assignment = unit.crewAssignments.find(
+        (crewAssignment) => crewAssignment.departmentId === departmentId && Boolean(crewAssignment.linkedUserId),
+      );
+
+      if (assignment?.linkedUserId && users.some((user) => user.id === assignment.linkedUserId)) {
+        return assignment.linkedUserId;
+      }
+    }
+
+    return "";
+  }, [departmentId, projectDetail.units, selectedProjectUnit, users]);
 
   useEffect(() => {
     if (!allowedModes.includes(mode)) {
@@ -102,14 +178,43 @@ export const AssetAssignMovePanel = ({
 
   useEffect(() => {
     setProjectUnitId("");
+    setDepartmentId("");
+    setAssignedToUserId("");
+    setExpectedReturnAt("");
+    userTouchedResponsibleRef.current = false;
+    userTouchedExpectedReturnRef.current = false;
   }, [projectId, mode]);
+
+  useEffect(() => {
+    if (departmentId && departmentOptions.some((department) => department.id === departmentId)) {
+      return;
+    }
+
+    setDepartmentId(departmentOptions.length === 1 ? departmentOptions[0]!.id : "");
+  }, [departmentId, departmentOptions]);
+
+  useEffect(() => {
+    if (userTouchedResponsibleRef.current || assignedToUserId || !suggestedResponsibleUserId) {
+      return;
+    }
+
+    setAssignedToUserId(suggestedResponsibleUserId);
+  }, [assignedToUserId, suggestedResponsibleUserId]);
+
+  useEffect(() => {
+    if (userTouchedExpectedReturnRef.current || !suggestedExpectedReturnAt || expectedReturnAt === suggestedExpectedReturnAt) {
+      return;
+    }
+
+    setExpectedReturnAt(suggestedExpectedReturnAt);
+  }, [expectedReturnAt, suggestedExpectedReturnAt]);
 
   useEffect(() => {
     setQuantityByAssetId((current) => {
       const nextState: Record<string, number> = {};
 
       selectedAssets.forEach((asset) => {
-        const maxQuantity = Math.max(1, asset.quantity);
+        const maxQuantity = resolveAssignableAssetQuantity(asset);
         nextState[asset.id] = Math.min(maxQuantity, Math.max(1, current[asset.id] ?? initialQuantityByAssetId.get(asset.id) ?? 1));
       });
 
@@ -121,12 +226,7 @@ export const AssetAssignMovePanel = ({
     () =>
       selectedAssets.map((asset) => {
         const lockedQuantity = lockedAssetSelections?.find((selection) => selection.assetId === asset.id)?.quantity;
-        const maxQuantity =
-          asset.quantity > 0
-            ? asset.quantity
-            : asset.assignedQuantity > 0 && asset.checkedOutQuantity === 0
-              ? asset.assignedQuantity
-              : Math.max(1, asset.quantity);
+        const maxQuantity = resolveAssignableAssetQuantity(asset);
         return {
           ...asset,
           sourceQuantity: maxQuantity,
@@ -181,9 +281,24 @@ export const AssetAssignMovePanel = ({
 
   const selectedLabel = t("assets.assignMove.selected", { count: selectedCount });
   const quantityLabel = t("assets.assignMove.itemsToAssign", { count: totalAssignQuantity });
+  const handleDepartmentChange = (nextDepartmentId: string) => {
+    setDepartmentId(nextDepartmentId);
+    if (!userTouchedResponsibleRef.current) {
+      setAssignedToUserId("");
+    }
+  };
+  const handleResponsibleChange = (nextUserId: string) => {
+    userTouchedResponsibleRef.current = true;
+    setAssignedToUserId(nextUserId);
+  };
+  const handleExpectedReturnChange = (nextExpectedReturnAt: string) => {
+    userTouchedExpectedReturnRef.current = true;
+    setExpectedReturnAt(nextExpectedReturnAt);
+  };
 
   return (
     <SurfaceCard
+      className="asset-assign-move-panel"
       aside={
         <button aria-label={t("assets.assignMove.close")} className="icon-ghost-control" onClick={onClose} type="button">
           <X size={14} />
@@ -290,12 +405,12 @@ export const AssetAssignMovePanel = ({
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">{t("assets.assignMove.responsible")}</span>
-              <SelectField onChange={(event) => setAssignedToUserId(event.target.value)} value={assignedToUserId}>
-                <option value="">{t("assets.assignMove.unassigned")}</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.fullName}
+              <span className="action-field-label">{t("assets.assignMove.department")}</span>
+              <SelectField onChange={(event) => handleDepartmentChange(event.target.value)} value={departmentId}>
+                <option value="">{t("assets.assignMove.noDepartment")}</option>
+                {departmentOptions.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.code} · {department.name}
                   </option>
                 ))}
               </SelectField>
@@ -326,55 +441,48 @@ export const AssetAssignMovePanel = ({
             ))}
           </SelectField>
         </label>
-      </div>
 
-      <details className="detail-disclosure">
-        <summary className="detail-disclosure-summary">{t("assets.detail.sections.moreDetails")}</summary>
-        <div className="detail-disclosure-content">
-          <div className="action-form-grid">
-            {mode === "assign" ? (
-              <>
-                <label className="action-field">
-                  <span className="action-field-label">{t("assets.assignMove.department")}</span>
-                  <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
-                    <option value="">{t("assets.assignMove.noDepartment")}</option>
-                    {departments.map((department) => (
-                      <option key={department.id} value={department.id}>
-                        {department.code} · {department.name}
-                      </option>
-                    ))}
-                  </SelectField>
-                </label>
+        {mode === "assign" ? (
+          <>
+            <label className="action-field">
+              <span className="action-field-label">{t("assets.assignMove.responsible")}</span>
+              <SelectField onChange={(event) => handleResponsibleChange(event.target.value)} value={assignedToUserId}>
+                <option value="">{t("assets.assignMove.unassigned")}</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.fullName}
+                  </option>
+                ))}
+              </SelectField>
+            </label>
 
-                <label className="action-field">
-                  <span className="action-field-label">{t("assets.assignMove.expectedReturn")}</span>
-                  <input
-                    className="action-field-control"
-                    onChange={(event) => setExpectedReturnAt(event.target.value)}
-                    type="datetime-local"
-                    value={expectedReturnAt}
-                  />
-                </label>
-              </>
-            ) : null}
-
-            <label className="action-field action-field-wide">
-              <span className="action-field-label">{t("assets.assignMove.notes")}</span>
-              <textarea
-                className="action-field-control action-textarea"
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder={t("assets.assignMove.optionalNote")}
-                rows={3}
-                value={notes}
+            <label className="action-field">
+              <span className="action-field-label">{t("assets.assignMove.expectedReturn")}</span>
+              <input
+                className="action-field-control"
+                onChange={(event) => handleExpectedReturnChange(event.target.value)}
+                type="datetime-local"
+                value={expectedReturnAt}
               />
             </label>
-          </div>
-        </div>
-      </details>
+          </>
+        ) : null}
+
+        <label className="action-field action-field-wide">
+          <span className="action-field-label">{t("assets.assignMove.notes")}</span>
+          <textarea
+            className="action-field-control action-textarea"
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder={t("assets.assignMove.optionalNote")}
+            rows={3}
+            value={notes}
+          />
+        </label>
+      </div>
 
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 
-      <div className="action-panel-actions">
+      <div className="action-panel-actions asset-assign-move-actions">
         <button className="ghost-control cancel-control" onClick={onClose} type="button">
           {t("common.cancel")}
         </button>

@@ -1,5 +1,22 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { Boxes, ClipboardList, ExternalLink, FileUp, GitCompareArrows, Import, MoveRight, Plus, ShieldCheck, Siren, SquarePen, Trash2, X } from "lucide-react";
+import {
+  Boxes,
+  ChevronDown,
+  ChevronUp,
+  ClipboardList,
+  ExternalLink,
+  FileUp,
+  GitCompareArrows,
+  Import,
+  MoveRight,
+  OctagonX,
+  Plus,
+  ShieldCheck,
+  Siren,
+  SquarePen,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -421,10 +438,14 @@ type AssetOperationCartItem = AssetListRow & {
 };
 
 const resolveAssignableQuantity = (
-  asset: Pick<AssetListRow, "quantity" | "assignedQuantity" | "checkedOutQuantity">,
+  asset: Pick<AssetListRow, "quantity" | "totalQuantity" | "assignedQuantity" | "checkedOutQuantity" | "linkedKitCount">,
 ) => {
   if (asset.quantity > 0) {
     return asset.quantity;
+  }
+
+  if ((asset.linkedKitCount ?? 0) > 0 && asset.checkedOutQuantity <= 0 && asset.totalQuantity > 0) {
+    return asset.assignedQuantity > 0 ? asset.assignedQuantity : asset.totalQuantity;
   }
 
   if (asset.assignedQuantity > 0 && asset.checkedOutQuantity === 0) {
@@ -470,7 +491,7 @@ const buildAssetListRowFromCatalogOption = (asset: CatalogAssetOptionRow, kit?: 
 });
 
 const clampOperationQuantity = (
-  asset: Pick<AssetListRow, "quantity" | "assignedQuantity" | "checkedOutQuantity">,
+  asset: Pick<AssetListRow, "quantity" | "totalQuantity" | "assignedQuantity" | "checkedOutQuantity" | "linkedKitCount">,
   quantity: number | undefined,
 ) => {
   const maxQuantity = resolveAssignableQuantity(asset);
@@ -502,6 +523,8 @@ type AssetOperationCartProps = {
   onOpenProjectReturns?: () => void;
   packingProjectId?: string | null;
   packingSourceKitId?: string | null;
+  deleteDisabled?: boolean;
+  deleteTooltip?: string | null;
   onQuantityChange: (assetId: string, quantity: number) => void;
   onReleaseAssignedAssets?: () => void;
   onRemove: (assetId: string) => void;
@@ -521,6 +544,8 @@ const AssetOperationCart = ({
   onOpenProjectReturns,
   packingProjectId,
   packingSourceKitId,
+  deleteDisabled = false,
+  deleteTooltip,
   onQuantityChange,
   onReleaseAssignedAssets,
   onRemove,
@@ -533,7 +558,9 @@ const AssetOperationCart = ({
 
   const lockedItems = items.filter((asset) => asset.linkedKitCount > 0);
   const unavailablePackingItems = items.filter((asset) => !resolveAssetPackingAvailability(asset, packingProjectId, packingSourceKitId).isAvailable);
-  const hasBulkKitLock = lockedItems.length > 0 && items.length > 1;
+  const hasFullKitOperationContext = Boolean(packingSourceKitId);
+  const assignMoveDisabled = lockedItems.length > 0 && items.length > 1 && !hasFullKitOperationContext;
+  const assignToKitDisabled = lockedItems.length > 0;
   const issueActionsDisabled = unavailablePackingItems.length > 0;
   const singleAsset = items.length === 1 ? items[0] : null;
   const checkedOutUnits = items.reduce((total, asset) => total + asset.checkedOutQuantity, 0);
@@ -541,6 +568,42 @@ const AssetOperationCart = ({
     (total, asset) => total + (asset.checkedOutQuantity > 0 ? 0 : asset.assignedQuantity),
     0,
   );
+  const unavailablePackingSummary = unavailablePackingItems
+    .slice(0, 4)
+    .map((asset) => asset.code || asset.name)
+    .join(", ");
+  const unavailablePackingTooltip = unavailablePackingItems.length
+    ? t("assets.cart.packingUnavailableTip", {
+        summary: [
+          unavailablePackingSummary,
+          unavailablePackingItems.length > 4 ? `+${unavailablePackingItems.length - 4}` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+        defaultValue: "No se puede emitir packing slip hasta resolver disponibilidad: {{summary}}",
+      })
+    : undefined;
+  const assignMoveTooltip = assignMoveDisabled
+    ? (kitLockTooltip ??
+      t("assets.cart.assignMoveKitUnavailableTip", {
+        defaultValue: "Estos equipos pertenecen a kits activos. Opera el kit completo o quítalos del kit primero.",
+      }))
+    : lockedItems.length
+      ? (kitLockTooltip ??
+        t("assets.cart.assignMoveKitAvailableTip", {
+          defaultValue: "Este equipo pertenece a un kit activo. La app te permitirá operar el kit completo.",
+        }))
+    : undefined;
+  const assignToKitTooltip = assignToKitDisabled
+    ? (kitLockTooltip ??
+      t("assets.cart.assignToKitUnavailableTip", {
+        defaultValue: "No puedes agregar a otro kit equipos que ya pertenecen a un kit activo.",
+      }))
+    : undefined;
+  const reportIssueDisabled = !singleAsset;
+  const createRmaDisabled = !singleAsset;
+  const returnDisabled = !checkedOutUnits;
+  const releaseDisabled = !releasableReservedUnits;
 
   return (
     <div className="asset-operation-cart">
@@ -567,65 +630,78 @@ const AssetOperationCart = ({
             onClick={onClear}
             type="button"
           >
-            <X size={13} />
+            <OctagonX size={13} />
             <span>{t("assets.cart.clear", { defaultValue: "Limpiar" })}</span>
           </button>
         </div>
       </div>
       <div className="asset-operation-cart-actions">
-        <button className="ghost-control action-row-button" onClick={onAddToCompare} type="button">
-          {t("assets.cart.addToCompare")}
-        </button>
-        <button
-          className="ghost-control action-row-button"
-          data-tooltip={singleAsset ? t("assets.cart.reportIssueSingleTip") : t("assets.cart.reportIssueMultiTip")}
-          disabled={!singleAsset}
-          onClick={() => singleAsset && onOpenAssetDetail(singleAsset.id)}
-          type="button"
-        >
-          {t("assets.cart.reportIssue")}
-        </button>
-        <button
-          className="ghost-control action-row-button"
-          data-tooltip={singleAsset ? t("assets.cart.createRmaSingleTip") : t("assets.cart.createRmaMultiTip")}
-          disabled={!singleAsset}
-          onClick={onCreateRma}
-          type="button"
-        >
-          {t("assets.cart.createRma")}
-        </button>
-        <button
-          className="ghost-control action-row-button"
-          disabled={issueActionsDisabled}
-          onClick={onCreatePackingSlip}
-          type="button"
-        >
-          {t("assets.cart.createPackingSlip")}
-        </button>
         <button
           className="action-primary-button action-row-button"
-          data-tooltip={lockedItems.length ? kitLockTooltip ?? t("assets.cart.kitLockedTip", { defaultValue: "Ya pertenecen a un kit" }) : undefined}
-          disabled={hasBulkKitLock}
-          onClick={() => void onOpenAssignMove()}
+          aria-disabled={assignMoveDisabled}
+          data-tooltip={assignMoveTooltip}
+          onClick={() => {
+            if (!assignMoveDisabled) void onOpenAssignMove();
+          }}
           type="button"
         >
           {t("assets.cart.assignMove")}
         </button>
         <button
           className="ghost-control action-row-button"
-          disabled={hasBulkKitLock}
-          data-tooltip={lockedItems.length > 0 ? t("assets.cart.kitLockedTip", { defaultValue: "Ya pertenecen a un kit" }) : undefined}
-          onClick={onOpenAssignToKit}
+          aria-disabled={assignToKitDisabled}
+          data-tooltip={assignToKitTooltip}
+          onClick={() => {
+            if (!assignToKitDisabled) onOpenAssignToKit();
+          }}
           type="button"
         >
           {t("assets.cart.assignToKit", { defaultValue: "Asignar a Kit" })}
+        </button>
+        <button
+          className="ghost-control action-row-button"
+          aria-disabled={issueActionsDisabled}
+          data-tooltip={unavailablePackingTooltip}
+          onClick={() => {
+            if (!issueActionsDisabled) onCreatePackingSlip();
+          }}
+          type="button"
+        >
+          {t("assets.cart.createPackingSlip")}
+        </button>
+        <button
+          className="ghost-control action-row-button"
+          data-tooltip={singleAsset ? t("assets.cart.createRmaSingleTip") : t("assets.cart.createRmaMultiTip")}
+          aria-disabled={createRmaDisabled}
+          onClick={() => {
+            if (!createRmaDisabled) onCreateRma();
+          }}
+          type="button"
+        >
+          {t("assets.cart.createRma")}
+        </button>
+        <button
+          className="ghost-control action-row-button"
+          data-tooltip={singleAsset ? t("assets.cart.reportIssueSingleTip") : t("assets.cart.reportIssueMultiTip")}
+          aria-disabled={reportIssueDisabled}
+          onClick={() => {
+            if (!reportIssueDisabled && singleAsset) onOpenAssetDetail(singleAsset.id);
+          }}
+          type="button"
+        >
+          {t("assets.cart.reportIssue")}
+        </button>
+        <button className="ghost-control action-row-button" onClick={onAddToCompare} type="button">
+          {t("assets.cart.addToCompare")}
         </button>
         {onOpenProjectReturns ? (
           <button
             className="ghost-control action-row-button"
             data-tooltip={checkedOutUnits ? t("assets.cart.returnAvailableTip") : t("assets.cart.returnUnavailableTip")}
-            disabled={!checkedOutUnits}
-            onClick={onOpenProjectReturns}
+            aria-disabled={returnDisabled}
+            onClick={() => {
+              if (!returnDisabled) onOpenProjectReturns();
+            }}
             type="button"
           >
             {t("assets.cart.return")}
@@ -642,10 +718,12 @@ const AssetOperationCart = ({
                   })
                 : t("assets.cart.releaseAssignedUnavailableTip", {
                     defaultValue: "No hay reservas seleccionadas para liberar.",
-                  })
+                })
             }
-            disabled={!releasableReservedUnits}
-            onClick={onReleaseAssignedAssets}
+            aria-disabled={releaseDisabled}
+            onClick={() => {
+              if (!releaseDisabled) onReleaseAssignedAssets();
+            }}
             type="button"
           >
             {t("assets.cart.releaseAssigned", { defaultValue: "Liberar reserva" })}
@@ -653,7 +731,11 @@ const AssetOperationCart = ({
         ) : null}
         <button
           className="ghost-control action-row-button is-danger asset-operation-cart-delete"
-          onClick={onDeleteSelected}
+          aria-disabled={deleteDisabled}
+          data-tooltip={deleteTooltip ?? undefined}
+          onClick={() => {
+            if (!deleteDisabled) onDeleteSelected();
+          }}
           type="button"
         >
           {t(items.length === 1 ? "assets.cart.deleteSelectedOne" : "assets.cart.deleteSelectedMany", {
@@ -668,7 +750,9 @@ const AssetOperationCart = ({
           const maxQuantity = resolveAssignableQuantity(asset);
           const isLocked = asset.linkedKitCount > 0;
           const availability = resolveAssetAvailability(asset);
-          const isUnavailable = !availability.isAvailable;
+          const isUnavailable = maxQuantity <= 0 || (!availability.isAvailable && !isLocked);
+          const displayedQuantity = isUnavailable ? 0 : Math.min(maxQuantity, Math.max(1, asset.requestedQuantity));
+          const remainingQuantity = Math.max(0, maxQuantity - displayedQuantity);
 
           return (
             <div className={`asset-operation-cart-row${isLocked || isUnavailable ? " is-warning" : ""}`} key={asset.id}>
@@ -679,16 +763,54 @@ const AssetOperationCart = ({
                 </span>
               </div>
               <label className="asset-operation-cart-quantity">
-                <span className="action-field-label">{t("assets.cart.qty")}</span>
-                <input
-                  className="action-field-control"
-                  disabled={isUnavailable}
-                  max={Math.max(1, maxQuantity)}
-                  min={isUnavailable ? 0 : 1}
-                  onChange={(event) => onQuantityChange(asset.id, Number.parseInt(event.target.value, 10))}
-                  type="number"
-                  value={isUnavailable ? 0 : Math.max(1, asset.requestedQuantity)}
-                />
+                <div className="asset-operation-cart-quantity-control">
+                  <span
+                    className="asset-operation-cart-availability"
+                    data-tooltip={t("assets.cart.availableTooltip", {
+                      available: maxQuantity,
+                      remaining: remainingQuantity,
+                      defaultValue: `${maxQuantity} disponibles · ${remainingQuantity} quedan después de esta operación`,
+                    })}
+                  >
+                    <span>{t("assets.cart.remainingPreviewPrefix", { defaultValue: "quedan" })}</span>
+                    <strong>{remainingQuantity}</strong>
+                  </span>
+                  <div className="asset-operation-cart-stepper">
+                    <input
+                      aria-label={t("assets.cart.qtyAria", { name: asset.name, defaultValue: `Cantidad para ${asset.name}` })}
+                      className="action-field-control"
+                      disabled={isUnavailable}
+                      inputMode="numeric"
+                      max={Math.max(1, maxQuantity)}
+                      min={isUnavailable ? 0 : 1}
+                      onChange={(event) => onQuantityChange(asset.id, Number.parseInt(event.target.value, 10))}
+                      type="text"
+                      value={displayedQuantity}
+                    />
+                    <div className="asset-operation-cart-stepper-buttons" aria-hidden={isUnavailable}>
+                      <button
+                        aria-label={t("assets.cart.incrementQty", { name: asset.name, defaultValue: `Aumentar cantidad de ${asset.name}` })}
+                        className="asset-operation-cart-stepper-button"
+                        disabled={isUnavailable || displayedQuantity >= maxQuantity}
+                        onClick={() => onQuantityChange(asset.id, displayedQuantity + 1)}
+                        tabIndex={-1}
+                        type="button"
+                      >
+                        <ChevronUp size={11} />
+                      </button>
+                      <button
+                        aria-label={t("assets.cart.decrementQty", { name: asset.name, defaultValue: `Reducir cantidad de ${asset.name}` })}
+                        className="asset-operation-cart-stepper-button"
+                        disabled={isUnavailable || displayedQuantity <= 1}
+                        onClick={() => onQuantityChange(asset.id, displayedQuantity - 1)}
+                        tabIndex={-1}
+                        type="button"
+                      >
+                        <ChevronDown size={11} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </label>
               <button
                 aria-label={t("assets.cart.removeAria", { name: asset.name })}
@@ -1550,6 +1672,33 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   }, [selectedKitLockedAssets]);
   const selectedKitLockTooltip = selectedKitLockSummary
     ? t("assets.selection.kitLocked", { summary: selectedKitLockSummary })
+    : null;
+  const selectedDeleteBlockedAssets = useMemo(
+    () =>
+      selectedAssets.filter(
+        (asset) =>
+          Boolean(asset.projectId && projectStatusById.get(asset.projectId) !== "Wrapped") ||
+          asset.assignedQuantity > 0 ||
+          asset.checkedOutQuantity > 0 ||
+          asset.custody !== "available" ||
+          asset.incidentsOpen > 0,
+      ),
+    [projectStatusById, selectedAssets],
+  );
+  const selectedDeleteBlockedTooltip = selectedDeleteBlockedAssets.length
+    ? t("assets.cart.deleteUnavailableTip", {
+        summary: [
+          selectedDeleteBlockedAssets
+            .slice(0, 4)
+            .map((asset) => asset.code || asset.name)
+            .join(", "),
+          selectedDeleteBlockedAssets.length > 4 ? `+${selectedDeleteBlockedAssets.length - 4}` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+        defaultValue:
+          "No se pueden eliminar equipos con proyecto activo, reserva, checkout, custodia no disponible o incidencias abiertas: {{summary}}",
+      })
     : null;
 
   const showIndividualKitLockedToast = (asset: AssetListRow | AssetOperationCartItem) => {
@@ -2737,6 +2886,20 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     updateCsvDraft(importRowNumber, { notes: event.target.value });
   };
 
+  const projectLabelById = useMemo(
+    () =>
+      new Map(
+        projects.map((project) => [
+          project.id,
+          {
+            code: project.code,
+            name: project.name,
+          },
+        ] as const),
+      ),
+    [projects],
+  );
+
   const assetColumns = useMemo(
     () => [
       {
@@ -2797,11 +2960,20 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       {
         key: "status",
         label: t("assets.columns.status"),
-        width: 138,
-        minWidth: 112,
+        width: 162,
+        minWidth: 136,
         render: (row: (typeof assets)[number]) => {
           const presented = presentAssetStatus(row.status, t);
-          return <StatusBadge tone={presented.tone}>{presented.label}</StatusBadge>;
+          const projectLabel = row.projectId ? projectLabelById.get(row.projectId) : null;
+          const projectContext = projectLabel?.code || (row.project && row.project !== "—" ? row.project : null);
+          const contextualLabel =
+            projectContext && row.status === "Assigned"
+              ? t("assets.status.assignedToProject", { project: projectContext })
+              : projectContext && row.status === "Checked out"
+                ? t("assets.status.checkedOutToProject", { project: projectContext })
+                : presented.label;
+
+          return <StatusBadge tone={presented.tone}>{contextualLabel}</StatusBadge>;
         },
       },
       {
@@ -2832,7 +3004,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       { key: "incidents", label: t("assets.columns.openIssues"), align: "right" as const, width: 96, minWidth: 84, render: (row: (typeof assets)[number]) => row.incidentsOpen },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [assets, t],
+    [assets, projectLabelById, t],
   );
 
   return (
@@ -4009,6 +4181,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               onOpenProjectReturns={isProjectMode && projectId ? () => navigate(`/projects/${projectId}/packing`) : undefined}
               packingProjectId={packingDefaultProjectId}
               packingSourceKitId={effectivePackingSourceKitId}
+              deleteDisabled={selectedDeleteBlockedAssets.length > 0}
+              deleteTooltip={selectedDeleteBlockedTooltip}
               onQuantityChange={updateCartQuantity}
               onReleaseAssignedAssets={handleReleaseAssignedAssets}
               onRemove={removeFromCart}
