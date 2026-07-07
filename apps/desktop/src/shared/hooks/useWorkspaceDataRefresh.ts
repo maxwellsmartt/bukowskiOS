@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 export const workspaceDataChangedEvent = "bukowski:workspace-data-changed";
+const syncRefreshCoalesceMs = 1_200;
 
 export type WorkspaceDataChangedDetail = {
   source?: "assistant-chat" | "assistant-tool" | "sync" | "manual";
@@ -33,6 +34,11 @@ export const useWorkspaceDataRefreshVersion = (filter: WorkspaceDataRefreshFilte
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
+    let syncRefreshTimer: number | null = null;
+    let syncRefreshQueued = false;
+
+    const bumpVersion = () => setVersion((current) => current + 1);
+
     const handleRefresh = (event: Event) => {
       const detail = (event as CustomEvent<WorkspaceDataChangedDetail>).detail ?? {};
       if (filter.ignoreSources?.includes(detail.source)) {
@@ -46,11 +52,31 @@ export const useWorkspaceDataRefreshVersion = (filter: WorkspaceDataRefreshFilte
         }
       }
 
-      setVersion((current) => current + 1);
+      if (detail.source === "sync") {
+        syncRefreshQueued = true;
+        if (syncRefreshTimer != null) {
+          return;
+        }
+
+        syncRefreshTimer = window.setTimeout(() => {
+          syncRefreshTimer = null;
+          if (!syncRefreshQueued) {
+            return;
+          }
+          syncRefreshQueued = false;
+          bumpVersion();
+        }, syncRefreshCoalesceMs);
+        return;
+      }
+
+      bumpVersion();
     };
 
     window.addEventListener(workspaceDataChangedEvent, handleRefresh);
     return () => {
+      if (syncRefreshTimer != null) {
+        window.clearTimeout(syncRefreshTimer);
+      }
       window.removeEventListener(workspaceDataChangedEvent, handleRefresh);
     };
   }, [filter.entities?.join("|"), filter.ignoreSources?.join("|")]);

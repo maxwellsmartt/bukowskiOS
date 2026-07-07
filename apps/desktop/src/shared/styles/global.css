@@ -9362,6 +9362,14 @@ body.is-resizing-side-rail {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
+.project-assets-command-card.is-empty {
+  grid-template-columns: minmax(220px, 0.9fr) minmax(360px, 1.4fr) auto;
+  padding: 12px 14px;
+  background:
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.075), transparent 34%),
+    rgba(255, 255, 255, 0.02);
+}
+
 .project-assets-command-copy {
   display: grid;
   gap: 4px;
@@ -9455,6 +9463,77 @@ body.is-resizing-side-rail {
   justify-content: space-between;
   gap: 10px;
   padding-top: 2px;
+}
+
+.project-assets-empty-state {
+  width: min(720px, 100%);
+  margin: 18px auto;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 26px 24px;
+  border: 1px solid rgba(126, 183, 178, 0.14);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(126, 183, 178, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.014));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 18px 52px rgba(0, 0, 0, 0.16);
+  text-align: center;
+}
+
+.project-assets-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(126, 183, 178, 0.2);
+  border-radius: 16px;
+  background: rgba(126, 183, 178, 0.09);
+  color: var(--accent, #7eb7b2);
+}
+
+.project-assets-empty-copy {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  max-width: 560px;
+}
+
+.project-assets-empty-copy span {
+  color: var(--accent, #7eb7b2);
+  font-size: var(--font-2xs, 10px);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.project-assets-empty-copy strong {
+  color: var(--text-primary);
+  font-size: clamp(18px, 1.5vw, 24px);
+  letter-spacing: -0.03em;
+}
+
+.project-assets-empty-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-sm, 12px);
+  line-height: 1.55;
+}
+
+.project-assets-empty-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+
+.project-assets-empty-actions .action-row-button {
+  min-height: 34px;
+  border-radius: 999px;
 }
 
 @media (max-width: 1180px) {

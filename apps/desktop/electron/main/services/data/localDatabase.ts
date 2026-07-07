@@ -1291,6 +1291,58 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       throw new Error(`Asset snapshot missing locally for ${row.entity_id}.`);
     }
 
+    const assignment = currentState.active_assignment_id
+      ? ((database
+          .prepare(
+            `
+              SELECT
+                id,
+                workspace_id,
+                asset_id,
+                project_id,
+                department_id,
+                project_unit_id,
+                assigned_to_user_id,
+                assigned_by_user_id,
+                source_location_id,
+                target_location_id,
+                quantity,
+                assignment_status,
+                checked_out_at,
+                expected_return_at,
+                returned_at,
+                notes,
+                created_at,
+                updated_at
+              FROM asset_assignments
+              WHERE id = ?
+              LIMIT 1
+            `,
+          )
+          .get(currentState.active_assignment_id) as
+          | {
+              id: string;
+              workspace_id: string;
+              asset_id: string;
+              project_id: string | null;
+              department_id: string | null;
+              project_unit_id: string | null;
+              assigned_to_user_id: string | null;
+              assigned_by_user_id: string;
+              source_location_id: string | null;
+              target_location_id: string | null;
+              quantity: number;
+              assignment_status: string;
+              checked_out_at: string | null;
+              expected_return_at: string | null;
+              returned_at: string | null;
+              notes: string | null;
+              created_at: string;
+              updated_at: string;
+            }
+          | undefined) ?? null)
+      : null;
+
     const event = row.event_id
       ? ((database
           .prepare(
@@ -1348,6 +1400,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         ...asset,
         is_active: asset.is_active === 1,
       },
+      assignment,
       currentState,
       event: event
         ? {

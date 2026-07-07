@@ -114,6 +114,65 @@ describe("asset snapshot pull service", () => {
     cleanup();
   });
 
+  it("hydrates active project assignments from remote current-state snapshots", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-remote-assignment");
+    const { asset, state } = readSeedSnapshot(database);
+    const assetId = "asset-remote-assigned-1";
+    const assignmentId = "assign-remote-active-1";
+
+    const result = createAssetSnapshotPullService(database).applyRemoteSnapshots(
+      asset.workspace_id,
+      [
+        {
+          ...asset,
+          id: assetId,
+          internal_code: "REMOTE-ASG-1",
+          name: "Remote assigned asset",
+          updated_at: "2026-06-27T12:00:00.000Z",
+        },
+      ],
+      [
+        {
+          ...state,
+          asset_id: assetId,
+          current_project_id: "project-aurora",
+          current_department_id: "dept-camera",
+          current_responsible_user_id: "user-paola",
+          active_assignment_id: assignmentId,
+          custody_status: "assigned",
+          available_quantity: 0,
+          assigned_quantity: 1,
+          checked_out_quantity: 0,
+          updated_at: "2026-06-27T12:00:00.000Z",
+        },
+      ],
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(result.appliedCount).toBe(1);
+    const currentState = database
+      .prepare("SELECT current_project_id, active_assignment_id, assigned_quantity FROM asset_current_state WHERE asset_id = ?")
+      .get(assetId) as { current_project_id: string | null; active_assignment_id: string | null; assigned_quantity: number } | undefined;
+    expect(currentState).toEqual({
+      current_project_id: "project-aurora",
+      active_assignment_id: assignmentId,
+      assigned_quantity: 1,
+    });
+    const assignment = database
+      .prepare("SELECT project_id, asset_id, quantity, assignment_status, returned_at FROM asset_assignments WHERE id = ?")
+      .get(assignmentId) as
+      | { project_id: string | null; asset_id: string; quantity: number; assignment_status: string; returned_at: string | null }
+      | undefined;
+    expect(assignment).toEqual({
+      project_id: "project-aurora",
+      asset_id: assetId,
+      quantity: 1,
+      assignment_status: "assigned",
+      returned_at: null,
+    });
+    cleanup();
+  });
+
   it("still defers an asset whose UUID category simply has not synced yet", () => {
     const { cleanup, database } = createTestDatabase("bukowski-asset-uuid-category-defer");
     const { asset, state } = readSeedSnapshot(database);

@@ -1524,6 +1524,14 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     !assetControls.searchValue.trim() &&
     !csvImportPreview &&
     !csvImportProgress;
+  const showProjectAssetEmptyState =
+    !error &&
+    !isLoading &&
+    isProjectMode &&
+    assets.length === 0 &&
+    !assetControls.searchValue.trim() &&
+    !csvImportPreview &&
+    !csvImportProgress;
   const selectedKitLockedAssets = useMemo(
     () => selectedAssets.filter((asset) => asset.linkedKitCount > 0),
     [selectedAssets],
@@ -2888,7 +2896,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         />
       ) : null}
       {!error && !isLoading && isProjectMode ? (
-        <section className="project-assets-command-card" aria-label={t("assets.projectInventory.aria")}>
+        <section className={`project-assets-command-card${showProjectAssetEmptyState ? " is-empty" : ""}`} aria-label={t("assets.projectInventory.aria")}>
           <div className="project-assets-command-copy">
             <span>{t("assets.projectInventory.eyebrow")}</span>
             <strong>{projectName ?? t("assets.projectInventory.fallbackName")}</strong>
@@ -2958,13 +2966,15 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             </button>
           </div>
 
-          <div className="project-assets-command-footnote">
-            <span>{t("assets.projectInventory.unitsAndOwners", {
-              units: projectAssetSummary.unitCount,
-              owners: projectAssetSummary.responsibleCount,
-            })}</span>
-            <span>{t("assets.projectInventory.selectionHint", { count: selectedRowIds.length })}</span>
-          </div>
+          {!showProjectAssetEmptyState ? (
+            <div className="project-assets-command-footnote">
+              <span>{t("assets.projectInventory.unitsAndOwners", {
+                units: projectAssetSummary.unitCount,
+                owners: projectAssetSummary.responsibleCount,
+              })}</span>
+              <span>{t("assets.projectInventory.selectionHint", { count: selectedRowIds.length })}</span>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -3009,26 +3019,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             </button>
           </div>
         </section>
-      ) : null}
-
-      {!showGlobalAssetLanding && !error && !isLoading && assets.length === 0 && !assetControls.searchValue.trim() && isProjectMode ? (
-        <GuidedEmptyState
-          title={isProjectMode ? t("assets.empty.projectTitle") : t("assets.empty.globalTitle")}
-          body={isProjectMode ? t("assets.empty.projectBody") : t("assets.empty.globalBody")}
-          tips={isProjectMode ? assetEmptyTips("assets.empty.tipsProject") : assetEmptyTips("assets.empty.tipsGlobal")}
-          actionLabel={isProjectMode ? t("assets.empty.projectAction") : t("assets.empty.globalAction")}
-          onAction={() => {
-            if (isProjectMode) {
-              navigate("/assets");
-              return;
-            }
-
-            setEditorMode("create");
-            setEditorError(null);
-          }}
-          secondaryActionLabel={t("assets.empty.openCatalog")}
-          onSecondaryAction={() => navigate("/catalog")}
-        />
       ) : null}
 
       {actionPanelOpen && selectedRowIds.length ? (
@@ -3925,32 +3915,47 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             ]}
             defaultVisibleColumnKeys={isProjectMode ? projectAssetDefaultColumnKeys : assetDefaultColumnKeys}
             emptyContent={
-              <GuidedEmptyState
-                title={
-                  assetControls.searchValue
-                    ? t("assets.empty.tableNoMatches")
-                    : isProjectMode
-                      ? t("assets.empty.tableNoneProjectTitle")
-                      : t("assets.empty.tableNoneTitle")
-                }
-                body={
-                  assetControls.searchValue
-                    ? t("assets.empty.tableNoMatchesBody")
-                    : isProjectMode
-                      ? t("assets.empty.tableNoneBodyProject")
-                      : t("assets.empty.tableNoneBody")
-                }
-                tone="subtle"
-                actionLabel={assetControls.searchValue ? t("assets.empty.clearSearch") : undefined}
-                onAction={assetControls.searchValue ? () => assetControls.setSearchValue("") : undefined}
-                tips={
-                  assetControls.searchValue
-                    ? undefined
-                    : isProjectMode
-                      ? assetEmptyTips("assets.empty.tipsTableProject")
-                      : assetEmptyTips("assets.empty.tipsTable")
-                }
-              />
+              isProjectMode && !assetControls.searchValue.trim() ? (
+                <div className="project-assets-empty-state">
+                  <div className="project-assets-empty-icon" aria-hidden="true">
+                    <Boxes size={18} />
+                  </div>
+                  <div className="project-assets-empty-copy">
+                    <span>{t("assets.empty.projectKicker")}</span>
+                    <strong>{t("assets.empty.tableNoneProjectTitle")}</strong>
+                    <p>{t("assets.empty.tableNoneBodyProject")}</p>
+                  </div>
+                  <div className="project-assets-empty-actions">
+                    <button
+                      className="asset-create-button action-row-button"
+                      onClick={() =>
+                        navigate("/assets", {
+                          state: {
+                            assignProjectId: projectId ?? undefined,
+                            assignProjectName: projectName ?? undefined,
+                          } satisfies AssetsRouteState,
+                        })
+                      }
+                      type="button"
+                    >
+                      <Plus size={14} />
+                      <span>{t("assets.projectActions.assignAssets")}</span>
+                    </button>
+                    <button className="ghost-control action-row-button" onClick={() => navigate("/catalog")} type="button">
+                      {t("assets.empty.openCatalog")}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <GuidedEmptyState
+                  title={assetControls.searchValue ? t("assets.empty.tableNoMatches") : t("assets.empty.tableNoneTitle")}
+                  body={assetControls.searchValue ? t("assets.empty.tableNoMatchesBody") : t("assets.empty.tableNoneBody")}
+                  tone="subtle"
+                  actionLabel={assetControls.searchValue ? t("assets.empty.clearSearch") : undefined}
+                  onAction={assetControls.searchValue ? () => assetControls.setSearchValue("") : undefined}
+                  tips={assetControls.searchValue ? undefined : assetEmptyTips("assets.empty.tipsTable")}
+                />
+              )
             }
             getRowId={(row) => row.id}
             onRowClick={(row) => setSelectedAssetId(row.id)}

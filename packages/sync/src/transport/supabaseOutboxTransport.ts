@@ -28,6 +28,7 @@ export type SupabaseAssetEventSnapshotRecord = {
 
 export type SupabaseOutboxAssetSnapshot = {
   asset: SupabaseAssetSnapshotRecord;
+  assignment?: SupabaseAssetSnapshotRecord | null;
   currentState: SupabaseAssetSnapshotRecord;
   event?: SupabaseAssetEventSnapshotRecord | null;
 };
@@ -458,6 +459,15 @@ export const createSupabaseOutboxTransport = ({
         payload: snapshot.asset,
         fetchImpl,
       });
+      if (snapshot.assignment) {
+        await upsertSupabaseRow({
+          accessToken,
+          anonKey,
+          endpoint: `${normalizedUrl}/rest/v1/asset_assignments?on_conflict=id`,
+          payload: snapshot.assignment,
+          fetchImpl,
+        });
+      }
       await upsertSupabaseRow({
         accessToken,
         anonKey,

@@ -705,6 +705,7 @@
     "empty": {
       "globalTitle": "Tu inventario aún está vacío",
       "projectTitle": "Este proyecto aún no tiene equipos asignados",
+      "projectKicker": "Listo para planificar",
       "globalKicker": "Inventario operativo",
       "globalBody": "Importa tu CSV revisado o crea el primer equipo manualmente. El catálogo queda limpio cuando ubicaciones, categorías y códigos se validan antes de guardar.",
       "projectBody": "Este proyecto aún no tiene equipos.",

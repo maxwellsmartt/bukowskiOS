@@ -703,6 +703,7 @@
     "empty": {
       "globalTitle": "Your asset registry is still empty",
       "projectTitle": "No assets are assigned to this project yet",
+      "projectKicker": "Ready to plan",
       "globalKicker": "Operational inventory",
       "globalBody": "Import your reviewed CSV or create the first asset manually. The catalog stays clean when locations, categories and codes are validated before saving.",
       "projectBody": "This project does not have assets yet.",

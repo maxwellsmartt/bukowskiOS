@@ -178,6 +178,81 @@ const ensureHydrationEvent = (db: DatabaseSync, workspaceId: string, assetId: st
   return eventId;
 };
 
+const ensureRemoteAssignment = (
+  db: DatabaseSync,
+  state: RemoteAssetCurrentStateRow,
+  references: {
+    currentProjectId: string | null;
+    currentDepartmentId: string | null;
+    currentResponsibleUserId: string | null;
+    currentLocationId: string | null;
+    projectUnitId: string | null;
+  },
+) => {
+  if (!state.active_assignment_id) {
+    return null;
+  }
+
+  const quantity = Math.max(1, (state.assigned_quantity ?? 0) + (state.checked_out_quantity ?? 0));
+  const assignmentStatus = (state.checked_out_quantity ?? 0) > 0 ? "checked_out" : "assigned";
+
+  db
+    .prepare(
+      `
+        INSERT INTO asset_assignments (
+          id,
+          workspace_id,
+          asset_id,
+          project_id,
+          department_id,
+          project_unit_id,
+          assigned_to_user_id,
+          assigned_by_user_id,
+          source_location_id,
+          target_location_id,
+          quantity,
+          assignment_status,
+          checked_out_at,
+          expected_return_at,
+          returned_at,
+          notes,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'user-ops', ?, ?, ?, ?, NULL, NULL, NULL, 'Hydrated from workspace sync.', ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          workspace_id = excluded.workspace_id,
+          asset_id = excluded.asset_id,
+          project_id = excluded.project_id,
+          department_id = excluded.department_id,
+          project_unit_id = excluded.project_unit_id,
+          assigned_to_user_id = excluded.assigned_to_user_id,
+          target_location_id = excluded.target_location_id,
+          quantity = excluded.quantity,
+          assignment_status = excluded.assignment_status,
+          returned_at = NULL,
+          updated_at = excluded.updated_at
+      `,
+    )
+    .run(
+      state.active_assignment_id,
+      state.workspace_id,
+      state.asset_id,
+      references.currentProjectId,
+      references.currentDepartmentId,
+      references.projectUnitId,
+      references.currentResponsibleUserId,
+      references.currentLocationId,
+      references.currentLocationId,
+      quantity,
+      assignmentStatus,
+      state.updated_at,
+      state.updated_at,
+    );
+
+  return state.active_assignment_id;
+};
+
 const upsertAsset = (db: DatabaseSync, asset: RemoteAssetSnapshotRow) => {
   const categoryId = resolveCategoryReference(db, asset.workspace_id, asset.category_id);
   const defaultLocationId = resolveUuidKeyedReference(db, "locations", asset.default_location_id, "Default location");
@@ -253,6 +328,13 @@ const upsertState = (db: DatabaseSync, state: RemoteAssetCurrentStateRow) => {
   const currentResponsibleUserId = requireReference(db, "users", state.current_responsible_user_id, "Responsible user");
   const projectUnitId = requireReference(db, "project_units", state.project_unit_id, "Project unit");
   const hydrationEventId = ensureHydrationEvent(db, state.workspace_id, state.asset_id, state.updated_at);
+  const activeAssignmentId = ensureRemoteAssignment(db, state, {
+    currentProjectId,
+    currentDepartmentId,
+    currentResponsibleUserId,
+    currentLocationId,
+    projectUnitId,
+  });
 
   db
     .prepare(
@@ -263,7 +345,7 @@ const upsertState = (db: DatabaseSync, state: RemoteAssetCurrentStateRow) => {
           custody_status, last_event_id, version, updated_at, project_unit_id, total_quantity,
           available_quantity, assigned_quantity, checked_out_quantity
         )
-        VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(asset_id) DO UPDATE SET
           current_location_id = excluded.current_location_id,
           current_project_id = excluded.current_project_id,
@@ -291,6 +373,7 @@ const upsertState = (db: DatabaseSync, state: RemoteAssetCurrentStateRow) => {
       currentProjectId,
       currentDepartmentId,
       currentResponsibleUserId,
+      activeAssignmentId,
       state.condition_status,
       state.operational_status,
       state.custody_status,

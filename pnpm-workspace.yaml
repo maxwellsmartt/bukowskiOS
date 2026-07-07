@@ -2,9 +2,19 @@ packages:
   - apps/*
   - packages/*
 
+allowBuilds:
+  better-sqlite3: true
+  better-sqlite3-multiple-ciphers: true
+  electron: true
+  electron-winstaller: true
+  esbuild: true
+  keytar: true
+
 onlyBuiltDependencies:
   - '@napi-rs/canvas'
   - better-sqlite3
+  - better-sqlite3-multiple-ciphers
   - electron
+  - electron-winstaller
   - esbuild
   - keytar

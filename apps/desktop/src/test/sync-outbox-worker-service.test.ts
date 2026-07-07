@@ -653,15 +653,26 @@ describe("sync outbox worker service", () => {
         currentState: {
           asset_id: "asset-1",
           workspace_id: "11111111-1111-4111-8111-111111111111",
+          active_assignment_id: "assign-1",
           condition_status: "Good",
           operational_status: "available",
-          custody_status: "available",
+          custody_status: "assigned",
           last_event_id: "event-1",
           version: 2,
           total_quantity: 3,
-          available_quantity: 3,
-          assigned_quantity: 0,
+          available_quantity: 2,
+          assigned_quantity: 1,
           checked_out_quantity: 0,
+          updated_at: "2026-04-12T18:01:00.000Z",
+        },
+        assignment: {
+          id: "assign-1",
+          workspace_id: "11111111-1111-4111-8111-111111111111",
+          asset_id: "asset-1",
+          project_id: "project-1",
+          quantity: 1,
+          assignment_status: "assigned",
+          created_at: "2026-04-12T18:00:00.000Z",
           updated_at: "2026-04-12T18:01:00.000Z",
         },
         event: {
@@ -698,6 +709,7 @@ describe("sync outbox worker service", () => {
 
     expect(requests.map((request) => request.url)).toEqual([
       "https://bukowski.test/rest/v1/assets?on_conflict=id",
+      "https://bukowski.test/rest/v1/asset_assignments?on_conflict=id",
       "https://bukowski.test/rest/v1/asset_current_state?on_conflict=asset_id",
       "https://bukowski.test/rest/v1/asset_events?on_conflict=id",
       "https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
@@ -709,16 +721,22 @@ describe("sync outbox worker service", () => {
       is_active: true,
     });
     expect(JSON.parse(String(requests[1]?.init.body))).toMatchObject({
+      id: "assign-1",
       asset_id: "asset-1",
+      quantity: 1,
+    });
+    expect(JSON.parse(String(requests[2]?.init.body))).toMatchObject({
+      asset_id: "asset-1",
+      active_assignment_id: "assign-1",
       version: 2,
       total_quantity: 3,
     });
-    expect(JSON.parse(String(requests[2]?.init.body))).toMatchObject({
+    expect(JSON.parse(String(requests[3]?.init.body))).toMatchObject({
       id: "event-1",
       asset_id: "asset-1",
       metadata_json: { kind: "asset_created" },
     });
-    expect(JSON.parse(String(requests[3]?.init.body))).toMatchObject({
+    expect(JSON.parse(String(requests[4]?.init.body))).toMatchObject({
       id: "outbox-event-1",
       entity_type: "asset_event",
       payload_json: { kind: "asset_created" },

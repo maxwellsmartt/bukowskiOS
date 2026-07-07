@@ -16,7 +16,10 @@ export type RealtimeSyncStatusSnapshot = {
   lastEventAt: string | null;
 };
 // Coalesce bursts (a multi-row push emits one event per row) into a single pull.
-const COALESCE_MS = 250;
+// Keep this long enough for bulk asset/assignment sync batches to land without
+// making the active view refresh dozens of times while an operator is still
+// selecting or assigning equipment.
+const COALESCE_MS = 1_200;
 const SUBSCRIBE_TIMEOUT_MS = 8_000;
 
 const isRealtimeStatus = (value: unknown): value is RealtimeSyncStatus =>
