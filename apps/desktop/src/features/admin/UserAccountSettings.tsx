@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { Camera, LogOut, Save, Trash2 } from "lucide-react";
+import { Camera, KeyRound, LogOut, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { clearCachedAvatar, useSession } from "@app/providers/SessionProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
+import { PasswordRequirementList } from "@shared/components/PasswordRequirementList";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { isPasswordPolicySatisfied } from "@shared/lib/passwordPolicy";
 
 const initialsFor = (value: string): string => {
   const trimmed = value.trim();
@@ -17,6 +19,16 @@ const initialsFor = (value: string): string => {
     return `${parts[0]![0]!}${parts[parts.length - 1]![0]!}`.toUpperCase();
   }
   return trimmed.slice(0, 2).toUpperCase();
+};
+
+const isReauthenticationRequiredError = (error: unknown): boolean => {
+  const maybeError = error as { code?: unknown; message?: unknown; name?: unknown };
+  const haystack = [maybeError.code, maybeError.message, maybeError.name]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes("reauth") || haystack.includes("nonce");
 };
 
 type UserAccountSettingsProps = {
@@ -39,7 +51,11 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [reauthCode, setReauthCode] = useState("");
+  const [reauthRequired, setReauthRequired] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [isSendingReauthCode, setIsSendingReauthCode] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
@@ -180,9 +196,40 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
     }
   };
 
-  const passwordTooShort = newPassword.length > 0 && newPassword.length < 8;
+  const passwordMeetsPolicy = isPasswordPolicySatisfied(newPassword);
   const passwordsMismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
-  const canUpdatePassword = newPassword.length >= 8 && newPassword === confirmPassword && !isUpdatingPassword;
+  const canUpdatePassword =
+    passwordMeetsPolicy &&
+    newPassword === confirmPassword &&
+    currentPassword.length > 0 &&
+    (!reauthRequired || reauthCode.trim().length > 0) &&
+    !isUpdatingPassword;
+
+  const handleSendReauthCode = async () => {
+    if (!supabase || isSendingReauthCode) {
+      return;
+    }
+
+    setIsSendingReauthCode(true);
+    try {
+      const { error } = await supabase.auth.reauthenticate();
+      if (error) {
+        throw error;
+      }
+      setReauthRequired(true);
+      toast.success(
+        t("settings.account.security.reauthSentTitle"),
+        t("settings.account.security.reauthSentBody"),
+      );
+    } catch (error) {
+      toast.error(
+        t("settings.account.security.reauthFailedTitle"),
+        getUserFacingErrorMessage(error, t("settings.account.toasts.couldNotSaveBody")),
+      );
+    } finally {
+      setIsSendingReauthCode(false);
+    }
+  };
 
   const handleUpdatePassword = async () => {
     if (!supabase || !canUpdatePassword) {
@@ -190,17 +237,29 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
     }
     setIsUpdatingPassword(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+        current_password: currentPassword,
+        ...(reauthCode.trim() ? { nonce: reauthCode.trim() } : {}),
+      });
       if (error) {
         throw error;
       }
       setNewPassword("");
       setConfirmPassword("");
+      setCurrentPassword("");
+      setReauthCode("");
+      setReauthRequired(false);
       toast.success(
         t("settings.account.security.updatedTitle"),
         t("settings.account.security.updatedBody"),
       );
     } catch (error) {
+      if (isReauthenticationRequiredError(error)) {
+        setReauthRequired(true);
+        await handleSendReauthCode();
+        return;
+      }
       toast.error(
         t("settings.account.security.failedTitle"),
         getUserFacingErrorMessage(error, t("settings.account.toasts.couldNotSaveBody")),
@@ -338,6 +397,17 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
             <summary className="detail-disclosure-summary">{t("settings.account.security.changePassword")}</summary>
             <div className="detail-disclosure-content">
               <div className="agent-form-grid">
+                <label className="field-block field-block-span-2">
+                  <span className="field-label">{t("settings.account.security.currentPassword")}</span>
+                  <input
+                    autoComplete="current-password"
+                    className="field-input"
+                    onChange={(event) => setCurrentPassword(event.target.value)}
+                    type="password"
+                    value={currentPassword}
+                  />
+                  <span className="field-helper">{t("settings.account.security.currentPasswordHelp")}</span>
+                </label>
                 <label className="field-block">
                   <span className="field-label">{t("settings.account.security.newPassword")}</span>
                   <input
@@ -359,11 +429,47 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
                   />
                 </label>
               </div>
-              {passwordTooShort ? (
-                <p className="surface-card-subtitle">{t("settings.account.security.minLength")}</p>
-              ) : passwordsMismatch ? (
+              <PasswordRequirementList password={newPassword} compact />
+              {passwordsMismatch ? (
                 <p className="surface-card-subtitle">{t("settings.account.security.mismatch")}</p>
               ) : null}
+              <div className={`password-reauth-card${reauthRequired ? " is-required" : ""}`}>
+                <div className="password-reauth-card-copy">
+                  <ShieldCheck size={15} />
+                  <div>
+                    <strong>{t("settings.account.security.secureChangeTitle")}</strong>
+                    <span>{t("settings.account.security.secureChangeBody")}</span>
+                  </div>
+                </div>
+                {reauthRequired ? (
+                  <label className="field-block">
+                    <span className="field-label">{t("settings.account.security.reauthCode")}</span>
+                    <input
+                      autoComplete="one-time-code"
+                      className="field-input"
+                      inputMode="numeric"
+                      onChange={(event) => setReauthCode(event.target.value)}
+                      placeholder={t("settings.account.security.reauthCodePlaceholder")}
+                      value={reauthCode}
+                    />
+                  </label>
+                ) : null}
+                <button
+                  className="ghost-control action-row-button"
+                  disabled={isSendingReauthCode}
+                  onClick={() => void handleSendReauthCode()}
+                  type="button"
+                >
+                  <KeyRound size={13} />
+                  <span>
+                    {isSendingReauthCode
+                      ? t("settings.account.security.sendingReauth")
+                      : reauthRequired
+                        ? t("settings.account.security.resendReauth")
+                        : t("settings.account.security.sendReauth")}
+                  </span>
+                </button>
+              </div>
               <div className="surface-card-actions" style={{ justifyContent: "flex-end" }}>
                 <button
                   className="action-primary-button"

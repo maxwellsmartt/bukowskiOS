@@ -6,7 +6,9 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "@app/providers/SessionProvider";
 import brandLogoWhite1x from "@shared/assets/inbox/logos/bukowskiOS_logo_white.png";
 import brandLogoWhite from "@shared/assets/logos/bukowskiOS_logo_white@2x.png";
+import { PasswordRequirementList } from "@shared/components/PasswordRequirementList";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { isPasswordPolicySatisfied } from "@shared/lib/passwordPolicy";
 
 export const ResetPasswordScreen = () => {
   const { t } = useTranslation();
@@ -18,7 +20,8 @@ export const ResetPasswordScreen = () => {
   const [status, setStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
+  const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
+  const passwordMeetsPolicy = isPasswordPolicySatisfied(password);
   const isFirstLogin = searchParams.get("mode") === "first-login";
 
   return (
@@ -39,7 +42,7 @@ export const ResetPasswordScreen = () => {
           onSubmit={(event) => {
             event.preventDefault();
 
-            if (password.length < 8) {
+            if (!passwordMeetsPolicy) {
               setStatus(t("auth.reset.minLength"));
               return;
             }
@@ -76,6 +79,7 @@ export const ResetPasswordScreen = () => {
               value={password}
             />
           </label>
+          <PasswordRequirementList password={password} />
           <label className="auth-field">
             <span>{t("auth.reset.confirmPassword")}</span>
             <input
@@ -87,7 +91,7 @@ export const ResetPasswordScreen = () => {
               value={confirmPassword}
             />
           </label>
-          <button className="auth-primary-button" disabled={isSubmitting || mismatch || !isPasswordRecovery} type="submit">
+          <button className="auth-primary-button" disabled={isSubmitting || !passwordsMatch || !passwordMeetsPolicy || !isPasswordRecovery} type="submit">
             <KeyRound size={16} />
             <span>{isSubmitting ? t("auth.reset.updating") : t("auth.reset.updatePassword")}</span>
           </button>

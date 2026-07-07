@@ -2757,6 +2757,16 @@
       "email": "Email",
       "password": "Password"
     },
+    "passwordPolicy": {
+      "title": "Your password must include",
+      "requirements": {
+        "minLength": "At least {{count}} characters",
+        "lowercase": "One lowercase letter",
+        "uppercase": "One uppercase letter",
+        "number": "One number",
+        "symbol": "One symbol"
+      }
+    },
     "login": {
       "title": "Welcome back",
       "localFallback": "Local dev session is active.",
@@ -2798,7 +2808,7 @@
       "title": "Set a new password",
       "firstLoginBody": "Add a password so you can sign in quickly next time. You can still use magic links whenever needed.",
       "body": "Choose a new password for your bukowskiOS account.",
-      "minLength": "Use at least 8 characters for the new password.",
+      "minLength": "The password must satisfy every requirement before continuing.",
       "passwordMismatch": "Passwords do not match.",
       "updated": "Password updated. Opening your workspaces...",
       "updateFailed": "Could not update the password.",
@@ -5557,12 +5567,24 @@
       },
       "security": {
         "changePassword": "Change password",
+        "currentPassword": "Current password",
+        "currentPasswordHelp": "Supabase requires it before accepting a password change.",
         "newPassword": "New password",
         "confirmPassword": "Confirm password",
         "update": "Update password",
         "updating": "Updating…",
-        "minLength": "The password must be at least 8 characters.",
+        "minLength": "The password must satisfy every requirement.",
         "mismatch": "Passwords do not match.",
+        "secureChangeTitle": "Secure change is active",
+        "secureChangeBody": "If your session is not recent, Supabase will ask for a code sent to your email before completing the change.",
+        "sendReauth": "Send code",
+        "sendingReauth": "Sending…",
+        "resendReauth": "Resend code",
+        "reauthCode": "Verification code",
+        "reauthCodePlaceholder": "Email code",
+        "reauthSentTitle": "Code sent",
+        "reauthSentBody": "Check your email and enter the code to complete the change.",
+        "reauthFailedTitle": "Could not send code",
         "updatedTitle": "Password updated",
         "updatedBody": "Use the new password the next time you sign in.",
         "failedTitle": "Could not update the password"

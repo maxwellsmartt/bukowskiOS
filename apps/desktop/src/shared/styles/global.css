@@ -1820,6 +1820,118 @@ button:disabled {
   line-height: 1.45;
 }
 
+.password-requirements {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid rgba(148, 184, 230, 0.12);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(148, 184, 230, 0.09), transparent 42%),
+    rgba(255, 255, 255, 0.028);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.password-requirements.is-compact {
+  margin-top: 2px;
+  padding: 10px;
+}
+
+.password-requirements-title {
+  color: var(--text-secondary);
+  font-size: var(--font-2xs, 10px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.password-requirements-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.password-requirement {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 10px);
+  line-height: 1;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.password-requirement svg {
+  flex: 0 0 auto;
+}
+
+.password-requirement.is-met {
+  border-color: rgba(114, 196, 146, 0.28);
+  background: rgba(114, 196, 146, 0.11);
+  color: rgba(178, 233, 199, 0.96);
+  transform: translateY(-1px);
+}
+
+.password-reauth-card {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(148, 184, 230, 0.12);
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(148, 184, 230, 0.08), transparent 44%),
+    rgba(255, 255, 255, 0.024);
+}
+
+.password-reauth-card.is-required {
+  border-color: rgba(212, 170, 83, 0.26);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(212, 170, 83, 0.12), transparent 46%),
+    rgba(255, 255, 255, 0.024);
+}
+
+.password-reauth-card-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--text-secondary);
+}
+
+.password-reauth-card-copy svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--accent-info);
+}
+
+.password-reauth-card.is-required .password-reauth-card-copy svg {
+  color: #d4aa53;
+}
+
+.password-reauth-card-copy div {
+  display: grid;
+  gap: 3px;
+}
+
+.password-reauth-card-copy strong {
+  color: var(--text-primary);
+  font-size: var(--font-xs, 11px);
+}
+
+.password-reauth-card-copy span {
+  color: var(--text-muted);
+  font-size: var(--font-xs, 11px);
+  line-height: 1.45;
+}
+
 /* Subtle cross-fade so the login options and the OAuth-waiting card swap in
    place without a jump (the card replaces the options, never stacks below). */
 .auth-options {
