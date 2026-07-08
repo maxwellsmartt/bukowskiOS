@@ -117,17 +117,16 @@ const isLegacyGhostId = (id: string) => !UUID_RE.test(id);
 
 // Materialize a recognizable placeholder for a ghost category so the asset still
 // lands (the column is NOT NULL) and the pull cursor advances. The code is the
-// id itself to satisfy UNIQUE(workspace_id, code); the name surfaces the legacy
-// code so the team can see and reconcile it later.
+// id itself to satisfy UNIQUE(workspace_id, code); the name is intentionally
+// honest rather than pretending we know the real category.
 const ensureCategoryPlaceholder = (db: DatabaseSync, workspaceId: string, categoryId: string) => {
-  const code = /^category-([a-z0-9]+)-/i.exec(categoryId)?.[1]?.toUpperCase() ?? "RENTMAN";
   const now = new Date().toISOString();
   db
     .prepare(
       `INSERT OR IGNORE INTO asset_categories (id, workspace_id, parent_category_id, code, name, description, created_at, updated_at)
        VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
     )
-    .run(categoryId, workspaceId, categoryId, `${code} (Rentman)`, "Categoría del import Rentman pendiente de reconciliar.", now, now);
+    .run(categoryId, workspaceId, categoryId, "Categoría pendiente", "Categoría remota pendiente de reconciliar.", now, now);
   return categoryId;
 };
 

@@ -3,6 +3,7 @@ import { createAssetMutationService } from "../../electron/main/services/data/as
 import { createCatalogMutationService } from "../../electron/main/services/data/catalogMutationService";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createPackingMutationService } from "../../electron/main/services/data/packingMutationService";
+import { repairAssetCurrentStateFromActiveAssignments } from "../../electron/main/services/data/assetQuantityFoundationBootstrap";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("asset mutation service", () => {
@@ -365,6 +366,108 @@ describe("asset mutation service", () => {
     expect(assignments).toHaveLength(1);
     expect(assignments[0]?.quantity).toBe(2);
     expect(reads.getAssetDetail("asset-legacy-rentman-1").asset?.quantity).toBe(0);
+
+    cleanup();
+  });
+
+  it("repairs project assignment state from the active assignment after a stale reload", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-assignment-state-repair-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createAssetMutationService(database);
+
+    mutations.assignMoveAssets({
+      commandId: "cmd-test-asset-assignment-repair-1",
+      workspaceId: "workspace-metadata",
+      assetIds: ["asset-legacy-rentman-1"],
+      assetSelections: [{ assetId: "asset-legacy-rentman-1", quantity: 1 }],
+      mode: "assign",
+      projectId: "project-aurora",
+      departmentId: "dept-video",
+      assignedToUserId: "user-paola",
+      targetLocationId: "loc-video-village",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    const activeAssignment = database
+      .prepare("SELECT active_assignment_id FROM asset_current_state WHERE asset_id = ?")
+      .get("asset-legacy-rentman-1") as { active_assignment_id: string } | undefined;
+
+    expect(activeAssignment?.active_assignment_id).toBeTruthy();
+
+    database
+      .prepare(
+        `
+          UPDATE asset_current_state
+          SET
+            current_project_id = NULL,
+            current_department_id = NULL,
+            project_unit_id = NULL,
+            current_responsible_user_id = NULL,
+            active_assignment_id = NULL,
+            available_quantity = total_quantity,
+            assigned_quantity = 0,
+            checked_out_quantity = 0,
+            custody_status = 'available'
+          WHERE asset_id = ?
+        `,
+      )
+      .run("asset-legacy-rentman-1");
+
+    expect(reads.getAssetDetail("asset-legacy-rentman-1").asset?.project).toBe("—");
+
+    const repairedCount = repairAssetCurrentStateFromActiveAssignments(database);
+
+    expect(repairedCount).toBe(1);
+    const repaired = database
+      .prepare(
+        `
+          SELECT
+            current_project_id,
+            current_department_id,
+            project_unit_id,
+            current_responsible_user_id,
+            active_assignment_id,
+            available_quantity,
+            assigned_quantity,
+            custody_status
+          FROM asset_current_state
+          WHERE asset_id = ?
+        `,
+      )
+      .get("asset-legacy-rentman-1") as
+      | {
+          current_project_id: string | null;
+          current_department_id: string | null;
+          project_unit_id: string | null;
+          current_responsible_user_id: string | null;
+          active_assignment_id: string | null;
+          available_quantity: number;
+          assigned_quantity: number;
+          custody_status: string;
+        }
+      | undefined;
+
+    expect(repaired).toMatchObject({
+      current_project_id: "project-aurora",
+      current_department_id: "dept-video",
+      project_unit_id: null,
+      current_responsible_user_id: "user-paola",
+      active_assignment_id: activeAssignment!.active_assignment_id,
+      assigned_quantity: 1,
+      custody_status: "partial_assigned",
+    });
+    expect(repaired?.available_quantity).toBeGreaterThan(0);
+    expect(reads.getAssetDetail("asset-legacy-rentman-1").asset?.project).toBe("Aurora Campaign");
+
+    const repairOutbox = database
+      .prepare("SELECT status, payload_json FROM sync_outbox WHERE id = ?")
+      .get(`outbox-asset-assignment-state-repair-${activeAssignment!.active_assignment_id}`) as
+      | { status: string; payload_json: string }
+      | undefined;
+
+    expect(repairOutbox?.status).toBe("pending");
+    expect(JSON.parse(repairOutbox!.payload_json)).toMatchObject({ kind: "asset_assignment_state_repair" });
 
     cleanup();
   });

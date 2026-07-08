@@ -517,7 +517,10 @@ export const createCatalogReadService = (db: DatabaseSync, _deps: CatalogReadDep
             assets.id,
             assets.name,
             COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
-            asset_categories.name AS category,
+            CASE
+              WHEN lower(asset_categories.name) LIKE 'remote category%' THEN 'Categoría pendiente'
+              ELSE asset_categories.name
+            END AS category,
             asset_current_state.total_quantity,
             asset_current_state.available_quantity AS quantity,
             asset_current_state.assigned_quantity,

@@ -41,7 +41,10 @@ import {
   reconcileLiveProviderEnablement,
 } from "./aiGatewayFoundationBootstrap";
 import { createFoundationReadService, type FoundationReadService } from "./foundationReadService";
-import { applyAssetQuantityFoundationMigration } from "./assetQuantityFoundationBootstrap";
+import {
+  applyAssetQuantityFoundationMigration,
+  repairAssetCurrentStateFromActiveAssignments,
+} from "./assetQuantityFoundationBootstrap";
 import { applyAssetValuationFoundationMigration } from "./assetValuationFoundationBootstrap";
 import { createAssetMutationService } from "./assetMutationService";
 import { createInventoryResetService, type InventoryResetService } from "./inventoryResetService";
@@ -781,6 +784,14 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   }
   runStartupStep("apply asset quantity foundation migration", () =>
     applyTrackedStep(database, "runtime_asset_quantity_foundation_v1", () => applyAssetQuantityFoundationMigration(database)),
+  );
+  runStartupStep("repair asset assignment current state", () =>
+    applyTrackedStep(database, "runtime_asset_assignment_state_repair_v1", () => {
+      const repairedCount = repairAssetCurrentStateFromActiveAssignments(database);
+      if (repairedCount > 0) {
+        logger.info("Repaired asset current state from active assignments.", { repairedCount });
+      }
+    }),
   );
   runStartupStep("apply asset valuation foundation migration", () =>
     applyTrackedStep(database, "runtime_asset_valuation_foundation_v1", () => applyAssetValuationFoundationMigration(database)),
@@ -2503,6 +2514,27 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     }
   } catch (error) {
     logger.warn("Could not schedule crew placeholder hydration.", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+  try {
+    const repairedCategories = database
+      .prepare(
+        `UPDATE asset_categories
+            SET name = 'Categoría pendiente',
+                description = COALESCE(NULLIF(description, ''), 'Categoría remota pendiente de reconciliar.'),
+                updated_at = '1970-01-01T00:00:00.000Z'
+          WHERE lower(name) LIKE 'remote category%'
+             OR lower(description) LIKE '%remote category%'`,
+      )
+      .run();
+    if (repairedCategories.changes > 0) {
+      logger.info("Repaired remote category placeholders so catalog hydration can replace them later.", {
+        placeholders: repairedCategories.changes,
+      });
+    }
+  } catch (error) {
+    logger.warn("Could not repair remote category placeholders.", {
       message: error instanceof Error ? error.message : String(error),
     });
   }

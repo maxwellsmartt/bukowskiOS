@@ -1,5 +1,5 @@
 import { PackageCheck, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AssetListRow, CatalogSnapshot, PackingSlipAssetSelection, ProjectCardRow } from "@contracts";
@@ -19,6 +19,7 @@ export type PackingSlipBuilderDraft = {
 };
 
 type PackingSlipBuilderPanelProps = {
+  defaultDepartmentId?: string | null;
   defaultProjectId: string | null;
   departments: CatalogSnapshot["departments"];
   error: string | null;
@@ -39,7 +40,25 @@ const normalizeOptional = (value: string) => {
   return nextValue ? nextValue : undefined;
 };
 
+const toSuggestedReturnDateTime = (dateValue: string | null | undefined) => {
+  if (!dateValue) {
+    return "";
+  }
+
+  const parsedDate = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "";
+  }
+
+  parsedDate.setDate(parsedDate.getDate() + 1);
+  const year = parsedDate.getFullYear();
+  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  const day = String(parsedDate.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}T09:00`;
+};
+
 export const PackingSlipBuilderPanel = ({
+  defaultDepartmentId,
   defaultProjectId,
   departments,
   error,
@@ -56,11 +75,13 @@ export const PackingSlipBuilderPanel = ({
   const { t } = useTranslation();
   const [projectId, setProjectId] = useState(defaultProjectId ?? "");
   const [projectUnitId, setProjectUnitId] = useState("");
-  const [departmentId, setDepartmentId] = useState("");
+  const [departmentId, setDepartmentId] = useState(defaultDepartmentId ?? "");
   const [responsibleUserId, setResponsibleUserId] = useState("");
   const [returnDueAt, setReturnDueAt] = useState("");
   const [notes, setNotes] = useState("");
   const [quantityByAssetId, setQuantityByAssetId] = useState<Record<string, number>>({});
+  const userTouchedResponsibleRef = useRef(false);
+  const userTouchedReturnRef = useRef(false);
   const { data: projectDetail } = useProjectDetail(normalizeOptional(projectId) ?? null);
   const initialQuantityByAssetId = useMemo(
     () => new Map((initialAssetSelections ?? []).map((selection) => [selection.assetId, selection.quantity] as const)),
@@ -89,6 +110,84 @@ export const PackingSlipBuilderPanel = ({
       projectDetail.units.some((unit) => unit.id === current) ? current : "",
     );
   }, [projectDetail.units, projectId]);
+
+  const selectedProjectUnit = useMemo(
+    () => projectDetail.units.find((unit) => unit.id === projectUnitId) ?? null,
+    [projectDetail.units, projectUnitId],
+  );
+  const departmentOptions = useMemo(() => {
+    const departmentIds = new Set<string>();
+    const sourceUnits = selectedProjectUnit ? [selectedProjectUnit] : projectDetail.units;
+
+    sourceUnits.forEach((unit) => {
+      unit.unitDepartments.forEach((department) => {
+        if (department.departmentId) {
+          departmentIds.add(department.departmentId);
+        }
+      });
+    });
+
+    return departmentIds.size ? departments.filter((department) => departmentIds.has(department.id)) : departments;
+  }, [departments, projectDetail.units, selectedProjectUnit]);
+  const suggestedResponsibleUserId = useMemo(() => {
+    if (!departmentId) {
+      return "";
+    }
+
+    const unitsToSearch = selectedProjectUnit ? [selectedProjectUnit, ...projectDetail.units.filter((unit) => unit.id !== selectedProjectUnit.id)] : projectDetail.units;
+    for (const unit of unitsToSearch) {
+      const assignment = unit.crewAssignments.find(
+        (crewAssignment) => crewAssignment.departmentId === departmentId && Boolean(crewAssignment.linkedUserId),
+      );
+
+      if (assignment?.linkedUserId && users.some((user) => user.id === assignment.linkedUserId)) {
+        return assignment.linkedUserId;
+      }
+    }
+
+    return "";
+  }, [departmentId, projectDetail.units, selectedProjectUnit, users]);
+  const suggestedReturnDueAt = useMemo(
+    () => toSuggestedReturnDateTime((selectedProjectUnit ?? projectDetail.project)?.endDate),
+    [projectDetail.project, selectedProjectUnit],
+  );
+
+  useEffect(() => {
+    setProjectUnitId("");
+    setDepartmentId(defaultDepartmentId ?? "");
+    setResponsibleUserId("");
+    setReturnDueAt("");
+    userTouchedResponsibleRef.current = false;
+    userTouchedReturnRef.current = false;
+  }, [defaultDepartmentId, projectId]);
+
+  useEffect(() => {
+    if (departmentId && departmentOptions.some((department) => department.id === departmentId)) {
+      return;
+    }
+
+    setDepartmentId(defaultDepartmentId && departmentOptions.some((department) => department.id === defaultDepartmentId)
+      ? defaultDepartmentId
+      : departmentOptions.length === 1
+        ? departmentOptions[0]!.id
+        : "");
+  }, [defaultDepartmentId, departmentId, departmentOptions]);
+
+  useEffect(() => {
+    if (userTouchedResponsibleRef.current || responsibleUserId || !suggestedResponsibleUserId) {
+      return;
+    }
+
+    setResponsibleUserId(suggestedResponsibleUserId);
+  }, [responsibleUserId, suggestedResponsibleUserId]);
+
+  useEffect(() => {
+    if (userTouchedReturnRef.current || !suggestedReturnDueAt || returnDueAt === suggestedReturnDueAt) {
+      return;
+    }
+
+    setReturnDueAt(suggestedReturnDueAt);
+  }, [returnDueAt, suggestedReturnDueAt]);
 
   const selectedLabel = t("packing.builder.assetSelected", { count: selectedCount });
   const selectedAssetDetails = useMemo(
@@ -145,11 +244,6 @@ export const PackingSlipBuilderPanel = ({
         </div>
       </div>
 
-      <div className="packing-builder-context-summary">
-        <strong>{t("packing.builder.cartContextTitle")}</strong>
-        <span>{t("packing.builder.cartContextBody")}</span>
-      </div>
-
       {hasVariableQuantityAssets ? (
         <div className="action-feedback action-feedback-warning">
           {t("packing.builder.bulkLocked")}
@@ -182,12 +276,12 @@ export const PackingSlipBuilderPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">{t("packing.builder.responsible")}</span>
-          <SelectField onChange={(event) => setResponsibleUserId(event.target.value)} value={responsibleUserId}>
-            <option value="">{t("packing.builder.autoOwner")}</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.fullName}
+          <span className="action-field-label">{t("packing.builder.department")}</span>
+          <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
+            <option value="">{t("packing.builder.noDepartment")}</option>
+            {departmentOptions.map((department) => (
+              <option key={department.id} value={department.id}>
+                {department.code} · {department.name}
               </option>
             ))}
           </SelectField>
@@ -209,42 +303,44 @@ export const PackingSlipBuilderPanel = ({
           <span className="action-field-label">{t("packing.builder.returnDue")}</span>
           <input
             className="action-field-control"
-            onChange={(event) => setReturnDueAt(event.target.value)}
+            onChange={(event) => {
+              userTouchedReturnRef.current = true;
+              setReturnDueAt(event.target.value);
+            }}
             type="datetime-local"
             value={returnDueAt}
           />
         </label>
+
+        <label className="action-field">
+          <span className="action-field-label">{t("packing.builder.responsible")}</span>
+          <SelectField
+            onChange={(event) => {
+              userTouchedResponsibleRef.current = true;
+              setResponsibleUserId(event.target.value);
+            }}
+            value={responsibleUserId}
+          >
+            <option value="">{t("packing.builder.autoOwner")}</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.fullName}
+              </option>
+            ))}
+          </SelectField>
+        </label>
+
+        <label className="action-field action-field-wide">
+          <span className="action-field-label">{t("packing.builder.notes")}</span>
+          <textarea
+            className="action-field-control action-textarea"
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder={t("packing.builder.optionalNote")}
+            rows={3}
+            value={notes}
+          />
+        </label>
       </div>
-
-      <details className="detail-disclosure">
-        <summary className="detail-disclosure-summary">{t("packing.builder.moreDetails")}</summary>
-        <div className="detail-disclosure-content">
-          <div className="action-form-grid">
-            <label className="action-field">
-              <span className="action-field-label">{t("packing.builder.department")}</span>
-              <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
-                <option value="">{t("packing.builder.noDepartment")}</option>
-                {departments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.code} · {department.name}
-                  </option>
-                ))}
-              </SelectField>
-            </label>
-
-            <label className="action-field action-field-wide">
-              <span className="action-field-label">{t("packing.builder.notes")}</span>
-              <textarea
-                className="action-field-control action-textarea"
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder={t("packing.builder.optionalNote")}
-                rows={3}
-                value={notes}
-              />
-            </label>
-          </div>
-        </div>
-      </details>
 
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 

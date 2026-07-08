@@ -271,7 +271,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
               assets.id,
               assets.name,
               COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
-              asset_categories.name AS category,
+              CASE
+                WHEN lower(asset_categories.name) LIKE 'remote category%' THEN 'Categoría pendiente'
+                ELSE asset_categories.name
+              END AS category,
               asset_current_state.available_quantity AS quantity,
               asset_current_state.total_quantity,
               asset_current_state.assigned_quantity,
@@ -285,6 +288,8 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
               COALESCE(projects.name, '—') AS project,
               asset_current_state.project_unit_id AS project_unit_id,
               COALESCE(project_units.name, '—') AS project_unit,
+              asset_current_state.current_department_id AS current_department_id,
+              COALESCE(departments.name, '—') AS current_department,
               COALESCE(users.full_name, '—') AS responsible,
               COALESCE(legacy_rentman_items.serial_number, assets.serial_number, '—') AS serial_number,
               COALESCE(legacy_rentman_items.qr_code_value, assets.qr_code_value, '—') AS qr_code_value,
@@ -317,6 +322,7 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
             LEFT JOIN locations ON locations.id = asset_current_state.current_location_id
             LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
             LEFT JOIN project_units ON project_units.id = asset_current_state.project_unit_id
+            LEFT JOIN departments ON departments.id = asset_current_state.current_department_id
             LEFT JOIN users ON users.id = asset_current_state.current_responsible_user_id
             WHERE ${whereClauses.join(" AND ")}
           `,
@@ -339,6 +345,8 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
         project: string;
         project_unit_id: string | null;
         project_unit: string;
+        current_department_id: string | null;
+        current_department: string;
         responsible: string;
         serial_number: string;
         qr_code_value: string;
@@ -380,6 +388,8 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           project: row.project,
           projectUnitId: row.project_unit_id,
           projectUnit: row.project_unit,
+          currentDepartmentId: row.current_department_id,
+          currentDepartment: row.current_department,
           responsible: row.responsible,
           serialNumber: row.serial_number,
           qrCode: row.qr_code_value,
@@ -403,6 +413,7 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
             row.location,
             row.project,
             row.projectUnit,
+            row.currentDepartment,
             row.responsible,
             row.serialNumber,
             row.qrCode,
@@ -438,7 +449,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
               COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
               assets.internal_code,
               assets.category_id,
-              COALESCE(asset_categories.name, '—') AS category_name,
+              CASE
+                WHEN lower(COALESCE(asset_categories.name, '')) LIKE 'remote category%' THEN 'Categoría pendiente'
+                ELSE COALESCE(asset_categories.name, '—')
+              END AS category_name,
               assets.brand,
               assets.model,
               assets.serial_number,

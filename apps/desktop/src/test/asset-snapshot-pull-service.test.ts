@@ -90,8 +90,8 @@ describe("asset snapshot pull service", () => {
   it("materializes a placeholder for a legacy ghost category instead of wedging the pull", () => {
     // A Rentman-import asset references a category by a legacy text id the
     // UUID-keyed cloud can never deliver. It must still land (under a recognizable
-    // placeholder) so the asset cursor advances and the whole inventory keeps
-    // flowing, rather than deferring forever.
+    // pending-category placeholder) so the asset cursor advances and the whole
+    // inventory keeps flowing, rather than deferring forever.
     const { cleanup, database } = createTestDatabase("bukowski-asset-ghost-category");
     const { asset, state } = readSeedSnapshot(database);
     const ghostCategoryId = "category-hd-mqv6ghost";
@@ -108,7 +108,7 @@ describe("asset snapshot pull service", () => {
       .prepare("SELECT code, name FROM asset_categories WHERE id = ?")
       .get(ghostCategoryId) as { code: string; name: string } | undefined;
     expect(placeholder).toBeTruthy();
-    expect(placeholder?.name).toContain("HD");
+    expect(placeholder?.name).toBe("Categoría pendiente");
     expect((database.prepare("SELECT category_id FROM assets WHERE id = ?").get("asset-r-ghost-1") as { category_id: string }).category_id)
       .toBe(ghostCategoryId);
     cleanup();

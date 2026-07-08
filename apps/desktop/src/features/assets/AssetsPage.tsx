@@ -35,7 +35,7 @@ import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { PackingSlipBuilderPanel, type PackingSlipBuilderDraft } from "@features/packing/PackingSlipBuilderPanel";
 import { createPackingSlip } from "@features/packing/usePackingData";
 import { createCatalogEntity, updateCatalogEntity, useCatalogData } from "@features/projects/useProjectsData";
-import { DataTable } from "@shared/components/DataTable";
+import { DataTable, type DataTableRowAction } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListSortMenuButton, ListToolbar } from "@shared/components/ListToolbar";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
@@ -122,7 +122,9 @@ const getActivePackingPreferenceKey = (targetProjectId?: string | null) =>
 // tracking, custody, warehouse, costs, etc.) stay one click away in the column
 // manager instead of cluttering the table with mostly-constant noise.
 const assetDefaultColumnKeys = ["asset", "kit", "category", "quantity", "location", "project", "status"];
-const projectAssetDefaultColumnKeys = ["asset", "projectUnit", "quantity", "responsible", "status", "condition", "incidents"];
+const projectAssetDefaultColumnKeys = ["asset", "projectUnit", "currentDepartment", "quantity", "responsible", "status", "condition", "incidents"];
+const allProjectDepartmentsTab = "__all__";
+const unassignedProjectDepartmentTab = "__unassigned__";
 
 const formatAssetKitMembership = (asset: Pick<AssetListRow, "linkedKitCodes" | "linkedKitNames">) => {
   const kitNames = asset.linkedKitNames.filter(Boolean);
@@ -473,6 +475,8 @@ const buildAssetListRowFromCatalogOption = (asset: CatalogAssetOptionRow, kit?: 
   project: asset.currentProject ?? "—",
   projectUnitId: asset.currentUnitId,
   projectUnit: asset.currentUnit ?? "—",
+  currentDepartmentId: asset.currentDepartmentId,
+  currentDepartment: asset.currentDepartment ?? "—",
   responsible: asset.currentDepartment ?? "—",
   serialNumber: "—",
   qrCode: "—",
@@ -523,6 +527,8 @@ type AssetOperationCartProps = {
   onOpenProjectReturns?: () => void;
   packingProjectId?: string | null;
   packingSourceKitId?: string | null;
+  projectMode?: boolean;
+  departmentScopeTooltip?: string | null;
   deleteDisabled?: boolean;
   deleteTooltip?: string | null;
   onQuantityChange: (assetId: string, quantity: number) => void;
@@ -544,6 +550,8 @@ const AssetOperationCart = ({
   onOpenProjectReturns,
   packingProjectId,
   packingSourceKitId,
+  projectMode = false,
+  departmentScopeTooltip,
   deleteDisabled = false,
   deleteTooltip,
   onQuantityChange,
@@ -561,7 +569,7 @@ const AssetOperationCart = ({
   const hasFullKitOperationContext = Boolean(packingSourceKitId);
   const assignMoveDisabled = lockedItems.length > 0 && items.length > 1 && !hasFullKitOperationContext;
   const assignToKitDisabled = lockedItems.length > 0;
-  const issueActionsDisabled = unavailablePackingItems.length > 0;
+  const issueActionsDisabled = unavailablePackingItems.length > 0 || Boolean(departmentScopeTooltip);
   const singleAsset = items.length === 1 ? items[0] : null;
   const checkedOutUnits = items.reduce((total, asset) => total + asset.checkedOutQuantity, 0);
   const releasableReservedUnits = items.reduce(
@@ -572,7 +580,8 @@ const AssetOperationCart = ({
     .slice(0, 4)
     .map((asset) => asset.code || asset.name)
     .join(", ");
-  const unavailablePackingTooltip = unavailablePackingItems.length
+  const unavailablePackingTooltip = departmentScopeTooltip ??
+    (unavailablePackingItems.length
     ? t("assets.cart.packingUnavailableTip", {
         summary: [
           unavailablePackingSummary,
@@ -582,7 +591,7 @@ const AssetOperationCart = ({
           .join(" "),
         defaultValue: "No se puede emitir packing slip hasta resolver disponibilidad: {{summary}}",
       })
-    : undefined;
+    : undefined);
   const assignMoveTooltip = assignMoveDisabled
     ? (kitLockTooltip ??
       t("assets.cart.assignMoveKitUnavailableTip", {
@@ -636,28 +645,32 @@ const AssetOperationCart = ({
         </div>
       </div>
       <div className="asset-operation-cart-actions">
-        <button
-          className="action-primary-button action-row-button"
-          aria-disabled={assignMoveDisabled}
-          data-tooltip={assignMoveTooltip}
-          onClick={() => {
-            if (!assignMoveDisabled) void onOpenAssignMove();
-          }}
-          type="button"
-        >
-          {t("assets.cart.assignMove")}
-        </button>
-        <button
-          className="ghost-control action-row-button"
-          aria-disabled={assignToKitDisabled}
-          data-tooltip={assignToKitTooltip}
-          onClick={() => {
-            if (!assignToKitDisabled) onOpenAssignToKit();
-          }}
-          type="button"
-        >
-          {t("assets.cart.assignToKit", { defaultValue: "Asignar a Kit" })}
-        </button>
+        {!projectMode ? (
+          <>
+            <button
+              className="action-primary-button action-row-button"
+              aria-disabled={assignMoveDisabled}
+              data-tooltip={assignMoveTooltip}
+              onClick={() => {
+                if (!assignMoveDisabled) void onOpenAssignMove();
+              }}
+              type="button"
+            >
+              {t("assets.cart.assignMove")}
+            </button>
+            <button
+              className="ghost-control action-row-button"
+              aria-disabled={assignToKitDisabled}
+              data-tooltip={assignToKitTooltip}
+              onClick={() => {
+                if (!assignToKitDisabled) onOpenAssignToKit();
+              }}
+              type="button"
+            >
+              {t("assets.cart.assignToKit", { defaultValue: "Asignar a Kit" })}
+            </button>
+          </>
+        ) : null}
         <button
           className="ghost-control action-row-button"
           aria-disabled={issueActionsDisabled}
@@ -1471,6 +1484,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [openingPreviewImageId, setOpeningPreviewImageId] = useState<string | null>(null);
   const [isImportingAssets, setIsImportingAssets] = useState(false);
   const [isReconcilingAssets, setIsReconcilingAssets] = useState(false);
+  const [activeProjectDepartmentId, setActiveProjectDepartmentId] = useState(allProjectDepartmentsTab);
   const [csvImportPreview, setCsvImportPreview] = useState<AssetCsvPreview | null>(null);
   const [csvImportProgress, setCsvImportProgress] = useState<AssetCsvImportProgress | null>(null);
   const [csvShowAllRows, setCsvShowAllRows] = useState(false);
@@ -1490,6 +1504,85 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     () => assets.find((asset) => asset.id === selectedAssetId) ?? null,
     [assets, selectedAssetId],
   );
+  const projectDepartmentTabs = useMemo(() => {
+    if (!isProjectMode) {
+      return [];
+    }
+
+    const departmentsById = new Map<string, {
+      id: string;
+      label: string;
+      assetCount: number;
+      assignedUnits: number;
+      checkedOutUnits: number;
+      openIncidents: number;
+    }>();
+    let unassignedAssetCount = 0;
+    let unassignedAssignedUnits = 0;
+    let unassignedCheckedOutUnits = 0;
+    let unassignedOpenIncidents = 0;
+
+    assets.forEach((asset) => {
+      const departmentId = asset.currentDepartmentId;
+      if (!departmentId) {
+        unassignedAssetCount += 1;
+        unassignedAssignedUnits += asset.assignedQuantity;
+        unassignedCheckedOutUnits += asset.checkedOutQuantity;
+        unassignedOpenIncidents += asset.incidentsOpen;
+        return;
+      }
+
+      const current = departmentsById.get(departmentId) ?? {
+        id: departmentId,
+        label: cleanDisplay(asset.currentDepartment) || t("assets.projectDepartments.unknown", { defaultValue: "Departamento" }),
+        assetCount: 0,
+        assignedUnits: 0,
+        checkedOutUnits: 0,
+        openIncidents: 0,
+      };
+      current.assetCount += 1;
+      current.assignedUnits += asset.assignedQuantity;
+      current.checkedOutUnits += asset.checkedOutQuantity;
+      current.openIncidents += asset.incidentsOpen;
+      departmentsById.set(departmentId, current);
+    });
+
+    const tabs = [
+      {
+        id: allProjectDepartmentsTab,
+        label: t("assets.projectDepartments.all", { defaultValue: "Todos" }),
+        assetCount: assets.length,
+        assignedUnits: assets.reduce((total, asset) => total + asset.assignedQuantity, 0),
+        checkedOutUnits: assets.reduce((total, asset) => total + asset.checkedOutQuantity, 0),
+        openIncidents: assets.reduce((total, asset) => total + asset.incidentsOpen, 0),
+      },
+      ...Array.from(departmentsById.values()).sort((left, right) => left.label.localeCompare(right.label)),
+    ];
+
+    if (unassignedAssetCount > 0) {
+      tabs.push({
+        id: unassignedProjectDepartmentTab,
+        label: t("assets.projectDepartments.unassigned", { defaultValue: "Sin departamento" }),
+        assetCount: unassignedAssetCount,
+        assignedUnits: unassignedAssignedUnits,
+        checkedOutUnits: unassignedCheckedOutUnits,
+        openIncidents: unassignedOpenIncidents,
+      });
+    }
+
+    return tabs;
+  }, [assets, isProjectMode, t]);
+  const visibleAssets = useMemo(() => {
+    if (!isProjectMode || activeProjectDepartmentId === allProjectDepartmentsTab) {
+      return assets;
+    }
+
+    if (activeProjectDepartmentId === unassignedProjectDepartmentTab) {
+      return assets.filter((asset) => !asset.currentDepartmentId);
+    }
+
+    return assets.filter((asset) => asset.currentDepartmentId === activeProjectDepartmentId);
+  }, [activeProjectDepartmentId, assets, isProjectMode]);
   const visibleAssetById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset] as const)), [assets]);
   const catalogAssetOptionById = useMemo(
     () => new Map(catalog.assetOptions.map((asset) => [asset.id, asset] as const)),
@@ -1597,6 +1690,14 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     const selectedProjectIds = [...new Set(selectedAssets.map((asset) => asset.projectId).filter(Boolean))] as string[];
     return selectedProjectIds.length === 1 ? selectedProjectIds[0] : null;
   }, [assignNextStep?.projectId, isProjectMode, projectId, selectedAssets]);
+  const packingDefaultDepartmentId = useMemo(() => {
+    if (isProjectMode && activeProjectDepartmentId !== allProjectDepartmentsTab && activeProjectDepartmentId !== unassignedProjectDepartmentTab) {
+      return activeProjectDepartmentId;
+    }
+
+    const selectedDepartmentIds = [...new Set(selectedAssets.map((asset) => asset.currentDepartmentId).filter(Boolean))] as string[];
+    return selectedDepartmentIds.length === 1 ? selectedDepartmentIds[0] : null;
+  }, [activeProjectDepartmentId, isProjectMode, selectedAssets]);
   const selectedAssetSelections = useMemo(
     () =>
       selectedAssets.map((asset) => ({
@@ -1673,6 +1774,21 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const selectedKitLockTooltip = selectedKitLockSummary
     ? t("assets.selection.kitLocked", { summary: selectedKitLockSummary })
     : null;
+  const selectedDepartmentScopeTooltip = useMemo(() => {
+    if (!isProjectMode || selectedAssets.length <= 1) {
+      return null;
+    }
+
+    const selectedDepartmentIds = new Set(
+      selectedAssets.map((asset) => asset.currentDepartmentId ?? unassignedProjectDepartmentTab),
+    );
+
+    return selectedDepartmentIds.size > 1
+      ? t("assets.projectDepartments.multiDepartmentActionBlocked", {
+          defaultValue: "Selecciona equipos de un solo departamento o usa un tab de departamento.",
+        })
+      : null;
+  }, [isProjectMode, selectedAssets, t]);
   const selectedDeleteBlockedAssets = useMemo(
     () =>
       selectedAssets.filter(
@@ -1837,6 +1953,20 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   // button and the per-row menu both add to the tray); we only clear it when
   // leaving Assets so a stale selection doesn't linger in the global launcher.
   useEffect(() => () => clearCompareTray(), [clearCompareTray]);
+
+  useEffect(() => {
+    if (!isProjectMode) {
+      if (activeProjectDepartmentId !== allProjectDepartmentsTab) {
+        setActiveProjectDepartmentId(allProjectDepartmentsTab);
+      }
+      return;
+    }
+
+    if (!projectDepartmentTabs.some((tab) => tab.id === activeProjectDepartmentId)) {
+      setActiveProjectDepartmentId(allProjectDepartmentsTab);
+      clearOperationCart();
+    }
+  }, [activeProjectDepartmentId, isProjectMode, projectDepartmentTabs]);
 
   useEffect(() => {
     if (isProjectMode || !routeState?.assignProjectId) {
@@ -2990,6 +3120,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       { key: "location", label: t("assets.columns.location"), width: 190, minWidth: 150, render: (row: (typeof assets)[number]) => row.location },
       { key: "project", label: t("assets.columns.project"), width: 170, minWidth: 140, render: (row: (typeof assets)[number]) => row.project },
       { key: "projectUnit", label: t("assets.columns.unit"), width: 150, minWidth: 124, render: (row: (typeof assets)[number]) => row.projectUnit },
+      { key: "currentDepartment", label: t("assets.columns.currentDepartment", { defaultValue: "Departamento asignado" }), width: 172, minWidth: 140, render: (row: (typeof assets)[number]) => row.currentDepartment },
       { key: "responsible", label: t("assets.columns.responsible"), width: 160, minWidth: 132, render: (row: (typeof assets)[number]) => row.responsible },
       { key: "serialNumber", label: t("assets.columns.serial"), width: 150, minWidth: 120, render: (row: (typeof assets)[number]) => row.serialNumber },
       { key: "qrCode", label: t("assets.columns.qr"), width: 130, minWidth: 108, render: (row: (typeof assets)[number]) => row.qrCode },
@@ -3117,12 +3248,15 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               <span>{t("assets.projectActions.assignAssets")}</span>
             </button>
             <button
-              className="ghost-control action-row-button"
-              disabled={!selectedRowIds.length}
+              className="action-primary-button action-row-button project-assets-secondary-action"
+              aria-disabled={!selectedRowIds.length || Boolean(selectedDepartmentScopeTooltip)}
+              data-tooltip={!selectedRowIds.length ? t("assets.projectActions.selectToEdit") : selectedDepartmentScopeTooltip ?? undefined}
               onClick={() => {
-                setPackingPanelOpen(true);
-                setActionPanelOpen(false);
-                setPackingError(null);
+                if (selectedRowIds.length && !selectedDepartmentScopeTooltip) {
+                  setPackingPanelOpen(true);
+                  setActionPanelOpen(false);
+                  setPackingError(null);
+                }
               }}
               type="button"
             >
@@ -3130,7 +3264,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               <span>{t("assets.projectInventory.actions.packing")}</span>
             </button>
             <button
-              className="ghost-control action-row-button"
+              className="action-primary-button action-row-button project-assets-secondary-action"
               onClick={() => navigate(`/projects/${projectId}/packing`)}
               type="button"
             >
@@ -3148,6 +3282,38 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             </div>
           ) : null}
         </section>
+      ) : null}
+
+      {!error && !isLoading && isProjectMode && projectDepartmentTabs.length > 1 ? (
+        <div className="project-assets-department-tabs" role="tablist" aria-label={t("assets.projectDepartments.aria", { defaultValue: "Departamentos del proyecto" })}>
+          {projectDepartmentTabs.map((tab) => {
+            const active = tab.id === activeProjectDepartmentId;
+            return (
+              <button
+                key={tab.id}
+                aria-selected={active}
+                className={`project-assets-department-tab${active ? " is-active" : ""}`}
+                onClick={() => {
+                  setActiveProjectDepartmentId(tab.id);
+                  clearOperationCart();
+                }}
+                role="tab"
+                type="button"
+              >
+                <span className="project-assets-department-tab-label">{tab.label}</span>
+                <span className="project-assets-department-tab-counts">
+                  {t("assets.projectDepartments.tabCounts", {
+                    assets: tab.assetCount,
+                    assigned: tab.assignedUnits,
+                    out: tab.checkedOutUnits,
+                    incidents: tab.openIncidents,
+                    defaultValue: "{{assets}} eq · {{assigned}} asig · {{out}} fuera · {{incidents}} inc.",
+                  })}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       ) : null}
 
       {showGlobalAssetLanding ? (
@@ -3264,6 +3430,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           className="asset-operation-modal-shell"
         >
           <PackingSlipBuilderPanel
+            defaultDepartmentId={packingDefaultDepartmentId}
             defaultProjectId={packingDefaultProjectId}
             departments={catalog.departments}
             error={packingError}
@@ -4023,14 +4190,15 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               />
             }
             columns={assetColumns}
-            rowActions={(row) => [
-              {
+            rowActions={(row) => {
+              const actions: DataTableRowAction<(typeof assets)[number]>[] = [
+                {
                 key: "open",
                 label: t("assets.quickPreview.openDetail"),
                 icon: <ExternalLink size={14} />,
                 onSelect: (target) => navigate(`/assets/${target.id}`),
-              },
-              {
+                },
+                {
                 key: "edit",
                 label: t("assets.quickPreview.editAsset"),
                 icon: <SquarePen size={14} />,
@@ -4039,52 +4207,63 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                   setEditorMode("edit");
                   setEditorError(null);
                 },
-              },
-              {
+                },
+                {
                 key: "add-to-compare",
                 label: t("assets.cart.addToCompare"),
                 icon: <GitCompareArrows size={14} />,
                 separatorBefore: true,
                 onSelect: (target) => addAssetToCompare(target),
-              },
-              {
-                key: "assign-move",
-                label: t("assets.cart.assignMove"),
-                icon: <MoveRight size={14} />,
-                onSelect: (target) => void openAssignMoveForAsset(target),
-              },
-              {
-                key: "assign-to-kit",
-                label: t("assets.cart.assignToKit", { defaultValue: "Asignar a Kit" }),
-                icon: <Boxes size={14} />,
-                disabled:
-                  selectedRowIds.length > 1 &&
-                    selectedRowIds.includes(row.id) &&
-                    selectedAssets.some((asset) => asset.linkedKitCount > 0),
-                onSelect: (target) => openAssignKitForAsset(target),
-              },
-              {
+                },
+              ];
+
+              if (!isProjectMode) {
+                actions.push(
+                  {
+                    key: "assign-move",
+                    label: t("assets.cart.assignMove"),
+                    icon: <MoveRight size={14} />,
+                    onSelect: (target) => void openAssignMoveForAsset(target),
+                  },
+                  {
+                    key: "assign-to-kit",
+                    label: t("assets.cart.assignToKit", { defaultValue: "Asignar a Kit" }),
+                    icon: <Boxes size={14} />,
+                    disabled:
+                      selectedRowIds.length > 1 &&
+                        selectedRowIds.includes(row.id) &&
+                        selectedAssets.some((asset) => asset.linkedKitCount > 0),
+                    onSelect: (target) => openAssignKitForAsset(target),
+                  },
+                );
+              }
+
+              actions.push(
+                {
                 key: "create-packing-slip",
                 label: t("assets.cart.createPackingSlip"),
                 icon: <ClipboardList size={14} />,
                 disabled: row.linkedKitCount > 0 || !resolveAssetAvailability(row).isAvailable,
                 onSelect: (target) => openPackingSlipForAsset(target),
-              },
-              {
+                },
+                {
                 key: "report-issue",
                 label: t("assets.cart.reportIssue"),
                 icon: <Siren size={14} />,
                 onSelect: (target) => navigate(`/assets/${target.id}?report=incident`),
-              },
-              {
+                },
+                {
                 key: "delete",
                 label: t("assets.cart.deleteSelectedOne", { defaultValue: "Eliminar equipo" }),
                 icon: <Trash2 size={14} />,
                 tone: "danger",
                 separatorBefore: true,
                 onSelect: (target) => void handleDeleteAssetRow(target),
-              },
-            ]}
+                },
+              );
+
+              return actions;
+            }}
             defaultVisibleColumnKeys={isProjectMode ? projectAssetDefaultColumnKeys : assetDefaultColumnKeys}
             emptyContent={
               isProjectMode && !assetControls.searchValue.trim() ? (
@@ -4136,7 +4315,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             persistKey={isProjectMode ? "project-assets-registry-v2" : "assets-registry-v2"}
             pruneSelectionOnRowsChange={false}
             fillParent
-            rows={assets}
+            rows={visibleAssets}
             shellClassName="table-shell-wide-scroll table-shell-fill"
             selectable
             selectedRowIds={selectedRowIds}
@@ -4168,9 +4347,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               }}
               onClear={clearOperationCart}
               onCreatePackingSlip={() => {
-                setPackingPanelOpen(true);
-                setActionPanelOpen(false);
-                setPackingError(null);
+                if (!selectedDepartmentScopeTooltip) {
+                  setPackingPanelOpen(true);
+                  setActionPanelOpen(false);
+                  setPackingError(null);
+                }
 
               }}
               onCreateRma={() => navigate("/incidents")}
@@ -4181,6 +4362,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               onOpenProjectReturns={isProjectMode && projectId ? () => navigate(`/projects/${projectId}/packing`) : undefined}
               packingProjectId={packingDefaultProjectId}
               packingSourceKitId={effectivePackingSourceKitId}
+              projectMode={isProjectMode}
+              departmentScopeTooltip={selectedDepartmentScopeTooltip}
               deleteDisabled={selectedDeleteBlockedAssets.length > 0}
               deleteTooltip={selectedDeleteBlockedTooltip}
               onQuantityChange={updateCartQuantity}

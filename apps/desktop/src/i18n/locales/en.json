@@ -251,6 +251,7 @@
       "location": "Location",
       "project": "Project",
       "unit": "Unit",
+      "currentDepartment": "Assigned department",
       "responsible": "Responsible",
       "serial": "Serial",
       "qr": "QR",
@@ -693,6 +694,14 @@
       "selectionHint_one": "{{count}} asset selected for operations.",
       "selectionHint_other": "{{count}} assets selected for operations.",
       "unitsAndOwners": "{{units}} units · {{owners}} owners"
+    },
+    "projectDepartments": {
+      "aria": "Project departments",
+      "all": "All",
+      "unassigned": "No department",
+      "unknown": "Department",
+      "tabCounts": "{{assets}} assets · {{assigned}} assigned · {{out}} out · {{incidents}} issues",
+      "multiDepartmentActionBlocked": "Select assets from one department or use a department tab."
     },
     "sideRail": {
       "preview": "Quick preview",

@@ -251,6 +251,7 @@
       "location": "Ubicación",
       "project": "Proyecto",
       "unit": "Unidad",
+      "currentDepartment": "Departamento asignado",
       "responsible": "Responsable",
       "serial": "Serie",
       "qr": "QR",
@@ -695,6 +696,14 @@
       "selectionHint_one": "{{count}} equipo seleccionado para operar.",
       "selectionHint_other": "{{count}} equipos seleccionados para operar.",
       "unitsAndOwners": "{{units}} unidades · {{owners}} responsables"
+    },
+    "projectDepartments": {
+      "aria": "Departamentos del proyecto",
+      "all": "Todos",
+      "unassigned": "Sin departamento",
+      "unknown": "Departamento",
+      "tabCounts": "{{assets}} eq · {{assigned}} asig · {{out}} fuera · {{incidents}} inc.",
+      "multiDepartmentActionBlocked": "Selecciona equipos de un solo departamento o usa un tab de departamento."
     },
     "sideRail": {
       "preview": "Vista rápida",
