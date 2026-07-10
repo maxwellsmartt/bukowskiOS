@@ -671,7 +671,7 @@ export const AssetDetailPage = () => {
             setAssignOpen(false);
             setAssignError(null);
           }}
-          width={820}
+          width={1080}
           className="asset-operation-modal-shell"
         >
           <AssetAssignMovePanel

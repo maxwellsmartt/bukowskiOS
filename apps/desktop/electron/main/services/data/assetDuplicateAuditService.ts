@@ -32,6 +32,8 @@ type DuplicateAuditAssetRow = {
   available_quantity: number;
   assigned_quantity: number;
   checked_out_quantity: number;
+  active_assignment_project_id: string | null;
+  active_assignment_quantity: number;
   open_incident_count: number;
   file_count: number;
 };
@@ -91,10 +93,10 @@ const extractSourceCodes = (notes: string | null | undefined) => {
 
 const explainBlockers = (row: DuplicateAuditAssetRow) => {
   const blockers: string[] = [];
-  if (row.current_project_id && row.current_project_status !== "Wrapped") {
+  if ((row.current_project_id || row.active_assignment_project_id) && row.current_project_status !== "Wrapped") {
     blockers.push(`Está asignado a ${row.current_project_name ?? "un proyecto activo"} (${row.current_project_status ?? "activo"}).`);
   }
-  if (row.assigned_quantity > 0 || row.checked_out_quantity > 0 || row.custody_status !== "available") {
+  if (row.assigned_quantity > 0 || row.checked_out_quantity > 0 || row.active_assignment_quantity > 0 || row.custody_status !== "available") {
     blockers.push("Tiene unidades asignadas, reservadas o fuera de almacén.");
   }
   if (row.open_incident_count > 0) {
@@ -174,6 +176,24 @@ export const buildAssetDuplicateAuditPreview = (db: DatabaseSync, workspaceId?: 
           COALESCE(asset_current_state.available_quantity, 1) AS available_quantity,
           COALESCE(asset_current_state.assigned_quantity, 0) AS assigned_quantity,
           COALESCE(asset_current_state.checked_out_quantity, 0) AS checked_out_quantity,
+          (
+            SELECT asset_assignments.project_id
+            FROM asset_assignments
+            WHERE asset_assignments.asset_id = assets.id
+              AND asset_assignments.returned_at IS NULL
+              AND asset_assignments.project_id IS NOT NULL
+              AND asset_assignments.assignment_status IN ('reserved', 'assigned', 'checked_out')
+            ORDER BY asset_assignments.updated_at DESC, asset_assignments.created_at DESC
+            LIMIT 1
+          ) AS active_assignment_project_id,
+          COALESCE((
+            SELECT SUM(asset_assignments.quantity)
+            FROM asset_assignments
+            WHERE asset_assignments.asset_id = assets.id
+              AND asset_assignments.returned_at IS NULL
+              AND asset_assignments.project_id IS NOT NULL
+              AND asset_assignments.assignment_status IN ('reserved', 'assigned', 'checked_out')
+          ), 0) AS active_assignment_quantity,
           (
             SELECT COUNT(*)
             FROM incidents

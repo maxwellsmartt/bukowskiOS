@@ -1592,7 +1592,11 @@ export const registerFoundationIpc = ({
       requiredPermission: "packing-slips.create",
     });
 
-    return packingMutations.createPackingSlip(input);
+    const actorUserId = await workspaceAccess.getCurrentUserId("create packing slips");
+    return packingMutations.createPackingSlip({
+      ...input,
+      actorUserId: actorUserId ?? input.actorUserId,
+    });
   });
   safeHandle(ipcChannels.packing.returnItems, returnPackingSlipItemsSchema, async (_event, input) => {
     await workspaceAccess.assertWorkspaceAccess({

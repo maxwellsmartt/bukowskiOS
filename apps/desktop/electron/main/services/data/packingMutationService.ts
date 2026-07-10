@@ -218,6 +218,34 @@ const loadKitMemberships = (db: DatabaseSync, assetIds: string[]) => {
   return byAssetId;
 };
 
+const loadKitMemberAssetIdsByKitId = (db: DatabaseSync, kitIds: string[]) => {
+  if (!kitIds.length) {
+    return new Map<string, Set<string>>();
+  }
+
+  const rows = db
+    .prepare(
+      `
+        SELECT kit_assets.kit_id, kit_assets.asset_id
+        FROM kit_assets
+        JOIN kits ON kits.id = kit_assets.kit_id
+        WHERE kits.is_active = 1
+          AND kit_assets.kit_id IN (${createPlaceholders(kitIds)})
+        ORDER BY kit_assets.kit_id, kit_assets.asset_id
+      `,
+    )
+    .all(...kitIds) as Array<{ kit_id: string; asset_id: string }>;
+
+  const byKitId = new Map<string, Set<string>>();
+  rows.forEach((row) => {
+    const current = byKitId.get(row.kit_id) ?? new Set<string>();
+    current.add(row.asset_id);
+    byKitId.set(row.kit_id, current);
+  });
+
+  return byKitId;
+};
+
 const ensureEntityExists = (value: string | undefined, label: string, map: Map<string, string>) => {
   if (!value) {
     return;
@@ -486,25 +514,28 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
     }
 
     const kitMembershipsByAssetId = loadKitMemberships(db, assetIds);
+    const selectedAssetIdSet = new Set(assetIds);
+    const selectedKitMemberships = [...kitMembershipsByAssetId.values()].flat();
+    const involvedKitIds = uniqueValues(selectedKitMemberships.map((membership) => membership.kit_id));
+    const kitMemberAssetIdsByKitId = loadKitMemberAssetIdsByKitId(db, involvedKitIds);
+    const completeSelectedKitIds = new Set(
+      involvedKitIds.filter((kitId) => {
+        const memberAssetIds = kitMemberAssetIdsByKitId.get(kitId);
+        return memberAssetIds ? memberAssetIds.size > 0 && [...memberAssetIds].every((assetId) => selectedAssetIdSet.has(assetId)) : false;
+      }),
+    );
+    const isKitMembershipAllowed = (membership: KitMembershipRow) =>
+      membership.kit_id === input.sourceKitId || completeSelectedKitIds.has(membership.kit_id);
     const kitProtectedAsset = assetRows.find((row) => {
       const memberships = kitMembershipsByAssetId.get(row.asset_id) ?? [];
-
-      if (!memberships.length) {
-        return false;
-      }
-
-      if (!input.sourceKitId) {
-        return true;
-      }
-
-      return !memberships.some((membership) => membership.kit_id === input.sourceKitId);
+      return memberships.length > 0 && !memberships.some(isKitMembershipAllowed);
     });
 
     if (kitProtectedAsset) {
       const memberships = kitMembershipsByAssetId.get(kitProtectedAsset.asset_id) ?? [];
       const membershipLabel = memberships.map((membership) => `${membership.kit_code} · ${membership.kit_name}`).join(", ");
       fail(
-        `${kitProtectedAsset.asset_name} is already part of the active kit${memberships.length === 1 ? "" : "s"} ${membershipLabel}. Remove it from the kit before issuing it individually on a packing slip.`,
+        `${kitProtectedAsset.asset_name} is already part of the active kit${memberships.length === 1 ? "" : "s"} ${membershipLabel}. Select the full kit or remove it from the kit before issuing it individually on a packing slip.`,
       );
     }
 
@@ -702,7 +733,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       );
       const insertAssetOutboxStatement = db.prepare(
         `
-          INSERT INTO sync_outbox (
+          INSERT OR REPLACE INTO sync_outbox (
             id,
             workspace_id,
             entity_type,
@@ -722,7 +753,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       );
       const insertPackingOutboxStatement = db.prepare(
         `
-          INSERT INTO sync_outbox (
+          INSERT OR REPLACE INTO sync_outbox (
             id,
             workspace_id,
             entity_type,
@@ -795,11 +826,11 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             responsibleUserId ? ` · ${userMap.get(responsibleUserId)}` : ""
           }.`;
 
+        const rowKitMemberships = kitMembershipsByAssetId.get(row.asset_id) ?? [];
         const itemKitId =
-          input.sourceKitId &&
-          (kitMembershipsByAssetId.get(row.asset_id) ?? []).some((membership) => membership.kit_id === input.sourceKitId)
-            ? input.sourceKitId
-            : null;
+          rowKitMemberships.find((membership) => membership.kit_id === input.sourceKitId)?.kit_id ??
+          rowKitMemberships.find((membership) => completeSelectedKitIds.has(membership.kit_id))?.kit_id ??
+          null;
         insertPackingItemStatement.run(
           itemId,
           packingSlipId,
@@ -1160,7 +1191,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       );
       const insertOutboxStatement = db.prepare(
         `
-          INSERT INTO sync_outbox (
+          INSERT OR REPLACE INTO sync_outbox (
             id,
             workspace_id,
             entity_type,

@@ -3366,7 +3366,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             setAssignMoveSourceKitId(null);
             setActionError(null);
           }}
-          width={820}
+          width={1080}
           className="asset-operation-modal-shell"
         >
           <AssetAssignMovePanel

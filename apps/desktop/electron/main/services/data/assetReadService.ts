@@ -16,6 +16,7 @@ import type {
 } from "@contracts";
 
 import { assertPathWithinRoot } from "../../security/pathSafety";
+import { repairAssetCurrentStateFromActiveAssignments } from "./assetQuantityFoundationBootstrap";
 import { buildAssetDuplicateAuditPreview } from "./assetDuplicateAuditService";
 
 type SortRows = <T>(rows: T[], comparator: (left: T, right: T) => number) => T[];
@@ -251,6 +252,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
     },
 
     getAssets(query: AssetListQuery = deps.defaultAssetListQuery): AssetListRow[] {
+      if (query.scopeProjectId) {
+        repairAssetCurrentStateFromActiveAssignments(db);
+      }
+
       const whereClauses = ["assets.is_active = 1"];
       const params: Array<string> = [];
 

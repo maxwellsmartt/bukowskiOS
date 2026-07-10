@@ -421,6 +421,18 @@ app.whenReady().then(async () => {
     throw error;
   }
   const documentGeneration = createDocumentGenerationService();
+  const resolvePackingPreparedByName = async (storedName: string) => {
+    const normalizedStoredName = storedName.trim();
+    if (normalizedStoredName && !["AI Agent", "Ops Repair", "—"].includes(normalizedStoredName)) {
+      return storedName;
+    }
+
+    try {
+      return (await localDatabase.workspaceAccess.getCurrentActorName()) || storedName || "Operations";
+    } catch {
+      return storedName || "Operations";
+    }
+  };
   const createFinanceSummaryReportPdf = async (query: TreasuryOverviewQuery | undefined, targetFilePath: string) => {
     const workspaceId = query?.workspaceId ?? LOCAL_FALLBACK_WORKSPACE_ID;
     const reportQuery: TreasuryOverviewQuery = {
@@ -647,6 +659,7 @@ app.whenReady().then(async () => {
       if (!detail.slip) {
         throw new Error("Packing slip was not found.");
       }
+      const preparedByName = await resolvePackingPreparedByName(detail.slip.preparedBy);
 
       const pdf = await documentGeneration.createPackingSlipPdf({
         slipNumber: detail.slip.number,
@@ -655,7 +668,7 @@ app.whenReady().then(async () => {
         departmentCode: detail.slip.departmentCode,
         departmentName: detail.slip.department,
         responsibleName: detail.slip.responsible,
-        preparedByName: detail.slip.preparedBy,
+        preparedByName,
         issueDate: detail.slip.issueDate,
         issueDateCompact: detail.slip.issueDateCompact,
         dueDate: detail.slip.dueDate,
@@ -717,6 +730,7 @@ app.whenReady().then(async () => {
               maximumFractionDigits: 0,
             }).format(insuredTotal)
           : "Pending";
+      const preparedByName = await resolvePackingPreparedByName(detail.slip.preparedBy);
 
       const pdf = await documentGeneration.createPackingSlipInsurancePdf({
         slipNumber: detail.slip.number,
@@ -725,7 +739,7 @@ app.whenReady().then(async () => {
         departmentCode: detail.slip.departmentCode,
         departmentName: detail.slip.department,
         responsibleName: detail.slip.responsible,
-        preparedByName: detail.slip.preparedBy,
+        preparedByName,
         issueDate: detail.slip.issueDate,
         issueDateCompact: detail.slip.issueDateCompact,
         dueDate: detail.slip.dueDate,

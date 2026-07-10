@@ -1874,6 +1874,8 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
       const unitInsuredValue = resolveUnitInsuredValue(row);
       return total + (typeof unitInsuredValue === "number" ? unitInsuredValue * row.quantity : 0);
     }, 0);
+    const itemResponsibleNames = [...new Set(itemRows.map((row) => row.responsible).filter((value) => value && value !== "—"))];
+    const resolvedResponsible = slip.responsible !== "—" ? slip.responsible : itemResponsibleNames.length === 1 ? itemResponsibleNames[0]! : "—";
 
     return {
       slip: {
@@ -1884,7 +1886,7 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
         project: slip.project,
         departmentCode: slip.department_code,
         department: slip.department,
-        responsible: slip.responsible,
+        responsible: resolvedResponsible,
         preparedBy: slip.prepared_by,
         issueDate: formatShortDateWithYear(slip.issue_date),
         issueDateCompact: formatCompactDate(slip.issue_date),

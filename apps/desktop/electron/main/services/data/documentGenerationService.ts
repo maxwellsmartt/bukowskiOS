@@ -377,6 +377,7 @@ export const createDocumentGenerationService = () => ({
     const surfaceText = "#1a2029";
     const surfaceBackground = "#f7f8fa";
     const accentBackground = "#141619";
+    const kitHeaderBackground = "#4b5563";
     const columnGap = 16;
     const headerHeight = 78;
     const footerReserve = 124;
@@ -483,6 +484,25 @@ export const createDocumentGenerationService = () => ({
         ellipsis: true,
       });
     };
+    const drawIssuedDueMetaRow = (x: number, y: number, width: number) => {
+      document.fillColor(surfaceMuted).fontSize(7.5).text("ISSUED / DUE", x, y, {
+        width,
+        characterSpacing: 0.9,
+        lineBreak: false,
+        ellipsis: true,
+      });
+      document.font("Helvetica").fillColor(surfaceText).fontSize(9.5).text(`${payload.issueDate} -> `, x, y + 12, {
+        width,
+        lineBreak: false,
+        continued: true,
+      });
+      document.font("Helvetica-Bold").fillColor(surfaceText).text(payload.dueDate || "—", {
+        width,
+        lineBreak: false,
+        ellipsis: true,
+      });
+      document.font("Helvetica");
+    };
 
     const metaColumnWidth = Math.floor((cardWidth - columnGap * 2) / 3);
 
@@ -492,7 +512,7 @@ export const createDocumentGenerationService = () => ({
 
     cursorY += 34;
     drawMetaRow("Prepared by", payload.preparedByName, cardLeft, cursorY, metaColumnWidth);
-    drawMetaRow("Issued / due", `${payload.issueDate} -> ${payload.dueDate}`, cardLeft + metaColumnWidth + columnGap, cursorY, metaColumnWidth);
+    drawIssuedDueMetaRow(cardLeft + metaColumnWidth + columnGap, cursorY, metaColumnWidth);
     drawMetaRow("Items", String(payload.summary.itemCount), cardLeft + (metaColumnWidth + columnGap) * 2, cursorY, metaColumnWidth);
 
     cursorY += 42;
@@ -548,7 +568,7 @@ export const createDocumentGenerationService = () => ({
               cursorY = document.page.margins.top;
               drawTableHeader();
             }
-            document.roundedRect(cardLeft, cursorY - 3, cardWidth, kitHeadingHeight, 7).fill(accentBackground);
+            document.roundedRect(cardLeft, cursorY - 3, cardWidth, kitHeadingHeight, 7).fill(kitHeaderBackground);
             document.font("Helvetica-Bold").fillColor("#eef2f8").fontSize(8).text(
               `PAQUETE · ${item.kitName}${item.kitCode ? ` (${item.kitCode})` : ""}`,
               cardLeft + tableInset,

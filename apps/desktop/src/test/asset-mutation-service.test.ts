@@ -416,9 +416,18 @@ describe("asset mutation service", () => {
 
     expect(reads.getAssetDetail("asset-legacy-rentman-1").asset?.project).toBe("—");
 
+    const projectAssetsAfterReadRepair = reads.getAssets({
+      workspaceId: "workspace-metadata",
+      scopeProjectId: "project-aurora",
+      sortBy: "name",
+      sortDirection: "asc",
+    });
+
+    expect(projectAssetsAfterReadRepair.some((asset) => asset.id === "asset-legacy-rentman-1")).toBe(true);
+
     const repairedCount = repairAssetCurrentStateFromActiveAssignments(database);
 
-    expect(repairedCount).toBe(1);
+    expect(repairedCount).toBe(0);
     const repaired = database
       .prepare(
         `

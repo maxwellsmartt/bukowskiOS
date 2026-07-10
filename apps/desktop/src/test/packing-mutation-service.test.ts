@@ -466,17 +466,28 @@ describe("packing mutation service", () => {
     cleanup();
   });
 
-  it("blocks issuing kit members individually on packing slips", () => {
+  it("blocks partial kit packing but allows complete kit packing", () => {
     const { cleanup, database } = createTestDatabase("bukowski-packing-kit-guard-test");
     const assetMutations = createAssetMutationService(database);
     const catalogMutations = createCatalogMutationService(database);
     const packingMutations = createPackingMutationService(database);
 
-    const createdAsset = assetMutations.createAsset({
+    const firstAsset = assetMutations.createAsset({
       commandId: "cmd-test-packing-kit-member-create",
       workspaceId: "workspace-metadata",
       name: "Packing locked monitor",
       internalCode: "PACKKIT-001",
+      categoryId: "cat-monitors",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Good",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+    const secondAsset = assetMutations.createAsset({
+      commandId: "cmd-test-packing-kit-member-create-2",
+      workspaceId: "workspace-metadata",
+      name: "Packing locked receiver",
+      internalCode: "PACKKIT-002",
       categoryId: "cat-monitors",
       defaultLocationId: "loc-warehouse-a",
       conditionStatus: "Good",
@@ -489,21 +500,110 @@ describe("packing mutation service", () => {
       entityType: "kit",
       code: "PACKKIT",
       name: "Packing Guard Kit",
-      assetSelections: [{ assetId: createdAsset.assetId, quantity: 1 }],
+      assetSelections: [
+        { assetId: firstAsset.assetId, quantity: 1 },
+        { assetId: secondAsset.assetId, quantity: 1 },
+      ],
     });
+    const kitRow = database
+      .prepare("SELECT id FROM kits WHERE workspace_id = ? AND code = ?")
+      .get("workspace-metadata", "PACKKIT") as { id: string } | undefined;
 
     expect(() =>
       packingMutations.createPackingSlip({
         commandId: "cmd-test-packing-kit-block",
         workspaceId: "workspace-metadata",
-        assetIds: [createdAsset.assetId],
-        assetSelections: [{ assetId: createdAsset.assetId, quantity: 1 }],
+        assetIds: [firstAsset.assetId],
+        assetSelections: [{ assetId: firstAsset.assetId, quantity: 1 }],
         projectId: "project-aurora",
         responsibleUserId: "user-paola",
         actorType: "user",
         sourceChannel: "desktop",
       }),
-    ).toThrow("Remove it from the kit");
+    ).toThrow("Select the full kit");
+
+    const issueResult = packingMutations.createPackingSlip({
+      commandId: "cmd-test-packing-kit-complete",
+      workspaceId: "workspace-metadata",
+      assetIds: [firstAsset.assetId, secondAsset.assetId],
+      assetSelections: [
+        { assetId: firstAsset.assetId, quantity: 1 },
+        { assetId: secondAsset.assetId, quantity: 1 },
+      ],
+      projectId: "project-aurora",
+      responsibleUserId: "user-paola",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(issueResult.processedAssetIds).toHaveLength(2);
+
+    const slipItems = database
+      .prepare("SELECT source_kit_id FROM packing_slip_items WHERE packing_slip_id = ? ORDER BY asset_id")
+      .all(issueResult.packingSlipId) as Array<{ source_kit_id: string | null }>;
+
+    expect(slipItems).toHaveLength(2);
+    expect(slipItems.every((item) => item.source_kit_id === kitRow?.id)).toBe(true);
+
+    cleanup();
+  });
+
+  it("replaces stale packing outbox rows when recreating a locally missing slip", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-packing-stale-outbox-test");
+    const packingMutations = createPackingMutationService(database);
+    const existingPackingIds = database.prepare("SELECT id FROM packing_slips").all() as Array<{ id: string }>;
+    const nextSequence =
+      existingPackingIds.reduce((highest, row) => {
+        const match = row.id.match(/(\d+)$/);
+        return Math.max(highest, match ? Number.parseInt(match[1], 10) : 0);
+      }, 0) + 1;
+    const nextPackingId = `packing-${String(nextSequence).padStart(4, "0")}`;
+    const now = new Date().toISOString();
+
+    database
+      .prepare(
+        `
+          INSERT INTO sync_outbox (
+            id,
+            workspace_id,
+            entity_type,
+            entity_id,
+            event_id,
+            operation_type,
+            payload_json,
+            status,
+            attempt_count,
+            last_error,
+            next_retry_at,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, 'packing_slip', ?, NULL, 'upsert', ?, 'failed', 1, 'stale local row', NULL, ?, ?)
+        `,
+      )
+      .run(`outbox-${nextPackingId}`, "workspace-metadata", nextPackingId, JSON.stringify({ stale: true }), now, now);
+
+    const issueResult = packingMutations.createPackingSlip({
+      commandId: "cmd-test-packing-stale-outbox",
+      workspaceId: "workspace-metadata",
+      assetIds: ["asset-legacy-rentman-1"],
+      assetSelections: [{ assetId: "asset-legacy-rentman-1", quantity: 1 }],
+      projectId: "project-archipielago",
+      responsibleUserId: "user-paola",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(issueResult.packingSlipId).toBe(nextPackingId);
+
+    const outboxRow = database
+      .prepare("SELECT status, attempt_count, last_error, payload_json FROM sync_outbox WHERE id = ?")
+      .get(`outbox-${nextPackingId}`) as
+      | { status: string; attempt_count: number; last_error: string | null; payload_json: string }
+      | undefined;
+
+    expect(outboxRow).toMatchObject({ status: "pending", attempt_count: 0, last_error: null });
+    expect(JSON.parse(outboxRow!.payload_json)).toMatchObject({ packingSlipId: nextPackingId });
 
     cleanup();
   });

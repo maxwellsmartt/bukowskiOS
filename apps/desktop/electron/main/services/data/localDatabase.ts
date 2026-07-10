@@ -785,14 +785,12 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   runStartupStep("apply asset quantity foundation migration", () =>
     applyTrackedStep(database, "runtime_asset_quantity_foundation_v1", () => applyAssetQuantityFoundationMigration(database)),
   );
-  runStartupStep("repair asset assignment current state", () =>
-    applyTrackedStep(database, "runtime_asset_assignment_state_repair_v1", () => {
-      const repairedCount = repairAssetCurrentStateFromActiveAssignments(database);
-      if (repairedCount > 0) {
-        logger.info("Repaired asset current state from active assignments.", { repairedCount });
-      }
-    }),
-  );
+  runStartupStep("repair asset assignment current state", () => {
+    const repairedCount = repairAssetCurrentStateFromActiveAssignments(database);
+    if (repairedCount > 0) {
+      logger.info("Repaired asset current state from active assignments.", { repairedCount });
+    }
+  });
   runStartupStep("apply asset valuation foundation migration", () =>
     applyTrackedStep(database, "runtime_asset_valuation_foundation_v1", () => applyAssetValuationFoundationMigration(database)),
   );

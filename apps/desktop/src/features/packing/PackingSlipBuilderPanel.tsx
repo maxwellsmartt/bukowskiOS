@@ -213,7 +213,7 @@ export const PackingSlipBuilderPanel = ({
   const availableSummaryLabel = unavailableAssets.length
     ? t("packing.builder.blocked", { count: unavailableAssets.length })
     : kitLockedAssets.length
-      ? t("packing.builder.kitLocked", { count: kitLockedAssets.length })
+      ? t("packing.builder.kitAware", { count: kitLockedAssets.length })
       : t("packing.builder.readyToIssue");
 
   return (
@@ -252,7 +252,7 @@ export const PackingSlipBuilderPanel = ({
 
       {kitLockedAssets.length ? (
         <div className="action-feedback action-feedback-warning">
-          {t("packing.builder.kitLockedWarning", { summary: kitLockSummary })}
+          {t("packing.builder.kitAwareWarning", { summary: kitLockSummary })}
         </div>
       ) : null}
 
@@ -350,7 +350,7 @@ export const PackingSlipBuilderPanel = ({
         </button>
         <button
           className="action-primary-button"
-          disabled={isSubmitting || kitLockedAssets.length > 0 || unavailableAssets.length > 0}
+          disabled={isSubmitting || unavailableAssets.length > 0}
           onClick={() =>
             void onSubmit({
               assetSelections: selectedAssetDetails.map((asset) => ({

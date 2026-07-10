@@ -6004,9 +6004,54 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   padding-bottom: 18px;
 }
 
+.asset-assign-move-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.92fr) minmax(360px, 1.08fr);
+  gap: 16px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.asset-assign-move-layout-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.asset-assign-move-form-pane,
+.asset-assign-move-selection-pane {
+  min-width: 0;
+}
+
+.asset-assign-move-form-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.asset-assign-move-selection-pane {
+  max-height: min(58vh, 560px);
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.032), rgba(255, 255, 255, 0.016)),
+    rgba(255, 255, 255, 0.02);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .asset-assign-move-panel .packing-builder-selection-list {
   gap: 7px;
   margin: 0 0 2px;
+}
+
+@media (max-width: 980px) {
+  .asset-assign-move-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .asset-assign-move-selection-pane {
+    max-height: 34vh;
+  }
 }
 
 .packing-builder-summary-grid,
@@ -9631,6 +9676,7 @@ body.is-resizing-side-rail {
 }
 
 .project-assets-command-card {
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: minmax(220px, 1.2fr) minmax(360px, 2fr) auto;
   gap: 12px;
@@ -9759,18 +9805,27 @@ body.is-resizing-side-rail {
 
 .project-assets-department-tabs {
   display: flex;
+  flex: 0 0 auto;
   gap: 8px;
   min-width: 0;
+  min-height: 48px;
   overflow-x: auto;
-  padding: 2px 2px 4px;
+  overflow-y: hidden;
+  padding: 2px 2px 8px;
+  margin-top: -4px;
+  margin-bottom: 2px;
   scrollbar-width: thin;
+  overscroll-behavior-x: contain;
 }
 
 .project-assets-department-tab {
   display: grid;
+  flex: 0 0 auto;
+  align-content: center;
   gap: 3px;
   min-width: 154px;
-  padding: 8px 10px;
+  min-height: 42px;
+  padding: 7px 10px;
   border: 1px solid rgba(126, 183, 178, 0.12);
   border-radius: 14px;
   background:
