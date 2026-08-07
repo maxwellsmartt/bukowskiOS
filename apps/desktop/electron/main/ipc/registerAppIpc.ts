@@ -558,6 +558,16 @@ const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) =
   };
 };
 
+const getSyncConflictWorkspaceId = (
+  database: RegisterAppIpcOptions["database"],
+  conflictId: string,
+): string | null => {
+  const row = database.prepare("SELECT workspace_id FROM sync_conflicts WHERE id = ? LIMIT 1").get(conflictId) as
+    | { workspace_id: string | null }
+    | undefined;
+  return row?.workspace_id?.trim() || null;
+};
+
 export const registerAppIpc = ({
   database,
   workspaceAccess,
@@ -1222,7 +1232,11 @@ export const registerAppIpc = ({
     ipcChannels.app.resolveSyncConflict,
     resolveSyncConflictSchema,
     async (_event, input) => {
-      await assertSensitiveAppAccess("resolve sync conflicts");
+      const workspaceId = getSyncConflictWorkspaceId(database, input.conflictId);
+      if (!workspaceId) {
+        throw new Error("That sync conflict no longer exists.");
+      }
+      await assertWorkspaceAdminAccess(workspaceId, "resolve sync conflicts");
       return resolveSyncConflict(input as import("@contracts").AppSyncConflictResolveCommand);
     },
     "The app could not resolve that sync conflict.",

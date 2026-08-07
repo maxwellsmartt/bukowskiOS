@@ -128,6 +128,19 @@ describe("security regression checks", () => {
     expect(source).toContain('requiredPermission: "users.invite"');
   });
 
+  it("re-checks the conflict workspace before resolving sync conflicts", () => {
+    const source = readText("apps/desktop/electron/main/ipc/registerAppIpc.ts");
+    const handlerIndex = source.indexOf("ipcChannels.app.resolveSyncConflict");
+    const handlerBlock = source.slice(handlerIndex, handlerIndex + 800);
+
+    expect(handlerIndex).toBeGreaterThan(-1);
+    expect(source).toContain("getSyncConflictWorkspaceId");
+    expect(handlerBlock).toContain("getSyncConflictWorkspaceId(database, input.conflictId)");
+    expect(handlerBlock).toContain('throw new Error("That sync conflict no longer exists.")');
+    expect(handlerBlock).toContain('assertWorkspaceAdminAccess(workspaceId, "resolve sync conflicts")');
+    expect(handlerBlock).not.toContain('assertSensitiveAppAccess("resolve sync conflicts")');
+  });
+
   it("re-verifies cached local workspace memberships in the main process", () => {
     const source = readText("apps/desktop/electron/main/ipc/registerAppIpc.ts");
     const handlerIndex = source.indexOf("ipcChannels.app.ensureLocalWorkspaces");
@@ -186,6 +199,31 @@ describe("security regression checks", () => {
     expect(hardeningMigration).toContain('DROP POLICY IF EXISTS "members can update ai provider configs" ON public.ai_provider_configs;');
     expect(hardeningMigration).toContain(
       'DROP POLICY IF EXISTS "members can delete agent connector configs" ON public.agent_connector_configs;',
+    );
+  });
+
+  it("does not let plain workspace membership mutate remote asset assignments", () => {
+    const hardeningMigration = readText(
+      "supabase/migrations/20260708103000_asset_assignments_write_hardening.sql",
+    );
+    const foundationIpcSource = readText("apps/desktop/electron/main/ipc/registerFoundationIpc.ts");
+
+    expect(foundationIpcSource).toContain('requiredPermission: "assets.manage"');
+    expect(hardeningMigration).toContain(
+      'DROP POLICY IF EXISTS "members can insert workspace asset assignments" ON public.asset_assignments;',
+    );
+    expect(hardeningMigration).toContain("public.has_permission(workspace_id, 'assets.read')");
+    expect(hardeningMigration).toContain(
+      'CREATE POLICY "admins can insert workspace asset assignments"',
+    );
+    expect(hardeningMigration).toContain(
+      "WITH CHECK (public.has_permission(workspace_id, 'assets.manage'));",
+    );
+    expect(hardeningMigration).toContain(
+      'CREATE POLICY "admins can update workspace asset assignments"',
+    );
+    expect(hardeningMigration).toContain(
+      'CREATE POLICY "admins can delete workspace asset assignments"',
     );
   });
 

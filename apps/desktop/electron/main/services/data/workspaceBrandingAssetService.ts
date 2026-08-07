@@ -86,9 +86,20 @@ const parseWorkspaceAssetsObjectKey = (url: string | null | undefined) => {
   return null;
 };
 
+const isAllowedBrandingSourceUrl = (url: string) => {
+  if (url.startsWith("data:")) {
+    return true;
+  }
+
+  return parseWorkspaceAssetsObjectKey(url) !== null;
+};
+
 const fetchPublicAsset = async (url: string) => {
   if (url.startsWith("data:")) {
     return dataUrlToBuffer(url);
+  }
+  if (!isAllowedBrandingSourceUrl(url)) {
+    return null;
   }
   try {
     const parsed = new URL(url);

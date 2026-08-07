@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createWorkspaceBrandingAssetService } from "../../electron/main/services/data/workspaceBrandingAssetService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
@@ -77,6 +77,28 @@ describe("workspace branding asset service", () => {
     expect(existsSync(privateFile)).toBe(true);
 
     cleanup();
+  });
+
+  it("does not fetch branding bytes from arbitrary remote urls", async () => {
+    const { cleanup, database } = createTestDatabase("workspace-branding-assets-remote-url");
+    const userDataPath = makeUserDataPath();
+    const fetchSpy = vi.fn();
+    const originalFetch = global.fetch;
+    global.fetch = fetchSpy as typeof fetch;
+
+    try {
+      const service = createWorkspaceBrandingAssetService(database, {
+        userDataPath,
+      });
+
+      const result = await service.resolveAssetBuffer("workspace-metadata", "logo", "https://example.com/logo.png");
+
+      expect(result).toBeNull();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+      cleanup();
+    }
   });
 
   it("does not read cached branding paths outside the configured storage root", async () => {
