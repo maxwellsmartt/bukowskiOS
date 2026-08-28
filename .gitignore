@@ -18,3 +18,8 @@ apps/desktop/.env.*.local
 supabase/.temp
 .claude/worktrees/
 .claude/settings.local.json
+
+# graphify knowledge graph — rebuilt locally in seconds, never committed (8MB, churns constantly)
+graphify-out/
+# impeccable per-developer hook consent
+.impeccable/config.local.json

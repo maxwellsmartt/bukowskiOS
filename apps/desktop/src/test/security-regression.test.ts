@@ -420,7 +420,6 @@ describe("security regression checks", () => {
       "ipcChannels.app.getSyncStatusSnapshot",
       "ipcChannels.app.retrySyncOutboxRow",
       "ipcChannels.app.retryAllFailedSyncOutboxRows",
-      "ipcChannels.app.resolveSyncConflict",
       "ipcChannels.app.exportWorkspaceData",
       "ipcChannels.app.exportRecentLogs",
       "ipcChannels.app.exportSupportBundle",
@@ -443,6 +442,9 @@ describe("security regression checks", () => {
     const workspaceScopedChannels = [
       "ipcChannels.app.getSyncConflicts",
       "ipcChannels.app.backfillOperationalSnapshots",
+      // Resolving a conflict requires admin of the workspace that owns it,
+      // which is narrower than the app-wide sensitive gate.
+      "ipcChannels.app.resolveSyncConflict",
     ];
     const missingWorkspaceGuard = workspaceScopedChannels.filter((channel) => {
       const channelIndex = appIpcSource.indexOf(channel);
