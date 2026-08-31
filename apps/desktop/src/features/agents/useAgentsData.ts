@@ -1,3 +1,4 @@
+import { isResolvedWorkspaceId } from "@contracts";
 import { useEffect, useState } from "react";
 
 import type {
@@ -178,6 +179,12 @@ export const useAgentModels = (query?: AgentWorkspaceQuery) => {
   return useAsyncValue(
     async () => {
       if (!window.bukowskiAgents) {
+        return emptyAgentModelsSnapshot;
+      }
+
+      // A caller that scopes the query to a workspace must wait for a real id;
+      // the provider's boot placeholder resolves to nothing on the other side.
+      if (query && !isResolvedWorkspaceId(workspaceId)) {
         return emptyAgentModelsSnapshot;
       }
 

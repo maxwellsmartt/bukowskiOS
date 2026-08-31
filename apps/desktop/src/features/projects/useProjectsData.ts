@@ -1,3 +1,4 @@
+import { isResolvedWorkspaceId } from "@contracts";
 import type {
   AddDepartmentToProjectUnitInput,
   ArchiveProjectInput,
@@ -135,6 +136,14 @@ export const useCatalogData = (query: CatalogListQuery = defaultCatalogListQuery
 
   return useAsyncValue(
     async () => {
+      // Between boot and the membership list landing, the provider reports a
+      // placeholder instead of the stored selection, which may name a workspace
+      // this machine never had. Querying it would only raise a misleading
+      // "workspace not available" error, so wait for the real id.
+      if (!isResolvedWorkspaceId(workspaceId)) {
+        return emptyCatalog;
+      }
+
       if (!window.bukowskiProjects) {
         if (window.bukowskiCatalog) {
           return window.bukowskiCatalog.getSnapshot(scopedQuery);

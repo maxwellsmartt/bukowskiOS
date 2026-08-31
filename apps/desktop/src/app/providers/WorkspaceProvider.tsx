@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID, PENDING_WORKSPACE_ID } from "@contracts";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
@@ -388,7 +388,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const value = useMemo<WorkspaceContextValue>(
     () => ({
-      activeWorkspaceId: activeMembership?.workspaceId ?? (isLocalFallback ? activeWorkspaceId : "__pending-workspace__"),
+      activeWorkspaceId: activeMembership?.workspaceId ?? (isLocalFallback ? activeWorkspaceId : PENDING_WORKSPACE_ID),
       activeWorkspaceName: activeMembership?.workspaceName ?? "Select workspace",
       memberships,
       activeMembership,

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { LOCAL_FALLBACK_WORKSPACE_ID } from "@contracts";
+import { LOCAL_FALLBACK_WORKSPACE_ID, PENDING_WORKSPACE_ID } from "@contracts";
 
 type WorkspaceAccessLevel = "read" | "write";
 
@@ -106,6 +106,14 @@ export const createWorkspaceAccessGuard = ({
   const membershipCache = new Map<string, number>();
 
   const assertLocalWorkspaceExists = (workspaceId: string) => {
+    // The renderer reports this placeholder until the membership list confirms
+    // which workspace the user is in. Reaching here means a caller queried
+    // before that resolved; say so plainly instead of blaming the workspace,
+    // which is what made this hard to diagnose the first time.
+    if (workspaceId === PENDING_WORKSPACE_ID) {
+      throw new Error("The workspace is still loading. Try again once it finishes.");
+    }
+
     const workspace = database.prepare("SELECT id, is_active FROM workspaces WHERE id = ? LIMIT 1").get(workspaceId) as
       | WorkspaceRow
       | undefined;

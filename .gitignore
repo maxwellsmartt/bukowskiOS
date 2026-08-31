@@ -23,3 +23,6 @@ supabase/.temp
 graphify-out/
 # impeccable per-developer hook consent
 .impeccable/config.local.json
+
+# Documentos fuente de intake (inventarios de los técnicos) — no versionar
+.intake/
