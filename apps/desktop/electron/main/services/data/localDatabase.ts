@@ -740,9 +740,14 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   runStartupStep("clean up seed-workspace kit outbox", () =>
     applyTrackedStep(database, "runtime_kit_seed_outbox_cleanup_v1", () => cleanupSeedKitOutbox(database)),
   );
-  runStartupStep("deduplicate crew catalog", () =>
-    applyTrackedStep(database, "runtime_crew_catalog_deduplication_v1", () => deduplicateCrewCatalog(database)),
-  );
+  // Runs every boot, not once: duplicates do not only come from the historical
+  // import this backfill was written for — they also arrive later through sync,
+  // when a crew catalogue that was seeded locally meets the copy the cloud
+  // pulls down. Behind applyTrackedStep the pass was marked done on first run
+  // and never fired again, so those later pairs stayed on screen. The function
+  // is idempotent (a name with a single row is skipped) and costs ~0ms on a
+  // clean catalogue, so there is nothing to gain from running it once.
+  runStartupStep("deduplicate crew catalog", () => deduplicateCrewCatalog(database));
   runStartupStep("apply AI gateway foundation migration", () =>
     applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database)),
   );
